@@ -326,9 +326,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       durableLogger.warn('security', 'AUTH_LOGIN_FAILED_INVALID_PASSWORD', { username }, 'AuthContext');
       return { ok: false, message: 'Invalid username or password' };
     } catch (error) {
-      logger.error('Login error: ' + String(error));
-      durableLogger.error('security', 'AUTH_LOGIN_ERROR', { username, error: String(error) }, 'AuthContext');
-      return { ok: false, message: 'An error occurred during login' };
+      const hint = error instanceof Error ? error.message : String(error);
+      logger.error('Login error: ' + hint);
+      durableLogger.error('security', 'AUTH_LOGIN_ERROR', { username, error: hint }, 'AuthContext');
+      return {
+        ok: false,
+        message: `Sign-in error: ${hint}. If this mentions fetch or network, check browser extensions, VPN, and that your Supabase project is up.`,
+      };
     } finally {
       setLoading(false);
     }

@@ -10,6 +10,8 @@ import { Loader2, LogIn, Key } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { UserWithPassword, LoginResult } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { logger } from '@/utils/logger';
 
 function normalizeLoginResult(raw: LoginResult | boolean): LoginResult {
   if (typeof raw === 'boolean') {
@@ -23,8 +25,6 @@ function normalizeLoginResult(raw: LoginResult | boolean): LoginResult {
   }
   return raw;
 }
-import { toast } from 'sonner';
-import { logger } from '@/utils/logger';
 
 // Initialize logger with login context
 logger.setContext('login');
