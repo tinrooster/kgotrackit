@@ -17,6 +17,10 @@ out
 *.tsbuildinfo
 *.local
 
+# Local tooling / generated caches (keep graph reports if committed intentionally)
+.specstory/
+graphify-out/cache/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

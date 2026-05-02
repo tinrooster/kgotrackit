@@ -9,7 +9,20 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, LogIn, Key } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { UserWithPassword } from '@/contexts/AuthContext';
+import type { UserWithPassword, LoginResult } from '@/contexts/AuthContext';
+
+function normalizeLoginResult(raw: LoginResult | boolean): LoginResult {
+  if (typeof raw === 'boolean') {
+    return raw
+      ? { ok: true }
+      : {
+          ok: false,
+          message:
+            'Sign-in failed. This build may be outdated, or cloud auth is misconfigured. Redeploy with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        };
+  }
+  return raw;
+}
 import { toast } from 'sonner';
 import { logger } from '@/utils/logger';
 
@@ -139,14 +152,17 @@ export function LoginForm() {
       }
 
       console.log('Attempting login...');
-      const success = await login(data.username, data.password, data.remember);
-      console.log('Login result:', success);
-      logger.log(`Login ${success ? 'successful' : 'failed'} for user: ${data.username}`);
+      const result = normalizeLoginResult(await login(data.username, data.password, data.remember));
+      console.log('Login result:', result);
+      logger.log(`Login ${result.ok ? 'successful' : 'failed'} for user: ${data.username}`);
 
-      if (!success) {
+      if (!result.ok) {
         console.log('Login failed, setting error state');
-        setLoginError('Invalid username or password. Please try again.');
-        toast.error('Invalid username or password');
+        const detail =
+          result.message ||
+          'Invalid username or password. Please try again.';
+        setLoginError(detail);
+        toast.error(detail);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -287,6 +303,12 @@ export function LoginForm() {
           )}
         </Button>
       </form>
+
+      <p className="mt-3 text-center text-xs text-muted-foreground leading-snug">
+        {authBackend === 'supabase'
+          ? 'Cloud sign-in (Supabase). Use the email and password from Authentication → Users for this project.'
+          : 'Local sign-in only: this bundle was built without Supabase env vars. Cloud accounts will not work until you redeploy with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'}
+      </p>
 
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <DialogContent>

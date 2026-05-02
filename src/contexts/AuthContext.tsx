@@ -20,11 +20,13 @@ export interface User {
 
 export type UserWithPassword = User;
 
+export type LoginResult = { ok: true } | { ok: false; message?: string };
+
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
   authBackend: AuthBackend;
-  login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
+  login: (username: string, password: string, rememberMe: boolean) => Promise<LoginResult>;
   logout: () => void;
   resetPassword: (username: string, securityAnswer: string, newPassword: string) => Promise<boolean>;
   requestPasswordResetEmail: (email: string) => Promise<boolean>;
@@ -187,15 +189,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = async (username: string, password: string, rememberMe: boolean): Promise<boolean> => {
+  const login = async (username: string, password: string, rememberMe: boolean): Promise<LoginResult> => {
     logger.info(`Login attempt for user: ${username}`);
     setLoading(true);
     try {
       if (isSupabaseConfigured()) {
         const client = getSupabase();
         if (!client) {
-          toast.error('Auth is not configured');
-          return false;
+          return { ok: false, message: 'Auth is not configured' };
         }
         const email = username.trim();
         const { data, error } = await client.auth.signInWithPassword({
@@ -203,10 +204,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password: password.trim(),
         });
         if (error) {
-          logger.warn('Supabase login failed: ' + error.message);
-          durableLogger.warn('security', 'AUTH_LOGIN_FAILED', { username: email, error: error.message }, 'AuthContext');
-          toast.error(error.message || 'Invalid email or password');
-          return false;
+          const detail =
+            error.message ||
+            ('msg' in error && typeof (error as { msg?: string }).msg === 'string'
+              ? (error as { msg: string }).msg
+              : '') ||
+            'Invalid login credentials';
+          logger.warn('Supabase login failed: ' + detail);
+          durableLogger.warn('security', 'AUTH_LOGIN_FAILED', { username: email, error: detail }, 'AuthContext');
+          return { ok: false, message: detail };
         }
         if (data.user) {
           const mapped = mapSupabaseUserToAppUser(data.user) as User;
@@ -220,9 +226,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: email, rememberMe }, 'AuthContext');
           toast.success('Login successful');
-          return true;
+          return { ok: true };
         }
-        return false;
+        return { ok: false, message: 'Sign-in failed with no user returned.' };
       }
 
       const store = getStore();
@@ -251,7 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logger.info('Admin dev login override applied');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
         toast.success('Login successful');
-        return true;
+        return { ok: true };
       }
 
       const users = ((await store.get('users')) as User[] | undefined) ?? [];
@@ -276,12 +282,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           logger.info('Recovered missing admin account during login');
           durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
           toast.success('Login successful');
-          return true;
+          return { ok: true };
         }
         logger.warn('Login failed: User not found');
         durableLogger.warn('security', 'AUTH_LOGIN_FAILED_USER_NOT_FOUND', { username }, 'AuthContext');
-        toast.error('Invalid username or password');
-        return false;
+        return { ok: false, message: 'Invalid username or password' };
       }
 
       if (normalizedUsername === 'admin' && normalizedPassword === 'admin') {
@@ -303,7 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logger.info('Recovered admin login with deterministic dev credentials');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
         toast.success('Login successful');
-        return true;
+        return { ok: true };
       }
 
       const passwordMatch = await comparePasswords(password, userRecord.password);
@@ -315,17 +320,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logger.info('Login successful');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: userRecord.username, rememberMe }, 'AuthContext');
         toast.success('Login successful');
-        return true;
+        return { ok: true };
       }
       logger.warn('Login failed: Invalid password');
       durableLogger.warn('security', 'AUTH_LOGIN_FAILED_INVALID_PASSWORD', { username }, 'AuthContext');
-      toast.error('Invalid username or password');
-      return false;
+      return { ok: false, message: 'Invalid username or password' };
     } catch (error) {
       logger.error('Login error: ' + String(error));
       durableLogger.error('security', 'AUTH_LOGIN_ERROR', { username, error: String(error) }, 'AuthContext');
-      toast.error('An error occurred during login');
-      return false;
+      return { ok: false, message: 'An error occurred during login' };
     } finally {
       setLoading(false);
     }
