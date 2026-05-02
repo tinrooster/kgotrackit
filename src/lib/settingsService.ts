@@ -1,13 +1,14 @@
 import { z } from "zod";
 import { Cabinet, CabinetWithItems } from "@/types/cabinets";
 import { SETTINGS_UPDATED_EVENT } from "@/lib/storageService";
+import { requestCloudSync } from "@/lib/cloudSyncEvents";
 
 /** Dispatched on window after default UI settings are persisted (theme, density, mobile layout). */
 export const DEFAULT_SETTINGS_CHANGED_EVENT = "trackit:default-settings-changed";
 
 declare global {
   interface Window {
-    electronStore: {
+    electronStore?: {
       getData: (key: string) => any;
       setData: (key: string, value: any) => void;
       deleteData: (key: string) => void;
@@ -78,7 +79,7 @@ export class SettingsService {
     try {
       const validated = defaultSettingsSchema.parse(settings);
       try {
-        window.electronStore.setData(this.SETTINGS_KEY, validated);
+        window.electronStore?.setData?.(this.SETTINGS_KEY, validated);
       } catch {
         // Fall back to localStorage when Electron bridge is unavailable.
       }
@@ -86,6 +87,7 @@ export class SettingsService {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(DEFAULT_SETTINGS_CHANGED_EVENT));
       }
+      requestCloudSync();
     } catch (error) {
       console.error('Error saving settings:', error);
       throw error;
@@ -129,6 +131,7 @@ export class SettingsService {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
     }
+    requestCloudSync();
   }
 
   // Cabinet Management
@@ -165,6 +168,7 @@ export class SettingsService {
       }
       localStorage.setItem(this.CABINETS_KEY, JSON.stringify(cabinets));
       window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
+      requestCloudSync();
     } catch (error) {
       console.error('Error saving cabinet:', error);
       throw error;
@@ -182,6 +186,7 @@ export class SettingsService {
       }
       localStorage.setItem(this.CABINETS_KEY, JSON.stringify(filtered));
       window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
+      requestCloudSync();
     } catch (error) {
       console.error('Error deleting cabinet:', error);
       throw error;

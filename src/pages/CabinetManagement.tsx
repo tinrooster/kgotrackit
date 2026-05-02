@@ -14,6 +14,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import { SettingsService } from "@/lib/settingsService";
 import { SETTINGS_UPDATED_EVENT } from "@/lib/storageService";
+import { requestCloudSync } from "@/lib/cloudSyncEvents";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -186,6 +187,7 @@ export default function CabinetManagement({ locations = [] }: CabinetManagementP
       }
       localStorage.setItem('cabinets', JSON.stringify(newCabinets));
       window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
+      requestCloudSync();
       setCabinets(newCabinets);
       console.log('Cabinets saved successfully');
     } catch (error) {

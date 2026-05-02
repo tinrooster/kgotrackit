@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,22 +22,36 @@ const loginSchema = z.object({
   remember: z.boolean().default(false),
 });
 
-const resetPasswordSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
-  securityAnswer: z.string().min(1, 'Security answer is required'),
-  newPassword: z.string().min(4, 'Password must be at least 4 characters'),
-});
+function buildResetPasswordSchema(isSupabase: boolean) {
+  if (isSupabase) {
+    return z.object({
+      username: z.string().min(1, 'Email is required').email('Enter a valid email'),
+      securityAnswer: z.string().optional(),
+      newPassword: z.string().optional(),
+    });
+  }
+  return z.object({
+    username: z.string().min(1, 'Username is required'),
+    securityAnswer: z.string().min(1, 'Security answer is required'),
+    newPassword: z.string().min(4, 'Password must be at least 4 characters'),
+  });
+}
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+type ResetPasswordValues = z.infer<ReturnType<typeof buildResetPasswordSchema>>;
 
 export function LoginForm() {
-  const { login, resetPassword } = useAuth();
+  const { login, resetPassword, authBackend, requestPasswordResetEmail } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
+
+  const resetSchema = useMemo(
+    () => buildResetPasswordSchema(authBackend === 'supabase'),
+    [authBackend]
+  );
 
   const { register, handleSubmit, formState: { errors }, getValues } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -49,7 +63,7 @@ export function LoginForm() {
   });
 
   const { register: registerReset, handleSubmit: handleResetSubmit, formState: { errors: resetErrors }, watch } = useForm<ResetPasswordValues>({
-    resolver: zodResolver(resetPasswordSchema),
+    resolver: zodResolver(resetSchema),
     defaultValues: {
       username: '',
       securityAnswer: '',
@@ -63,6 +77,10 @@ export function LoginForm() {
   // Fetch security question when username changes
   useEffect(() => {
     const fetchSecurityQuestion = async () => {
+      if (authBackend === 'supabase') {
+        setSecurityQuestion('');
+        return;
+      }
       if (!username) {
         setSecurityQuestion('');
         return;
@@ -80,7 +98,7 @@ export function LoginForm() {
     };
 
     fetchSecurityQuestion();
-  }, [username]);
+  }, [username, authBackend]);
 
   const onSubmit = async (data: LoginFormValues) => {
     console.log('Form submitted with:', { username: data.username, remember: data.remember });
@@ -92,7 +110,12 @@ export function LoginForm() {
       const normalizedUsername = data.username.trim().toLowerCase();
       const normalizedPassword = data.password.trim();
 
-      if (normalizedUsername === 'admin' && normalizedPassword === 'admin' && window.electronStore) {
+      if (
+        authBackend === 'local' &&
+        normalizedUsername === 'admin' &&
+        normalizedPassword === 'admin' &&
+        window.electronStore
+      ) {
         const existingUsers = (window.electronStore.getData('users') as UserWithPassword[] | undefined) ?? [];
         const adminUser = {
           id: existingUsers.find((user) => user.username.toLowerCase() === 'admin')?.id ?? crypto.randomUUID(),
@@ -141,6 +164,15 @@ export function LoginForm() {
     setIsResetting(true);
     setResetError(null);
     try {
+      if (authBackend === 'supabase') {
+        const success = await requestPasswordResetEmail(data.username);
+        if (success) {
+          setShowResetDialog(false);
+        } else {
+          setResetError('Could not send reset email. Check the address and try again.');
+        }
+        return;
+      }
       const success = await resetPassword(data.username, data.securityAnswer, data.newPassword);
       if (success) {
         logger.log(`Password reset successful for user: ${data.username}`);
@@ -181,11 +213,13 @@ export function LoginForm() {
         )}
         
         <div className="space-y-2">
-          <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+          <Label htmlFor="username" className="text-sm font-medium">
+            {authBackend === 'supabase' ? 'Email' : 'Username'}
+          </Label>
           <Input
             id="username"
-            type="text"
-            placeholder="Enter your username"
+            type={authBackend === 'supabase' ? 'email' : 'text'}
+            placeholder={authBackend === 'supabase' ? 'you@company.com' : 'Enter your username'}
             {...register('username')}
             disabled={isLoading}
             className={`h-10 ${loginError ? 'border-destructive' : ''}`}
@@ -259,7 +293,9 @@ export function LoginForm() {
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
-              Enter your username and security answer to reset your password.
+              {authBackend === 'supabase'
+                ? 'Enter your account email. We will send a link to set a new password.'
+                : 'Enter your username and security answer to reset your password.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleResetSubmit(onResetSubmit)} className="space-y-4">
@@ -274,11 +310,11 @@ export function LoginForm() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="reset-username">Username</Label>
+              <Label htmlFor="reset-username">{authBackend === 'supabase' ? 'Email' : 'Username'}</Label>
               <Input
                 id="reset-username"
-                type="text"
-                placeholder="Enter your username"
+                type={authBackend === 'supabase' ? 'email' : 'text'}
+                placeholder={authBackend === 'supabase' ? 'you@company.com' : 'Enter your username'}
                 {...registerReset('username')}
                 disabled={isResetting}
               />
@@ -287,41 +323,45 @@ export function LoginForm() {
               )}
             </div>
 
-            {securityQuestion && (
+            {authBackend === 'local' && securityQuestion && (
               <div className="space-y-2">
                 <Label>Security Question</Label>
                 <p className="text-sm text-muted-foreground">{securityQuestion}</p>
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="security-answer">Security Answer</Label>
-              <Input
-                id="security-answer"
-                type="text"
-                placeholder="Enter your security answer"
-                {...registerReset('securityAnswer')}
-                disabled={isResetting}
-                className={resetError ? 'border-destructive' : ''}
-              />
-              {resetErrors.securityAnswer && (
-                <p className="text-sm font-medium text-destructive">{resetErrors.securityAnswer.message}</p>
-              )}
-            </div>
+            {authBackend === 'local' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="security-answer">Security Answer</Label>
+                  <Input
+                    id="security-answer"
+                    type="text"
+                    placeholder="Enter your security answer"
+                    {...registerReset('securityAnswer')}
+                    disabled={isResetting}
+                    className={resetError ? 'border-destructive' : ''}
+                  />
+                  {resetErrors.securityAnswer && (
+                    <p className="text-sm font-medium text-destructive">{resetErrors.securityAnswer.message}</p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                placeholder="Enter new password (minimum 4 characters)"
-                {...registerReset('newPassword')}
-                disabled={isResetting}
-              />
-              {resetErrors.newPassword && (
-                <p className="text-sm font-medium text-destructive">{resetErrors.newPassword.message}</p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="Enter new password (minimum 4 characters)"
+                    {...registerReset('newPassword')}
+                    disabled={isResetting}
+                  />
+                  {resetErrors.newPassword && (
+                    <p className="text-sm font-medium text-destructive">{resetErrors.newPassword.message}</p>
+                  )}
+                </div>
+              </>
+            )}
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowResetDialog(false)} type="button">
@@ -331,12 +371,12 @@ export function LoginForm() {
                 {isResetting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Resetting...
+                    {authBackend === 'supabase' ? 'Sending…' : 'Resetting...'}
                   </>
                 ) : (
                   <>
                     <Key className="mr-2 h-4 w-4" />
-                    Reset Password
+                    {authBackend === 'supabase' ? 'Send reset link' : 'Reset Password'}
                   </>
                 )}
               </Button>

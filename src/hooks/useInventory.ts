@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { InventoryItem, CategoryNode, ItemWithSubcategories, OrderStatus } from '@/types/inventory'
-import { getItems, saveItems, getSettings, saveSettings } from '@/lib/storageService' 
+import { getItems, saveItems, getSettings, saveSettings } from '@/lib/storageService'
+import { requestCloudSync } from '@/lib/cloudSyncEvents'
 import { DUMMY_INVENTORY_DATA } from '@/lib/dummyData'; 
 import { toast } from 'sonner'; 
 import { Settings } from '@/lib/storageService'
@@ -103,6 +104,7 @@ export function useInventory() {
            timestamp: entry.timestamp instanceof Date ? entry.timestamp.toISOString() : new Date().toISOString()
          }));
          localStorage.setItem('inventoryHistory', JSON.stringify(historyToSave));
+         requestCloudSync();
        } catch (error) { console.error("Error saving history:", error); }
      } 
   }, [history, loading]);
