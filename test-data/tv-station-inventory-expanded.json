@@ -1,0 +1,79 @@
+{
+  "categories": [
+    { "id": "cat-cam", "name": "Cameras" },
+    { "id": "cat-audio", "name": "Audio" },
+    { "id": "cat-light", "name": "Lighting" },
+    { "id": "cat-rf", "name": "RF & Comms" },
+    { "id": "cat-network", "name": "Network & Control" },
+    { "id": "cat-power", "name": "Power" },
+    { "id": "cat-grip", "name": "Grip & Rigging" },
+    { "id": "cat-lens", "name": "Lenses" },
+    { "id": "cat-monitor", "name": "Monitoring" }
+  ],
+  "units": [
+    { "id": "unit-each", "name": "each" },
+    { "id": "unit-kit", "name": "kit" },
+    { "id": "unit-roll", "name": "roll" },
+    { "id": "unit-pair", "name": "pair" },
+    { "id": "unit-case", "name": "case" }
+  ],
+  "locations": [
+    { "id": "loc-main-wh", "name": "Main Warehouse" },
+    { "id": "loc-engarage", "name": "ENG Van Bay" },
+    { "id": "loc-studio-a", "name": "Studio A" },
+    { "id": "loc-studio-b", "name": "Studio B" },
+    { "id": "loc-truck-1", "name": "Remote Truck 1" },
+    { "id": "loc-truck-2", "name": "Remote Truck 2" },
+    { "id": "loc-truck-3", "name": "Remote Truck 3" },
+    { "id": "loc-flypack", "name": "Flypack Lockup" },
+    { "id": "loc-edit", "name": "Field Edit Kit" }
+  ],
+  "suppliers": [
+    { "id": "sup-bh", "name": "B&H" },
+    { "id": "sup-markertek", "name": "Markertek" },
+    { "id": "sup-audio", "name": "Trew Audio" },
+    { "id": "sup-broadcast", "name": "Broadcast Depot" },
+    { "id": "sup-local", "name": "Local Rental Partner" }
+  ],
+  "projects": [
+    { "id": "proj-election", "name": "Election Night 2026" },
+    { "id": "proj-nfl", "name": "Friday Night Football" },
+    { "id": "proj-wildfire", "name": "Wildfire Field Coverage" },
+    { "id": "proj-parade", "name": "City Parade Live" },
+    { "id": "proj-remote-studio", "name": "Remote Studio Buildout" },
+    { "id": "proj-awards", "name": "Awards Show Live" },
+    { "id": "proj-storm", "name": "Storm Chaser Unit" }
+  ],
+  "inventory": [
+    { "id": "inv-001", "name": "Sony FX6 Body A", "category": "Cameras", "unit": "each", "location": "Remote Truck 1", "project": "Wildfire Field Coverage", "quantity": 1, "costPerUnit": 5998, "lastUpdated": "2026-04-30T10:00:00.000Z" },
+    { "id": "inv-002", "name": "Sony FX6 Body B", "category": "Cameras", "unit": "each", "location": "Remote Truck 2", "project": "City Parade Live", "quantity": 1, "costPerUnit": 5998, "lastUpdated": "2026-04-30T10:01:00.000Z" },
+    { "id": "inv-003", "name": "Sony A7S III", "category": "Cameras", "unit": "each", "location": "Field Edit Kit", "project": "Storm Chaser Unit", "quantity": 2, "costPerUnit": 3499, "lastUpdated": "2026-04-30T10:02:00.000Z" },
+    { "id": "inv-004", "name": "PTZ Camera - Studio A", "category": "Cameras", "unit": "each", "location": "Studio A", "project": "Remote Studio Buildout", "quantity": 1, "costPerUnit": 9700, "lastUpdated": "2026-04-30T10:03:00.000Z" },
+    { "id": "inv-005", "name": "PTZ Camera - Studio B", "category": "Cameras", "unit": "each", "location": "Studio B", "project": "Remote Studio Buildout", "quantity": 1, "costPerUnit": 9700, "lastUpdated": "2026-04-30T10:04:00.000Z" },
+    { "id": "inv-006", "name": "70-200mm Lens", "category": "Lenses", "unit": "each", "location": "Main Warehouse", "project": "Friday Night Football", "quantity": 4, "costPerUnit": 2599, "lastUpdated": "2026-04-30T10:05:00.000Z" },
+    { "id": "inv-007", "name": "24-70mm Lens", "category": "Lenses", "unit": "each", "location": "Main Warehouse", "project": "Election Night 2026", "quantity": 6, "costPerUnit": 2199, "lastUpdated": "2026-04-30T10:06:00.000Z" },
+    { "id": "inv-008", "name": "Wireless Lav Kit", "category": "Audio", "unit": "kit", "location": "ENG Van Bay", "project": "Friday Night Football", "quantity": 8, "costPerUnit": 1199, "lastUpdated": "2026-04-30T10:07:00.000Z" },
+    { "id": "inv-009", "name": "Shotgun Mic", "category": "Audio", "unit": "each", "location": "Remote Truck 1", "project": "Wildfire Field Coverage", "quantity": 6, "costPerUnit": 999, "lastUpdated": "2026-04-30T10:08:00.000Z" },
+    { "id": "inv-010", "name": "IFB Earpiece Set", "category": "Audio", "unit": "pair", "location": "Main Warehouse", "project": "Election Night 2026", "quantity": 24, "costPerUnit": 85, "lastUpdated": "2026-04-30T10:09:00.000Z" },
+    { "id": "inv-011", "name": "Field Audio Mixer", "category": "Audio", "unit": "each", "location": "Remote Truck 2", "project": "City Parade Live", "quantity": 3, "costPerUnit": 6195, "lastUpdated": "2026-04-30T10:10:00.000Z" },
+    { "id": "inv-012", "name": "Bi-Color LED Panel", "category": "Lighting", "unit": "each", "location": "Flypack Lockup", "project": "City Parade Live", "quantity": 14, "costPerUnit": 1090, "lastUpdated": "2026-04-30T10:11:00.000Z" },
+    { "id": "inv-013", "name": "Battery Light Stand Kit", "category": "Lighting", "unit": "kit", "location": "Remote Truck 2", "project": "Wildfire Field Coverage", "quantity": 6, "costPerUnit": 450, "lastUpdated": "2026-04-30T10:12:00.000Z" },
+    { "id": "inv-014", "name": "Fresnel Fixture", "category": "Lighting", "unit": "each", "location": "Studio B", "project": "Awards Show Live", "quantity": 8, "costPerUnit": 780, "lastUpdated": "2026-04-30T10:13:00.000Z" },
+    { "id": "inv-015", "name": "Intercom Beltpack", "category": "RF & Comms", "unit": "each", "location": "Remote Truck 1", "project": "Friday Night Football", "quantity": 16, "costPerUnit": 620, "lastUpdated": "2026-04-30T10:14:00.000Z" },
+    { "id": "inv-016", "name": "2-Wire Headset", "category": "RF & Comms", "unit": "each", "location": "Remote Truck 1", "project": "Friday Night Football", "quantity": 20, "costPerUnit": 210, "lastUpdated": "2026-04-30T10:15:00.000Z" },
+    { "id": "inv-017", "name": "Walkie 2-Wire Adapter", "category": "RF & Comms", "unit": "each", "location": "ENG Van Bay", "project": "City Parade Live", "quantity": 18, "costPerUnit": 48, "lastUpdated": "2026-04-30T10:16:00.000Z" },
+    { "id": "inv-018", "name": "Bonded Cellular Encoder", "category": "Network & Control", "unit": "each", "location": "Remote Truck 2", "project": "Wildfire Field Coverage", "quantity": 4, "costPerUnit": 14500, "lastUpdated": "2026-04-30T10:17:00.000Z" },
+    { "id": "inv-019", "name": "10Gb Managed Switch", "category": "Network & Control", "unit": "each", "location": "Main Warehouse", "project": "Remote Studio Buildout", "quantity": 7, "costPerUnit": 2600, "lastUpdated": "2026-04-30T10:18:00.000Z" },
+    { "id": "inv-020", "name": "NDI Decoder", "category": "Network & Control", "unit": "each", "location": "Studio A", "project": "Remote Studio Buildout", "quantity": 5, "costPerUnit": 490, "lastUpdated": "2026-04-30T10:19:00.000Z" },
+    { "id": "inv-021", "name": "V-Mount Battery 150Wh", "category": "Power", "unit": "each", "location": "Flypack Lockup", "project": "Wildfire Field Coverage", "quantity": 36, "costPerUnit": 470, "lastUpdated": "2026-04-30T10:20:00.000Z" },
+    { "id": "inv-022", "name": "Portable Inverter Generator", "category": "Power", "unit": "each", "location": "ENG Van Bay", "project": "City Parade Live", "quantity": 3, "costPerUnit": 4999, "lastUpdated": "2026-04-30T10:21:00.000Z" },
+    { "id": "inv-023", "name": "UPS Rack Unit", "category": "Power", "unit": "each", "location": "Studio A", "project": "Remote Studio Buildout", "quantity": 4, "costPerUnit": 899, "lastUpdated": "2026-04-30T10:22:00.000Z" },
+    { "id": "inv-024", "name": "Heavy Duty Tripod", "category": "Grip & Rigging", "unit": "each", "location": "Main Warehouse", "project": "Friday Night Football", "quantity": 16, "costPerUnit": 1650, "lastUpdated": "2026-04-30T10:23:00.000Z" },
+    { "id": "inv-025", "name": "Sandbag 25lb", "category": "Grip & Rigging", "unit": "each", "location": "Studio B", "project": "Election Night 2026", "quantity": 60, "costPerUnit": 22, "lastUpdated": "2026-04-30T10:24:00.000Z" },
+    { "id": "inv-026", "name": "Ball Head Mount", "category": "Grip & Rigging", "unit": "each", "location": "Field Edit Kit", "project": "Storm Chaser Unit", "quantity": 10, "costPerUnit": 75, "lastUpdated": "2026-04-30T10:25:00.000Z" },
+    { "id": "inv-027", "name": "7in Camera Monitor", "category": "Monitoring", "unit": "each", "location": "Remote Truck 3", "project": "Awards Show Live", "quantity": 5, "costPerUnit": 699, "lastUpdated": "2026-04-30T10:26:00.000Z" },
+    { "id": "inv-028", "name": "17in Director Monitor", "category": "Monitoring", "unit": "each", "location": "Studio A", "project": "Election Night 2026", "quantity": 3, "costPerUnit": 1900, "lastUpdated": "2026-04-30T10:27:00.000Z" },
+    { "id": "inv-029", "name": "Waveform Monitor", "category": "Monitoring", "unit": "each", "location": "Remote Truck 1", "project": "Friday Night Football", "quantity": 2, "costPerUnit": 4200, "lastUpdated": "2026-04-30T10:28:00.000Z" },
+    { "id": "inv-030", "name": "Fiber Converter Pair", "category": "Network & Control", "unit": "pair", "location": "Remote Truck 3", "project": "Awards Show Live", "quantity": 6, "costPerUnit": 680, "lastUpdated": "2026-04-30T10:29:00.000Z" }
+  ]
+}

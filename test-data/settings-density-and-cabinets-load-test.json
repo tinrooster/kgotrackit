@@ -1,0 +1,84 @@
+{
+  "categories": [
+    { "id": "cat-001", "name": "Cameras" },
+    { "id": "cat-002", "name": "Audio" },
+    { "id": "cat-003", "name": "Lighting" },
+    { "id": "cat-004", "name": "RF & Comms" },
+    { "id": "cat-005", "name": "Network & Control" },
+    { "id": "cat-006", "name": "Power" },
+    { "id": "cat-007", "name": "Grip & Rigging" },
+    { "id": "cat-008", "name": "Lenses" },
+    { "id": "cat-009", "name": "Monitoring" },
+    { "id": "cat-010", "name": "Accessories" },
+    { "id": "cat-011", "name": "Streaming" },
+    { "id": "cat-012", "name": "Studio Furniture" }
+  ],
+  "units": [
+    { "id": "unit-001", "name": "each" },
+    { "id": "unit-002", "name": "kit" },
+    { "id": "unit-003", "name": "roll" },
+    { "id": "unit-004", "name": "pair" },
+    { "id": "unit-005", "name": "case" },
+    { "id": "unit-006", "name": "box" },
+    { "id": "unit-007", "name": "set" }
+  ],
+  "locations": [
+    { "id": "loc-001", "name": "Main Warehouse" },
+    { "id": "loc-002", "name": "ENG Van Bay" },
+    { "id": "loc-003", "name": "Studio A" },
+    { "id": "loc-004", "name": "Studio B" },
+    { "id": "loc-005", "name": "Remote Truck 1" },
+    { "id": "loc-006", "name": "Remote Truck 2" },
+    { "id": "loc-007", "name": "Remote Truck 3" },
+    { "id": "loc-008", "name": "Flypack Lockup" },
+    { "id": "loc-009", "name": "Field Edit Kit" },
+    { "id": "loc-010", "name": "Satellite Van" },
+    { "id": "loc-011", "name": "Master Control" },
+    { "id": "loc-012", "name": "Newsroom Cage" }
+  ],
+  "suppliers": [
+    { "id": "sup-001", "name": "B&H" },
+    { "id": "sup-002", "name": "Markertek" },
+    { "id": "sup-003", "name": "Trew Audio" },
+    { "id": "sup-004", "name": "Broadcast Depot" },
+    { "id": "sup-005", "name": "Local Rental Partner" },
+    { "id": "sup-006", "name": "VideoLink" },
+    { "id": "sup-007", "name": "SignalWorks" },
+    { "id": "sup-008", "name": "StudioSource" }
+  ],
+  "projects": [
+    { "id": "proj-001", "name": "Election Night 2026" },
+    { "id": "proj-002", "name": "Friday Night Football" },
+    { "id": "proj-003", "name": "Wildfire Field Coverage" },
+    { "id": "proj-004", "name": "City Parade Live" },
+    { "id": "proj-005", "name": "Remote Studio Buildout" },
+    { "id": "proj-006", "name": "Awards Show Live" }
+  ],
+  "defaultSettings": {
+    "defaultLocation": "Main Warehouse",
+    "defaultUnit": "each",
+    "defaultCategory": "Cameras",
+    "defaultSupplier": "B&H",
+    "defaultProject": "Remote Studio Buildout",
+    "defaultOrderStatus": "delivered",
+    "enableQRTracking": true,
+    "requireCheckoutForSecureCabinets": true,
+    "autoGenerateQRCodes": true,
+    "defaultMinQuantity": 0,
+    "defaultReorderLevel": 5,
+    "theme": "light",
+    "condensedView": true
+  },
+  "cabinets": [
+    { "id": "CAMA", "name": "Camera Bay A", "locationId": "Main Warehouse", "description": "Primary body storage", "isSecure": true, "allowedCategories": ["Cameras", "Lenses"], "qrCode": "cabinet-CAMA-171465200001", "notes": "Sign-out required" },
+    { "id": "CAMB", "name": "Camera Bay B", "locationId": "Main Warehouse", "description": "Overflow camera bodies", "isSecure": true, "allowedCategories": ["Cameras"], "qrCode": "cabinet-CAMB-171465200002", "notes": "Reserve units" },
+    { "id": "AUD1", "name": "Audio Locker 1", "locationId": "ENG Van Bay", "description": "Wireless and IFB", "isSecure": true, "allowedCategories": ["Audio", "RF & Comms"], "qrCode": "cabinet-AUD1-171465200003", "notes": "Label packs by channel set" },
+    { "id": "LGT1", "name": "Lighting Cage 1", "locationId": "Studio A", "description": "Panels and fixtures", "isSecure": false, "allowedCategories": ["Lighting", "Grip & Rigging"], "qrCode": "cabinet-LGT1-171465200004", "notes": "Open studio access" },
+    { "id": "LGT2", "name": "Lighting Cage 2", "locationId": "Studio B", "description": "Event lighting", "isSecure": false, "allowedCategories": ["Lighting"], "qrCode": "cabinet-LGT2-171465200005", "notes": "Festival package stock" },
+    { "id": "TRK1", "name": "Truck 1 Secure Bay", "locationId": "Remote Truck 1", "description": "Critical live gear", "isSecure": true, "allowedCategories": ["Cameras", "Audio", "Network & Control", "Power"], "qrCode": "cabinet-TRK1-171465200006", "notes": "Dispatch checklist required" },
+    { "id": "TRK2", "name": "Truck 2 Secure Bay", "locationId": "Remote Truck 2", "description": "Secondary live gear", "isSecure": true, "allowedCategories": ["Cameras", "Audio", "RF & Comms"], "qrCode": "cabinet-TRK2-171465200007", "notes": "Keep spare comms packs" },
+    { "id": "FLYP", "name": "Flypack Storage", "locationId": "Flypack Lockup", "description": "Portable production kits", "isSecure": false, "allowedCategories": ["Network & Control", "Monitoring", "Power"], "qrCode": "cabinet-FLYP-171465200008", "notes": "Quick deploy shelves" },
+    { "id": "EDIT", "name": "Field Edit Rack", "locationId": "Field Edit Kit", "description": "Edit laptops and SSDs", "isSecure": true, "allowedCategories": ["Monitoring", "Accessories"], "qrCode": "cabinet-EDIT-171465200009", "notes": "Encrypt drives" },
+    { "id": "MCR1", "name": "Master Control Rack 1", "locationId": "Master Control", "description": "Core signal path", "isSecure": true, "allowedCategories": ["Network & Control", "Streaming"], "qrCode": "cabinet-MCR1-171465200010", "notes": "Engineering access only" }
+  ]
+}

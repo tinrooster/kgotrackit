@@ -1,0 +1,106 @@
+{
+  "categories": [
+    { "id": "cat-cam", "name": "Cameras", "children": [{ "id": "cat-cam-ptz", "name": "PTZ" }, { "id": "cat-cam-cine", "name": "Cinema" }] },
+    { "id": "cat-audio", "name": "Audio", "children": [{ "id": "cat-audio-wireless", "name": "Wireless Mics" }, { "id": "cat-audio-ifb", "name": "IFB" }] },
+    { "id": "cat-light", "name": "Lighting", "children": [{ "id": "cat-light-panel", "name": "Panels" }, { "id": "cat-light-fixture", "name": "Fixtures" }] },
+    { "id": "cat-rf", "name": "RF & Comms" },
+    { "id": "cat-network", "name": "Network & Control" },
+    { "id": "cat-power", "name": "Power" },
+    { "id": "cat-grip", "name": "Grip & Rigging" }
+  ],
+  "units": [
+    { "id": "unit-each", "name": "each" },
+    { "id": "unit-kit", "name": "kit" },
+    { "id": "unit-roll", "name": "roll" },
+    { "id": "unit-pair", "name": "pair" },
+    { "id": "unit-case", "name": "case" }
+  ],
+  "locations": [
+    { "id": "loc-main-wh", "name": "Main Warehouse" },
+    { "id": "loc-engarage", "name": "ENG Van Bay" },
+    { "id": "loc-studio-a", "name": "Studio A" },
+    { "id": "loc-studio-b", "name": "Studio B" },
+    { "id": "loc-truck-1", "name": "Remote Truck 1" },
+    { "id": "loc-truck-2", "name": "Remote Truck 2" },
+    { "id": "loc-flypack", "name": "Flypack Lockup" }
+  ],
+  "suppliers": [
+    { "id": "sup-bh", "name": "B&H" },
+    { "id": "sup-markertek", "name": "Markertek" },
+    { "id": "sup-audio", "name": "Trew Audio" },
+    { "id": "sup-broadcast", "name": "Broadcast Depot" },
+    { "id": "sup-local", "name": "Local Rental Partner" }
+  ],
+  "projects": [
+    { "id": "proj-election", "name": "Election Night 2026" },
+    { "id": "proj-nfl", "name": "Friday Night Football" },
+    { "id": "proj-wildfire", "name": "Wildfire Field Coverage" },
+    { "id": "proj-parade", "name": "City Parade Live" },
+    { "id": "proj-remote-studio", "name": "Remote Studio Buildout" }
+  ],
+  "defaultSettings": {
+    "defaultLocation": "Main Warehouse",
+    "defaultUnit": "each",
+    "defaultCategory": "Cameras",
+    "defaultSupplier": "B&H",
+    "defaultProject": "Remote Studio Buildout",
+    "defaultOrderStatus": "delivered",
+    "enableQRTracking": true,
+    "requireCheckoutForSecureCabinets": true,
+    "autoGenerateQRCodes": true,
+    "defaultMinQuantity": 0,
+    "defaultReorderLevel": 5
+  },
+  "cabinets": [
+    {
+      "id": "CAMA",
+      "name": "Camera Bay A",
+      "locationId": "Main Warehouse",
+      "description": "Primary camera body and lens storage",
+      "isSecure": true,
+      "allowedCategories": ["Cameras", "Grip & Rigging"],
+      "qrCode": "cabinet-CAMA-1714651000001",
+      "notes": "Access controlled, sign-out required"
+    },
+    {
+      "id": "AUD1",
+      "name": "Audio Locker 1",
+      "locationId": "ENG Van Bay",
+      "description": "Wireless kits, IFB sets, handheld mics",
+      "isSecure": true,
+      "allowedCategories": ["Audio", "RF & Comms"],
+      "qrCode": "cabinet-AUD1-1714651000002",
+      "notes": "Keep silica packs in each shelf"
+    },
+    {
+      "id": "LGT1",
+      "name": "Lighting Cage 1",
+      "locationId": "Studio A",
+      "description": "LED panels, stands, and grip accessories",
+      "isSecure": false,
+      "allowedCategories": ["Lighting", "Grip & Rigging"],
+      "qrCode": "cabinet-LGT1-1714651000003",
+      "notes": "Open access for studio crews"
+    },
+    {
+      "id": "TRK1",
+      "name": "Truck 1 Secure Bay",
+      "locationId": "Remote Truck 1",
+      "description": "Mission-critical remote production kits",
+      "isSecure": true,
+      "allowedCategories": ["Cameras", "Audio", "Network & Control", "Power"],
+      "qrCode": "cabinet-TRK1-1714651000004",
+      "notes": "Verify checkout before dispatch"
+    },
+    {
+      "id": "FLYP",
+      "name": "Flypack Storage",
+      "locationId": "Flypack Lockup",
+      "description": "Backpack encoder kits and compact lighting",
+      "isSecure": false,
+      "allowedCategories": ["Network & Control", "Lighting", "Power"],
+      "qrCode": "cabinet-FLYP-1714651000005",
+      "notes": "Prioritize quick-access layouts"
+    }
+  ]
+}
