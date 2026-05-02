@@ -12,6 +12,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import * as React from "react";
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
+import { cn } from '@/lib/utils';
 
 interface EditItemDialogProps {
   item: InventoryItem;
@@ -84,7 +85,12 @@ export function EditItemDialog({
         supplier: values.supplier ?? item.supplier,
         supplierWebsite: values.supplierWebsite ?? item.supplierWebsite,
         project: values.project ?? item.project,
-        assetId: values.assetId ?? item.assetId,
+        recordId: item.recordId,
+        assetId: item.assetId,
+        companyAssetTag:
+          typeof values.companyAssetTag === "string"
+            ? values.companyAssetTag.trim() || undefined
+            : item.companyAssetTag,
         assetStatus: values.assetStatus ?? item.assetStatus,
         expenseCode: values.expenseCode ?? item.expenseCode,
         expenseTypeCode: values.expenseTypeCode ?? item.expenseTypeCode,
@@ -93,7 +99,18 @@ export function EditItemDialog({
         costCenterDescription: values.costCenterDescription ?? item.costCenterDescription,
         assetTrackingMode: values.assetTrackingMode ?? item.assetTrackingMode,
         assetTagEnd: values.assetTagEnd ?? item.assetTagEnd,
-        notes: values.notes ?? item.notes,
+        notes:
+          typeof values.additionalNotes === "string"
+            ? values.additionalNotes.trim() || undefined
+            : item.notes,
+        manufacturerNotes:
+          typeof values.manufacturerNotes === "string"
+            ? values.manufacturerNotes.trim() || undefined
+            : item.manufacturerNotes,
+        additionalNotes:
+          typeof values.additionalNotes === "string"
+            ? values.additionalNotes.trim() || undefined
+            : item.additionalNotes,
         orderStatus: values.orderStatus ?? item.orderStatus,
         deliveryPercentage: values.deliveryPercentage !== undefined ? Number(values.deliveryPercentage) : item.deliveryPercentage,
         expectedDeliveryDate: values.expectedDeliveryDate ?? item.expectedDeliveryDate,
@@ -106,6 +123,21 @@ export function EditItemDialog({
         dateInService: values.dateInService ?? item.dateInService,
         maintenanceNotes: values.maintenanceNotes ?? item.maintenanceNotes,
         unitSubcategory: values.unitSubcategory ?? item.unitSubcategory,
+        photoUrl: typeof values.photoUrl === "string" ? values.photoUrl.trim() || undefined : item.photoUrl,
+        rackLocation:
+          typeof values.rackLocation === "string" ? values.rackLocation.trim() || undefined : item.rackLocation,
+        decomEOLDate:
+          typeof values.decomEOLDate === "string" ? values.decomEOLDate.trim() || undefined : item.decomEOLDate,
+        decomCutoverDate:
+          typeof values.decomCutoverDate === "string"
+            ? values.decomCutoverDate.trim() || undefined
+            : item.decomCutoverDate,
+        decomLastAuditAt:
+          typeof values.decomLastAuditAt === "string"
+            ? values.decomLastAuditAt.trim() || undefined
+            : item.decomLastAuditAt,
+        decomNotes:
+          typeof values.decomNotes === "string" ? values.decomNotes.trim() || undefined : item.decomNotes,
         lastUpdated: new Date()
       };
 
@@ -124,30 +156,41 @@ export function EditItemDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[625px]">
-        <DialogHeader>
-          <DialogTitle>Edit Inventory Item</DialogTitle>
-          <DialogDescription>
-            Make changes to your inventory item here. Click save when you're done.
-          </DialogDescription>
-        </DialogHeader>
-        <EditItemForm
-          key={item.id} // Add key to force form re-render with new item
-          item={item}
-          onSubmit={handleSubmit}
-          onCancel={onClose}
-          categories={categories}
-          units={units}
-          locations={locations}
-          suppliers={suppliers}
-          projects={projects}
-          expenseTypes={expenseTypes}
-          costCenters={costCenters}
-          cabinets={cabinets}
-          isSubmitting={isSubmitting}
-          existingItems={existingItems}
-        />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()} modal={false}>
+      <DialogContent
+        nonModalBackdrop
+        className={cn(
+          "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-2xl",
+          "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"
+        )}
+      >
+        <div className="shrink-0 border-b px-6 pb-4 pt-6">
+          <DialogHeader className="space-y-0 p-0 text-left">
+            <DialogTitle>Edit Inventory Item</DialogTitle>
+            <DialogDescription>
+              {"Make changes to your inventory item here. Click save when you're done."}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <EditItemForm
+            key={item.id}
+            item={item}
+            onSubmit={handleSubmit}
+            onCancel={onClose}
+            categories={categories}
+            units={units}
+            locations={locations}
+            suppliers={suppliers}
+            projects={projects}
+            expenseTypes={expenseTypes}
+            costCenters={costCenters}
+            cabinets={cabinets}
+            isSubmitting={isSubmitting}
+            existingItems={existingItems}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

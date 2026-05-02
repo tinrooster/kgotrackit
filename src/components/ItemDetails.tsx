@@ -3,6 +3,8 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { InventoryItem } from "@/types/inventory";
+import { getSettings } from "@/lib/storageService";
+import { resolveLocationDisplay } from "@/lib/resolveLocationLabel";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,6 +94,33 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
             </div>
           </CardTitle>
           <CardDescription>{item.description || "No description provided"}</CardDescription>
+          {item.photoUrl ? (
+            <div className="pt-2">
+              <img
+                src={item.photoUrl}
+                alt=""
+                className="max-h-48 max-w-full rounded-md border object-contain"
+              />
+            </div>
+          ) : null}
+          {item.recordId ? (
+            <p className="text-xs text-muted-foreground/90 pt-1">
+              <span className="font-medium text-muted-foreground">Record ID:</span> {item.recordId}
+            </p>
+          ) : null}
+          {item.assetId ? (
+            <p className="text-xs text-muted-foreground/90">
+              <span className="font-medium text-muted-foreground">Asset tag:</span>{" "}
+              {item.assetId}
+              {item.assetTagEnd ? ` – ${item.assetTagEnd}` : ""}
+            </p>
+          ) : null}
+          {item.companyAssetTag ? (
+            <p className="text-xs text-muted-foreground/90">
+              <span className="font-medium text-muted-foreground">Company asset tag:</span>{" "}
+              {item.companyAssetTag}
+            </p>
+          ) : null}
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -130,8 +159,42 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
               <div className="flex items-center">
                 <MapPin className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm font-medium mr-2">Location:</span>
-                <span>{item.location || "Not specified"}</span>
+                <span>
+                  {item.location
+                    ? resolveLocationDisplay(item.location, getSettings().locations || [])
+                    : "Not specified"}
+                </span>
               </div>
+              {item.rackLocation ? (
+                <div className="flex items-center">
+                  <Package className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm font-medium mr-2">Rack:</span>
+                  <span className="font-mono text-sm">{item.rackLocation}</span>
+                </div>
+              ) : null}
+              {(item.decomEOLDate || item.decomCutoverDate || item.decomLastAuditAt || item.decomNotes) ? (
+                <div className="rounded-md border border-border/60 bg-muted/15 p-3 text-sm">
+                  <p className="mb-2 font-medium text-foreground">Decommissioning</p>
+                  {item.decomEOLDate ? (
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-foreground">EOL target:</span> {item.decomEOLDate}
+                    </p>
+                  ) : null}
+                  {item.decomCutoverDate ? (
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-foreground">Cut-over:</span> {item.decomCutoverDate}
+                    </p>
+                  ) : null}
+                  {item.decomLastAuditAt ? (
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-foreground">Last audit:</span> {item.decomLastAuditAt}
+                    </p>
+                  ) : null}
+                  {item.decomNotes ? (
+                    <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{item.decomNotes}</p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="flex items-center">
                 <Barcode className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm font-medium mr-2">Barcode:</span>

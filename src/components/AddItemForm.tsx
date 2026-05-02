@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { InventoryItem, OrderStatus, CategoryNode, ItemWithSubcategories } from "@/types/inventory";
@@ -20,6 +20,11 @@ import { AdditionalInfoTab } from "@/components/AdditionalInfoTab";
 import { Cabinet } from "@/types/cabinets";
 import { ensureUrlProtocol } from "@/utils/url";
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
+import { getFirstTabWithErrors } from "@/lib/inventoryFormTabs";
+import { getTodayDateInputValue, resolveDefaultUnitName } from "@/lib/inventoryFormDefaults";
+import type { FieldErrors } from "react-hook-form";
+import { useWatch } from "react-hook-form";
+import { previewNextRecordId, previewNextAssetTags } from "@/lib/inventoryIdGeneration";
 
 // Define the form schema
 const formSchema = z.object({
@@ -51,9 +56,15 @@ const formSchema = z.object({
   expenseTypeDescription: z.string().optional(),
   costCenterCode: z.string().optional(),
   costCenterDescription: z.string().optional(),
-  assetId: z.string().optional(),
+  companyAssetTag: z.string().optional(),
   assetTrackingMode: z.enum(['line_item', 'per_unit']).default('line_item'),
   assetTagEnd: z.string().optional(),
+  photoUrl: z.string().optional(),
+  rackLocation: z.string().optional(),
+  decomEOLDate: z.string().optional(),
+  decomCutoverDate: z.string().optional(),
+  decomLastAuditAt: z.string().optional(),
+  decomNotes: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -103,6 +114,9 @@ export function AddItemForm({
   const [activeTab, setActiveTab] = useState("details");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
+  const defaultUnit = React.useMemo(() => resolveDefaultUnitName(units), [units]);
+  const todayDate = React.useMemo(() => getTodayDateInputValue(), []);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -115,8 +129,8 @@ export function AddItemForm({
       name: initialValues?.name || "",
       description: initialValues?.description || "",
       category: initialValues?.category || "",
-      quantity: initialValues?.quantity || 1,
-      unit: initialValues?.unit || "",
+      quantity: initialValues?.quantity ?? 1,
+      unit: initialValues?.unit || defaultUnit,
       unitSubcategory: initialValues?.unitSubcategory || "",
       location: initialValues?.location || "",
       locationSubcategory: initialValues?.locationSubcategory || "",
@@ -128,23 +142,48 @@ export function AddItemForm({
       serialNumber: initialValues?.serialNumber || "",
       manufacturer: initialValues?.manufacturer || "",
       modelNumber: initialValues?.modelNumber || "",
-      dateInService: initialValues?.dateInService || "",
+      dateInService:
+        initialValues?.dateInService !== undefined && initialValues.dateInService !== ""
+          ? String(initialValues.dateInService).slice(0, 10)
+          : todayDate,
       manufacturerNotes: initialValues?.manufacturerNotes || "",
       maintenanceNotes: initialValues?.maintenanceNotes || "",
       additionalNotes: initialValues?.additionalNotes || "",
       supplier: initialValues?.supplier || "",
       supplierWebsite: initialValues?.supplierWebsite || "",
-      assetStatus: initialValues?.assetStatus || "",
+      assetStatus: initialValues?.assetStatus || "active",
       expenseCode: initialValues?.expenseCode || "",
-      expenseTypeCode: initialValues?.expenseTypeCode || "",
+      expenseTypeCode: initialValues?.expenseTypeCode || "N/A",
       expenseTypeDescription: initialValues?.expenseTypeDescription || "",
-      costCenterCode: initialValues?.costCenterCode || "",
+      costCenterCode: initialValues?.costCenterCode || "N/A",
       costCenterDescription: initialValues?.costCenterDescription || "",
-      assetId: initialValues?.assetId || "",
+      companyAssetTag: initialValues?.companyAssetTag || "",
       assetTrackingMode: initialValues?.assetTrackingMode || "line_item",
       assetTagEnd: initialValues?.assetTagEnd || "",
+      photoUrl: initialValues?.photoUrl || "",
+      rackLocation: initialValues?.rackLocation || "",
+      decomEOLDate: initialValues?.decomEOLDate || "",
+      decomCutoverDate: initialValues?.decomCutoverDate || "",
+      decomLastAuditAt: initialValues?.decomLastAuditAt || "",
+      decomNotes: initialValues?.decomNotes || "",
     },
   });
+
+  const quantityW = useWatch({ control: form.control, name: "quantity" });
+  const trackingW = useWatch({ control: form.control, name: "assetTrackingMode" });
+  const dateInServiceW = useWatch({ control: form.control, name: "dateInService" });
+  const inventoryRecordLine = previewNextRecordId();
+  const assetTagLine = React.useMemo(() => {
+    const q = typeof quantityW === "number" && !Number.isNaN(quantityW) ? quantityW : 1;
+    const mode = trackingW === "per_unit" ? "per_unit" : "line_item";
+    return previewNextAssetTags(
+      dateInServiceW !== undefined && dateInServiceW !== ""
+        ? String(dateInServiceW).slice(0, 10)
+        : undefined,
+      q,
+      mode
+    ).line;
+  }, [quantityW, trackingW, dateInServiceW]);
 
   const handleScanResult = (result: string) => {
     form.setValue("barcode", result);
@@ -154,12 +193,18 @@ export function AddItemForm({
 
   const onSubmitForm = async (values: FormValues) => {
     try {
-      // Process the URL if present
       const processedValues = {
         ...values,
         supplierWebsite: values.supplierWebsite ? ensureUrlProtocol(values.supplierWebsite) : "",
+        companyAssetTag: values.companyAssetTag?.trim() || undefined,
+        photoUrl: values.photoUrl?.trim() || undefined,
+        rackLocation: values.rackLocation?.trim() || undefined,
+        decomEOLDate: values.decomEOLDate?.trim() || undefined,
+        decomCutoverDate: values.decomCutoverDate?.trim() || undefined,
+        decomLastAuditAt: values.decomLastAuditAt?.trim() || undefined,
+        decomNotes: values.decomNotes?.trim() || undefined,
       };
-      
+
       await onSubmit(processedValues);
     } catch (error) {
       console.error("Form submission error:", error);
@@ -167,9 +212,20 @@ export function AddItemForm({
     }
   };
 
+  const onInvalid = (errors: FieldErrors<FormValues>) => {
+    const tab = getFirstTabWithErrors(errors);
+    if (tab) {
+      setActiveTab(tab);
+    }
+    toast.error("Check all tabs", {
+      description:
+        "Some required or invalid fields may be on another tab. Switched to the first tab that needs attention.",
+    });
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmitForm)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmitForm, onInvalid)} className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details">Item Details</TabsTrigger>
@@ -178,14 +234,14 @@ export function AddItemForm({
           </TabsList>
 
           <TabsContent value="details">
-            <BasicDetailsTab 
-              form={form} 
-              categories={categories} 
+            <BasicDetailsTab
+              form={form}
+              categories={categories}
               locations={locations}
               cabinets={cabinets}
               projects={projects}
-              expenseTypes={expenseTypes}
-              costCenters={costCenters}
+              inventoryRecordLine={inventoryRecordLine}
+              assetTagLine={assetTagLine}
             />
           </TabsContent>
 
@@ -198,9 +254,11 @@ export function AddItemForm({
           </TabsContent>
 
           <TabsContent value="additional">
-            <AdditionalInfoTab 
+            <AdditionalInfoTab
               form={form}
               onScanBarcode={() => setIsScannerOpen(true)}
+              expenseTypes={expenseTypes}
+              costCenters={costCenters}
             />
           </TabsContent>
         </Tabs>

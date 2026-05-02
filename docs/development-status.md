@@ -5,7 +5,7 @@ This document outlines the current development status of the Inventory Tracking 
 ## Version Information
 
 - **Current Version**: 1.0.0-beta
-- **Last Updated**: April 2024
+- **Last Updated**: May 2026
 
 ## Completed Features
 
@@ -21,6 +21,7 @@ This document outlines the current development status of the Inventory Tracking 
 
 ### User Interface
 - ✅ Responsive design for desktop and mobile
+- ✅ Inventory **Quick add** dialog for fast mobile-oriented item capture (collapsible sections, selection strip, unit sub-sizes, barcode/camera)
 - ✅ Navigation between main sections
 - ✅ Toast notifications for user feedback
 - ✅ Form validation with error messages

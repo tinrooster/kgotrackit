@@ -40,7 +40,7 @@ npm run dev
 
 - `/` Dashboard
 - `/inventory` Inventory management
-- `/checkout` Secure cabinet check-in/out
+- `/checkout` Secure cabinet check-in/out (navigation label **Check-In/Out**)
 - `/reports` Reporting and exports
 - `/settings` App configuration and management
 - `/help` In-app documentation
@@ -56,6 +56,7 @@ Use the docs index as the canonical entry point:
 - [Getting Started](./docs/getting-started.md)
 - [User Guide](./docs/user-guide.md)
 - [Technical Documentation](./docs/technical-documentation.md)
+- [Changelog](./docs/changes.md)
 
 ## License
 

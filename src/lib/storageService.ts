@@ -178,59 +178,96 @@ export const saveSettings = (settings: Settings): void => {
   }
 };
 
-// Save templates to store
+// Save templates to store (Electron + localStorage, same pattern as saveItems)
 export const saveTemplates = (templates: ItemTemplate[]): void => {
   try {
-    console.log('Saving templates:', templates);
     if (!Array.isArray(templates)) {
       console.error('Templates must be an array');
       return;
     }
-    
-    // Ensure we're saving valid template data
-    const validTemplates = templates.filter(template => 
-      template && 
-      typeof template === 'object' && 
-      template.templateId && 
-      template.templateName
+
+    const validTemplates = templates.filter(
+      (template) =>
+        template &&
+        typeof template === 'object' &&
+        template.templateId &&
+        template.templateName
     );
-    
-    window.electronStore.setData(STORAGE_KEYS.TEMPLATES, validTemplates);
-    console.log('Templates saved successfully');
+
+    try {
+      window.electronStore?.setData?.(STORAGE_KEYS.TEMPLATES, validTemplates);
+    } catch (e) {
+      console.warn('electronStore template save failed, using localStorage:', e);
+    }
+    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(validTemplates));
   } catch (error) {
     console.error('Error saving templates to store:', error);
-    throw error;
+    try {
+      const validTemplates = templates.filter(
+        (template) =>
+          template &&
+          typeof template === 'object' &&
+          template.templateId &&
+          template.templateName
+      );
+      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(validTemplates));
+    } catch {
+      throw error;
+    }
   }
 };
 
-// Get templates from store
+// Get templates from store (Electron or localStorage fallback)
 export const getTemplates = (): ItemTemplate[] => {
   try {
-    const templates = window.electronStore.getData(STORAGE_KEYS.TEMPLATES) as ItemTemplate[];
-    console.log('Templates loaded from store:', templates);
-    
-    if (!templates) {
-      console.log('No templates found in storage');
+    let templates: ItemTemplate[] | undefined;
+
+    try {
+      templates = window.electronStore?.getData?.(STORAGE_KEYS.TEMPLATES) as ItemTemplate[] | undefined;
+    } catch {
+      templates = undefined;
+    }
+
+    if (templates && Array.isArray(templates) && templates.length > 0) {
+      const valid = templates.filter(
+        (template) =>
+          template &&
+          typeof template === 'object' &&
+          template.templateId &&
+          template.templateName
+      );
+      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(valid));
+      return valid;
+    }
+
+    const localRaw = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    if (!localRaw) {
       return [];
     }
-    
-    if (!Array.isArray(templates)) {
-      console.error('Stored templates is not an array');
+
+    const parsed = JSON.parse(localRaw) as ItemTemplate[];
+    if (!Array.isArray(parsed)) {
       return [];
     }
-    
-    // Validate template structure
-    const validTemplates = templates.filter(template => 
-      template && 
-      typeof template === 'object' && 
-      template.templateId && 
-      template.templateName
+
+    return parsed.filter(
+      (template) =>
+        template &&
+        typeof template === 'object' &&
+        template.templateId &&
+        template.templateName
     );
-    
-    console.log('Valid templates loaded:', validTemplates);
-    return validTemplates;
   } catch (error) {
     console.error('Error getting templates from store:', error);
-    return [];
+    try {
+      const localRaw = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+      if (!localRaw) {
+        return [];
+      }
+      const parsed = JSON.parse(localRaw) as ItemTemplate[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   }
 };

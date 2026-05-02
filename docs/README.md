@@ -11,7 +11,7 @@ This docs index is the single entry point for setup, operations, architecture, a
    Install, run, and verify local development workflows.
 
 2. [User Guide](user-guide.md)  
-   Day-to-day usage for Inventory, Checkout, Reports, and Settings.
+   Day-to-day usage for Inventory, Check-In/Out, Reports, and Settings.
 
 3. [Technical Documentation](technical-documentation.md)  
    System architecture, data flows, and implementation details.
@@ -28,6 +28,9 @@ This docs index is the single entry point for setup, operations, architecture, a
 7. [Development Status](development-status.md)  
    Current feature maturity and project status notes.
 
+8. [Changes / changelog](changes.md)  
+   Notable feature and documentation updates by period.
+
 ## Supplemental Guides
 
 - [Help Menu Reference](help-menu.md)  
@@ -42,7 +45,7 @@ This docs index is the single entry point for setup, operations, architecture, a
 ## High-Level Feature Coverage
 
 - Durable inventory CRUD with per-item auditing
-- Secure cabinet check-in/check-out operations
+- Secure cabinet check-in/check-out operations (top nav: **Check-In/Out**)
 - Bulk editing and bulk label-print workflows
 - Production-focused report generation with CSV/XLSX export
 - User-defined taxonomy and financial coding support

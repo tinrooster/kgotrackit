@@ -1,38 +1,50 @@
 import { useState, useEffect, useRef } from 'react'
-import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, Database } from 'lucide-react'
+import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { getItems, saveItems, getSettings, saveSettings, STORAGE_KEYS } from '@/lib/storageService'
+import {
+  getItems,
+  saveItems,
+  getSettings,
+  saveSettings,
+  STORAGE_KEYS,
+  SETTINGS_UPDATED_EVENT,
+  type Settings,
+} from '@/lib/storageService'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
 import { InventoryItem, CategoryNode, ItemWithSubcategories } from '@/types/inventory'
+import type { Cabinet } from '@/types/cabinets'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from '@/contexts/AuthContext'
 import { Label } from "@/components/ui/label"
 import { getPasswordError } from '@/utils/passwordUtils'
-import { EditableItemWithSubcategoriesList } from '@/components/EditableItemWithSubcategoriesList'
-import { CategoryTreeManager } from '@/components/CategoryTreeManager'
 import { v4 as uuidv4 } from 'uuid'
-import CabinetManagement from './CabinetManagement'
 import { DataBackupTab } from "@/components/settings/DataBackupTab"
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
-import { FinancialCodesTab } from '@/components/settings/FinancialCodesTab'
+import {
+  UserDefinedListsSection,
+  type UserDefinedPanel,
+} from '@/components/settings/UserDefinedListsSection'
 import { CameraSettingsDialog } from '@/components/CameraSettingsDialog'
-import { SettingsService, type DefaultSettings } from '@/lib/settingsService'
+import { SettingsService, type DefaultSettings, defaultSettingsSchema } from '@/lib/settingsService'
 import { FinancialCodeEntry, getFinancialSettings, saveFinancialSettings } from '@/lib/financialSettingsService'
-import { TemplatesPage } from './TemplatesPage'
 import * as XLSX from 'xlsx'
 import { SystemLogs } from '@/components/settings/SystemLogs'
 import AddUserDialog from '@/components/AddUserDialog'
 import { logger } from '@/lib/logging'
 import { reconcileInventoryGroup, type GroupReconcileResult } from '@/lib/groupInventoryReconciliation'
+import {
+  fixUnreconciledForLookupPanel,
+  panelSupportsListReconcile,
+} from '@/lib/listReconcileFixes'
 
 interface SettingsState {
   categories: ItemWithSubcategories[];
@@ -43,7 +55,14 @@ interface SettingsState {
   expenseCodes: ItemWithSubcategories[];
 }
 
+interface ListUndoSnapshot {
+  settings: SettingsState;
+  items: InventoryItem[];
+}
+
 type SettingsKey = keyof SettingsState;
+
+const MAX_LIST_UNDO = 40;
 
 interface ListInfo {
   list: ItemWithSubcategories[];
@@ -293,6 +312,12 @@ export default function SettingsPage() {
   const [defaultSettings, setDefaultSettings] = useState<DefaultSettings>(() => SettingsService.loadDefaultSettings());
   const [financialSettings, setFinancialSettings] = useState<{ expenseTypes: FinancialCodeEntry[]; costCenters: FinancialCodeEntry[] }>(() => getFinancialSettings());
   const [settingsTab, setSettingsTab] = useState('general');
+  const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>('overview');
+
+  const listUndoStackRef = useRef<ListUndoSnapshot[]>([]);
+  const listRedoStackRef = useRef<ListUndoSnapshot[]>([]);
+  const [listUndoAvailable, setListUndoAvailable] = useState(false);
+  const [listRedoAvailable, setListRedoAvailable] = useState(false);
 
   const [importDuplicates, setImportDuplicates] = useState<{
     type: SettingsKey;
@@ -353,6 +378,15 @@ export default function SettingsPage() {
 
   const updateSettingsList = (key: SettingsKey, newValue: ItemWithSubcategories[]) => {
     setSettings((previousSettings) => {
+      listUndoStackRef.current.push({
+        settings: JSON.parse(JSON.stringify(previousSettings)) as SettingsState,
+        items: JSON.parse(JSON.stringify(getItems())) as InventoryItem[],
+      });
+      if (listUndoStackRef.current.length > MAX_LIST_UNDO) {
+        listUndoStackRef.current.shift();
+      }
+      listRedoStackRef.current = [];
+
       const previousList = previousSettings[key];
       const updatedSettings = {
         ...previousSettings,
@@ -423,6 +457,8 @@ export default function SettingsPage() {
       saveSettings(updatedSettings);
       return updatedSettings;
     });
+    setListUndoAvailable(true);
+    setListRedoAvailable(false);
   };
 
   useEffect(() => {
@@ -451,6 +487,7 @@ export default function SettingsPage() {
       || (uiSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     rootElement.classList.toggle('dark', shouldUseDarkTheme);
     document.body.classList.toggle('compact-ui', uiSettings.condensedView);
+    document.body.classList.toggle('mt-compact-ui', uiSettings.mobileTabletUi);
   };
 
   useEffect(() => {
@@ -505,6 +542,53 @@ export default function SettingsPage() {
       console.error('Settings snapshot export failed:', error);
       toast.error('Failed to export settings snapshot');
     }
+  };
+
+  const handleRestoreSettingsSnapshot = async (file: File): Promise<void> => {
+    const text = await file.text();
+    const snapshot = JSON.parse(text) as Record<string, unknown>;
+    if (snapshot.version !== 'trackIT-settings-snapshot') {
+      throw new Error('Invalid file: expected "version": "trackIT-settings-snapshot".');
+    }
+    const lists = snapshot.lists as Record<string, unknown> | undefined;
+    if (!lists || typeof lists !== 'object') {
+      throw new Error('Snapshot is missing a "lists" object.');
+    }
+    const nextLists: Settings = {
+      categories: Array.isArray(lists.categories) ? (lists.categories as Settings['categories']) : [],
+      units: Array.isArray(lists.units) ? (lists.units as Settings['units']) : [],
+      locations: Array.isArray(lists.locations) ? (lists.locations as Settings['locations']) : [],
+      suppliers: Array.isArray(lists.suppliers) ? (lists.suppliers as Settings['suppliers']) : [],
+      projects: Array.isArray(lists.projects) ? (lists.projects as Settings['projects']) : [],
+      expenseCodes: Array.isArray(lists.expenseCodes) ? (lists.expenseCodes as Settings['expenseCodes']) : [],
+    };
+    setSettings(nextLists as SettingsState);
+    saveSettings(nextLists);
+
+    if (snapshot.financial && typeof snapshot.financial === 'object') {
+      const f = snapshot.financial as { expenseTypes?: unknown; costCenters?: unknown };
+      saveFinancialSettings({
+        expenseTypes: Array.isArray(f.expenseTypes) ? (f.expenseTypes as FinancialCodeEntry[]) : [],
+        costCenters: Array.isArray(f.costCenters) ? (f.costCenters as FinancialCodeEntry[]) : [],
+      });
+      setFinancialSettings(getFinancialSettings());
+    }
+
+    if (snapshot.defaultSettings && typeof snapshot.defaultSettings === 'object') {
+      const merged = defaultSettingsSchema.parse({
+        ...SettingsService.loadDefaultSettings(),
+        ...(snapshot.defaultSettings as object),
+      });
+      SettingsService.saveDefaultSettings(merged);
+      setDefaultSettings(merged);
+      applyUiPreferences(merged);
+    }
+
+    if (Array.isArray(snapshot.cabinets)) {
+      await SettingsService.replaceAllCabinets(snapshot.cabinets as Cabinet[]);
+    }
+
+    window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT, { detail: getSettings() }));
   };
 
   const handleGroupInventoryReconcile = (): GroupReconcileResult => {
@@ -1431,31 +1515,140 @@ export default function SettingsPage() {
     }
   };
 
+  const requestListDeleteReconcile = ({
+    type,
+    value,
+    affectedCount,
+  }: {
+    type: string;
+    value: string;
+    affectedCount: number;
+  }) => {
+    setItemToDelete({ type, value });
+    setAffectedItemsCount(affectedCount);
+    setReconcileAction('delete');
+    setReplacementValue('');
+    setShowReconcileDialog(true);
+  };
+
+  const undoLookupListChange = () => {
+    const snap = listUndoStackRef.current.pop();
+    if (!snap) {
+      toast.info('Nothing to undo');
+      return;
+    }
+    setSettings((current) => {
+      listRedoStackRef.current.push({
+        settings: JSON.parse(JSON.stringify(current)) as SettingsState,
+        items: JSON.parse(JSON.stringify(getItems())) as InventoryItem[],
+      });
+      saveSettings(snap.settings);
+      saveItems(snap.items);
+      return snap.settings;
+    });
+    setListRedoAvailable(true);
+    setListUndoAvailable(listUndoStackRef.current.length > 0);
+  };
+
+  const redoLookupListChange = () => {
+    const snap = listRedoStackRef.current.pop();
+    if (!snap) {
+      toast.info('Nothing to redo');
+      return;
+    }
+    setSettings((current) => {
+      listUndoStackRef.current.push({
+        settings: JSON.parse(JSON.stringify(current)) as SettingsState,
+        items: JSON.parse(JSON.stringify(getItems())) as InventoryItem[],
+      });
+      saveSettings(snap.settings);
+      saveItems(snap.items);
+      return snap.settings;
+    });
+    setListUndoAvailable(true);
+    setListRedoAvailable(listRedoStackRef.current.length > 0);
+  };
+
+  const handleFixUnreconciledLookup = () => {
+    if (!panelSupportsListReconcile(userDefinedPanel)) {
+      return;
+    }
+    fixUnreconciledForLookupPanel(userDefinedPanel, settings);
+  };
+
   return (
     <div className="settings-page container max-w-6xl py-6">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <div className="flex max-w-xl flex-col items-stretch gap-2 sm:items-end">
-          <p className="text-xs text-muted-foreground sm:text-right">
-            Edits to lists and General preferences usually save as you make them. Use Sync to force-write the current
-            screen state to storage. Download a portable settings snapshot from Data Management → Backup &amp; Restore.
-          </p>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={saveAllSettings}>
-              <Save className="mr-2 h-4 w-4" />
-              Sync to storage
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={undoLookupListChange}
+            disabled={!listUndoAvailable}
+            title="Undo last lookup list change"
+          >
+            <Undo2 className="mr-2 h-4 w-4" />
+            Undo
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={redoLookupListChange}
+            disabled={!listRedoAvailable}
+            title="Redo lookup list change"
+          >
+            <Redo2 className="mr-2 h-4 w-4" />
+            Redo
+          </Button>
+          {settingsTab === 'userDefined' && panelSupportsListReconcile(userDefinedPanel) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleFixUnreconciledLookup}
+              title="Clear invalid inventory references for this list"
+            >
+              <Wrench className="mr-2 h-4 w-4" />
+              Fix unreconciled
             </Button>
-          </div>
+          )}
+          <Button type="button" variant="secondary" onClick={saveAllSettings}>
+            <Save className="mr-2 h-4 w-4" />
+            Sync to storage
+          </Button>
         </div>
       </div>
 
       <Tabs value={settingsTab} onValueChange={setSettingsTab} className="w-full">
-        <TabsList className="mb-4 flex h-auto min-h-10 w-full flex-wrap justify-start gap-1 bg-muted p-1">
-          <TabsTrigger value="general">General Settings</TabsTrigger>
-          <TabsTrigger value="userDefined">User-defined Items</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="data">Data Management</TabsTrigger>
-          <TabsTrigger value="logs">System Logs</TabsTrigger>
+        <TabsList className="settings-primary-tabs mb-4 flex h-auto min-h-10 w-full max-w-full flex-nowrap justify-start gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-muted p-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:flex-wrap lg:overflow-x-visible [&::-webkit-scrollbar]:hidden">
+          <TabsTrigger value="general" title="General settings" className="inline-flex items-center gap-1.5">
+            <SlidersHorizontal className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span data-settings-tab-long>General Settings</span>
+            <span data-settings-tab-short>General</span>
+          </TabsTrigger>
+          <TabsTrigger value="userDefined" title="Lookup lists" className="inline-flex items-center gap-1.5">
+            <Boxes className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span data-settings-tab-long>Lookup Lists</span>
+            <span data-settings-tab-short>Lookup Lists</span>
+          </TabsTrigger>
+          <TabsTrigger value="users" title="Users" className="inline-flex items-center gap-1.5">
+            <Users className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span data-settings-tab-long>Users</span>
+            <span data-settings-tab-short>Users</span>
+          </TabsTrigger>
+          <TabsTrigger value="data" title="Data management" className="inline-flex items-center gap-1.5">
+            <HardDrive className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span data-settings-tab-long>Data Management</span>
+            <span data-settings-tab-short>Data</span>
+          </TabsTrigger>
+          <TabsTrigger value="logs" title="System logs" className="inline-flex items-center gap-1.5">
+            <ScrollText className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span data-settings-tab-long>System Logs</span>
+            <span data-settings-tab-short>Logs</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -1468,520 +1661,16 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="userDefined">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>User-defined Items</CardTitle>
-              <CardDescription>Open and manage all configurable lists and templates.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setSettingsTab('categories')}>Categories</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setSettingsTab('suppliers')}>Suppliers</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setSettingsTab('units')}>Units</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setSettingsTab('locations')}>Locations</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setSettingsTab('projects')}>Projects</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setSettingsTab('financial')}>Expense Codes</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setSettingsTab('templates')}>Templates</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setSettingsTab('cabinets')}>Cab/Storage</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="categories">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Categories</CardTitle>
-              <CardDescription>
-                Define and organize categories for inventory items
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EditableItemWithSubcategoriesList
-                items={settings.categories}
-                setItems={(newItems) => updateSettingsList('categories', newItems)}
-                title="Categories"
-                showColorPicker
-                onCheckBeforeDelete={(value, onSafeToDelete) => {
-                  // Check if this category is being used in any inventory items
-                  const items = getItems();
-                  const affectedItems = items.filter(item => item.category === value);
-                  
-                  if (affectedItems.length > 0) {
-                    // Show reconciliation dialog
-                    setItemToDelete({type: 'Categories', value});
-                    setAffectedItemsCount(affectedItems.length);
-                    setReconcileAction('delete');
-                    setReplacementValue('');
-                    setShowReconcileDialog(true);
-                  } else {
-                    // Safe to delete
-                    onSafeToDelete();
-                  }
-                }}
-              />
-              
-              <div className="mt-6 border-t pt-4">
-                <h3 className="text-md font-medium mb-2 text-foreground">Fix Unreconciled Items</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  If you have inventory items showing categories that no longer exist in your list, 
-                  you can clean them up with this tool.
-                </p>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    // Get all inventory items
-                    const items = getItems();
-                    // Get list of valid categories
-                    const validCategories = settings.categories.map(cat => cat.name);
-                    
-                    // Find items with invalid categories
-                    const itemsWithInvalidCategories = items.filter(
-                      item => item.category && !validCategories.includes(item.category)
-                    );
-                    
-                    if (itemsWithInvalidCategories.length === 0) {
-                      toast.info("No inventory items with invalid categories found");
-                      return;
-                    }
-                    
-                    // Fix the items by removing invalid categories
-                    const fixedItems = items.map(item => {
-                      if (item.category && !validCategories.includes(item.category)) {
-                        // Make a copy of the item
-                        const newItem = { ...item };
-                        // Store the invalid category in a custom field for reference
-                        newItem.customFields = { 
-                          ...newItem.customFields, 
-                          previousCategory: item.category 
-                        };
-                        // Remove the invalid category
-                        delete newItem.category;
-                        return newItem;
-                      }
-                      return item;
-                    });
-                    
-                    // Save the fixed items
-                    saveItems(fixedItems);
-                    
-                    toast.success(`Fixed ${itemsWithInvalidCategories.length} items with invalid categories`);
-                  }}
-                >
-                  Fix Unreconciled Items
-        </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="suppliers">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Suppliers</CardTitle>
-              <CardDescription>
-                Manage suppliers for your inventory items
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EditableItemWithSubcategoriesList
-                items={settings.suppliers}
-                setItems={(newItems) => updateSettingsList('suppliers', newItems)}
-                title="Suppliers"
-                enableSubcategories={false}
-                onCheckBeforeDelete={(value, onSafeToDelete) => {
-                  // Check if this supplier is being used in any inventory items
-                  const items = getItems();
-                  const affectedItems = items.filter(item => item.supplier === value);
-                  
-                  if (affectedItems.length > 0) {
-                    // Show reconciliation dialog
-                    setItemToDelete({type: 'Suppliers', value});
-                    setAffectedItemsCount(affectedItems.length);
-                    setReconcileAction('delete');
-                    setReplacementValue('');
-                    setShowReconcileDialog(true);
-                  } else {
-                    // Safe to delete
-                    onSafeToDelete();
-                  }
-                }}
-              />
-              
-              <div className="mt-6 border-t pt-4">
-                <h3 className="text-md font-medium mb-2 text-foreground">Fix Unreconciled Items</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  If you have inventory items showing suppliers that no longer exist in your list, 
-                  you can clean them up with this tool.
-                </p>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    // Get all inventory items
-                    const items = getItems();
-                    // Get list of valid suppliers
-                    const validSuppliers = settings.suppliers.map(sup => sup.name);
-                    
-                    // Find items with invalid suppliers
-                    const itemsWithInvalidSuppliers = items.filter(
-                      item => item.supplier && !validSuppliers.includes(item.supplier)
-                    );
-                    
-                    if (itemsWithInvalidSuppliers.length === 0) {
-                      toast.info("No inventory items with invalid suppliers found");
-                      return;
-                    }
-                    
-                    // Fix the items by removing invalid suppliers
-                    const fixedItems = items.map(item => {
-                      if (item.supplier && !validSuppliers.includes(item.supplier)) {
-                        // Make a copy of the item
-                        const newItem = { ...item };
-                        // Store the invalid supplier in a custom field for reference
-                        newItem.customFields = { 
-                          ...newItem.customFields, 
-                          previousSupplier: item.supplier 
-                        };
-                        // Remove the invalid supplier
-                        delete newItem.supplier;
-                        return newItem;
-                      }
-                      return item;
-                    });
-                    
-                    // Save the fixed items
-                    saveItems(fixedItems);
-                    
-                    toast.success(`Fixed ${itemsWithInvalidSuppliers.length} items with invalid suppliers`);
-                  }}
-                >
-                  Fix Unreconciled Items
-          </Button>
-        </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="units">
-          <Card className="mb-6">
-                  <CardHeader>
-              <CardTitle>Units</CardTitle>
-              <CardDescription>
-                Manage units of measurement for your inventory items
-              </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <EditableItemWithSubcategoriesList
-                items={settings.units}
-                setItems={(newItems) => updateSettingsList('units', newItems)}
-                title="Units"
-                onCheckBeforeDelete={(value, onSafeToDelete) => {
-                  // Check if this unit is being used in any inventory items
-                  const items = getItems();
-                  const affectedItems = items.filter(item => item.unit === value);
-                  
-                  if (affectedItems.length > 0) {
-                    // Show reconciliation dialog
-                    setItemToDelete({type: 'Units', value});
-                    setAffectedItemsCount(affectedItems.length);
-                    setReconcileAction('delete');
-                    setReplacementValue('');
-                    setShowReconcileDialog(true);
-                  } else {
-                    // Safe to delete
-                    onSafeToDelete();
-                  }
-                }}
-              />
-              
-              <div className="mt-6 border-t pt-4">
-                <h3 className="text-md font-medium mb-2 text-foreground">Fix Unreconciled Items</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  If you have inventory items showing units that no longer exist in your list, 
-                  you can clean them up with this tool.
-                </p>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    // Get all inventory items
-                    const items = getItems();
-                    // Get list of valid units
-                    const validUnits = settings.units.map(unit => unit.name);
-                    
-                    // Find items with invalid units
-                    const itemsWithInvalidUnits = items.filter(
-                      item => item.unit && !validUnits.includes(item.unit)
-                    );
-                    
-                    if (itemsWithInvalidUnits.length === 0) {
-                      toast.info("No inventory items with invalid units found");
-                      return;
-                    }
-                    
-                    // Fix the items by setting a default unit
-                    const defaultUnit = validUnits.length > 0 ? validUnits[0] : "each";
-                    const fixedItems = items.map(item => {
-                      if (item.unit && !validUnits.includes(item.unit)) {
-                        // Make a copy of the item
-                        const newItem = { ...item };
-                        // Store the invalid unit in a custom field for reference
-                        newItem.customFields = { 
-                          ...newItem.customFields, 
-                          previousUnit: item.unit 
-                        };
-                        // Set a default unit (unlike categories, units are required)
-                        newItem.unit = defaultUnit;
-                        return newItem;
-                      }
-                      return item;
-                    });
-                    
-                    // Save the fixed items
-                    saveItems(fixedItems);
-                    
-                    toast.success(`Fixed ${itemsWithInvalidUnits.length} items with invalid units`);
-                  }}
-                >
-                  Fix Unreconciled Items
-                </Button>
-              </div>
-                  </CardContent>
-                </Card>
-        </TabsContent>
-
-        <TabsContent value="locations">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Locations</CardTitle>
-              <CardDescription>
-                Manage storage locations for your inventory items
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EditableItemWithSubcategoriesList
-                items={settings.locations}
-                setItems={(newItems) => updateSettingsList('locations', newItems)}
-                title="Locations"
-                onCheckBeforeDelete={(value, onSafeToDelete) => {
-                  // Check if this location is being used in any inventory items
-                  const items = getItems();
-                  const affectedItems = items.filter(item => item.location === value);
-                  
-                  if (affectedItems.length > 0) {
-                    // Show reconciliation dialog
-                    setItemToDelete({type: 'Locations', value});
-                    setAffectedItemsCount(affectedItems.length);
-                    setReconcileAction('delete');
-                    setReplacementValue('');
-                    setShowReconcileDialog(true);
-                  } else {
-                    // Safe to delete
-                    onSafeToDelete();
-                  }
-                }}
-              />
-              
-              <div className="mt-6 border-t pt-4">
-                <h3 className="text-md font-medium mb-2 text-foreground">Fix Unreconciled Items</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  If you have inventory items showing locations that no longer exist in your list, 
-                  you can clean them up with this tool.
-                </p>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    // Get all inventory items
-                    const items = getItems();
-                    // Get list of valid locations
-                    const validLocations = settings.locations.map(loc => loc.name);
-                    
-                    // Find items with invalid locations
-                    const itemsWithInvalidLocations = items.filter(
-                      item => item.location && !validLocations.includes(item.location)
-                    );
-                    
-                    if (itemsWithInvalidLocations.length === 0) {
-                      toast.info("No inventory items with invalid locations found");
-                      return;
-                    }
-                    
-                    // Fix the items by removing invalid locations
-                    const fixedItems = items.map(item => {
-                      if (item.location && !validLocations.includes(item.location)) {
-                        // Make a copy of the item
-                        const newItem = { ...item };
-                        // Store the invalid location in a custom field for reference
-                        newItem.customFields = { 
-                          ...newItem.customFields, 
-                          previousLocation: item.location 
-                        };
-                        // Remove the invalid location
-                        delete newItem.location;
-                        return newItem;
-                      }
-                      return item;
-                    });
-                    
-                    // Save the fixed items
-                    saveItems(fixedItems);
-                    
-                    toast.success(`Fixed ${itemsWithInvalidLocations.length} items with invalid locations`);
-                  }}
-                >
-                  Fix Unreconciled Items
-              </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="projects">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Projects</CardTitle>
-              <CardDescription>
-                Manage projects for your inventory items
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EditableItemWithSubcategoriesList
-                items={settings.projects}
-                setItems={(newItems) => updateSettingsList('projects', newItems)}
-                title="Projects"
-                onCheckBeforeDelete={(value, onSafeToDelete) => {
-                  // Check if this project is being used in any inventory items
-                  const items = getItems();
-                  const affectedItems = items.filter(item => item.project === value);
-                  
-                  if (affectedItems.length > 0) {
-                    // Show reconciliation dialog
-                    setItemToDelete({type: 'Projects', value});
-                    setAffectedItemsCount(affectedItems.length);
-                    setReconcileAction('delete');
-                    setReplacementValue('');
-                    setShowReconcileDialog(true);
-                  } else {
-                    // Safe to delete
-                    onSafeToDelete();
-                  }
-                }}
-              />
-              
-              <div className="mt-6 border-t pt-4">
-                <h3 className="text-md font-medium mb-2 text-foreground">Fix Unreconciled Items</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  If you have inventory items showing projects that no longer exist in your list, 
-                  you can clean them up with this tool.
-                </p>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    // Get all inventory items
-                    const items = getItems();
-                    // Get list of valid projects
-                    const validProjects = settings.projects.map(proj => proj.name);
-                    
-                    // Find items with invalid projects
-                    const itemsWithInvalidProjects = items.filter(
-                      item => item.project && !validProjects.includes(item.project)
-                    );
-                    
-                    if (itemsWithInvalidProjects.length === 0) {
-                      toast.info("No inventory items with invalid projects found");
-                      return;
-                    }
-                    
-                    // Fix the items by removing invalid projects
-                    const fixedItems = items.map(item => {
-                      if (item.project && !validProjects.includes(item.project)) {
-                        // Make a copy of the item
-                        const newItem = { ...item };
-                        // Store the invalid project in a custom field for reference
-                        newItem.customFields = { 
-                          ...newItem.customFields, 
-                          previousProject: item.project 
-                        };
-                        // Remove the invalid project
-                        delete newItem.project;
-                        return newItem;
-                      }
-                      return item;
-                    });
-                    
-                    // Save the fixed items
-                    saveItems(fixedItems);
-                    
-                    toast.success(`Fixed ${itemsWithInvalidProjects.length} items with invalid projects`);
-                  }}
-                >
-                  Fix Unreconciled Items
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="financial">
-          <FinancialCodesTab
-            expenseTypes={financialSettings.expenseTypes}
-            costCenters={financialSettings.costCenters}
-            onChangeExpenseTypes={(entries) => {
-              const previousCodes = financialSettings.expenseTypes.map((entry) => entry.code);
-              const nextCodes = entries.map((entry) => entry.code);
-              const next = { ...financialSettings, expenseTypes: entries };
-              setFinancialSettings(next);
-              saveFinancialSettings(next);
-              logger.info(
-                'security',
-                'FINANCIAL_EXPENSE_TYPES_UPDATED',
-                {
-                  previousCount: previousCodes.length,
-                  nextCount: nextCodes.length,
-                  addedCodes: nextCodes.filter((code) => !previousCodes.includes(code)),
-                  removedCodes: previousCodes.filter((code) => !nextCodes.includes(code)),
-                  performedBy: currentUser?.username || 'Unknown',
-                },
-                'SettingsPage'
-              );
-            }}
-            onChangeCostCenters={(entries) => {
-              const previousCodes = financialSettings.costCenters.map((entry) => entry.code);
-              const nextCodes = entries.map((entry) => entry.code);
-              const next = { ...financialSettings, costCenters: entries };
-              setFinancialSettings(next);
-              saveFinancialSettings(next);
-              logger.info(
-                'security',
-                'FINANCIAL_COST_CENTERS_UPDATED',
-                {
-                  previousCount: previousCodes.length,
-                  nextCount: nextCodes.length,
-                  addedCodes: nextCodes.filter((code) => !previousCodes.includes(code)),
-                  removedCodes: previousCodes.filter((code) => !nextCodes.includes(code)),
-                  performedBy: currentUser?.username || 'Unknown',
-                },
-                'SettingsPage'
-              );
-            }}
+          <UserDefinedListsSection
+            panel={userDefinedPanel}
+            onPanelChange={setUserDefinedPanel}
+            settings={settings}
+            updateSettingsList={updateSettingsList}
+            financialSettings={financialSettings}
+            setFinancialSettings={setFinancialSettings}
+            currentUsername={currentUser?.username ?? 'admin'}
+            onRequestDeleteReconcile={requestListDeleteReconcile}
           />
-        </TabsContent>
-
-        <TabsContent value="templates">
-          <TemplatesPage />
-        </TabsContent>
-
-        <TabsContent value="cabinets">
-          <Card>
-            <CardHeader>
-              <CardTitle>Secure Cabinet / Storage Management</CardTitle>
-              <CardDescription>
-                Manage secure cabinets and storage units by location.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CabinetManagement 
-                locations={settings.locations.map(loc => loc.name)} 
-              />
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="users">
@@ -2008,6 +1697,17 @@ export default function SettingsPage() {
             onBackupData={handleBackupData}
             onRestoreData={handleRestoreData}
             onExportSettingsSnapshot={() => void handleExportSettingsSnapshot()}
+            onRestoreSettingsSnapshot={handleRestoreSettingsSnapshot}
+            dailyOfflineBackupEnabled={defaultSettings.dailyOfflineBackupEnabled}
+            onDailyOfflineBackupEnabledChange={(enabled) => {
+              const next = defaultSettingsSchema.parse({
+                ...defaultSettings,
+                dailyOfflineBackupEnabled: enabled,
+              });
+              setDefaultSettings(next);
+              SettingsService.saveDefaultSettings(next);
+            }}
+            dailyOfflineBackupLastDate={defaultSettings.dailyOfflineBackupLastDate}
             onRunGroupInventoryReconcile={handleGroupInventoryReconcile}
           />
         </TabsContent>
@@ -2016,7 +1716,6 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>System Logs</CardTitle>
-              <CardDescription>View system activity and troubleshoot issues</CardDescription>
             </CardHeader>
             <CardContent>
               <SystemLogs />
@@ -2247,12 +1946,10 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {isCameraDialogOpen && (
-        <CameraSettingsDialog
-          isOpen={isCameraDialogOpen}
-          onClose={() => setIsCameraDialogOpen(false)}
-        />
-      )}
+      <CameraSettingsDialog
+        isOpen={isCameraDialogOpen}
+        onClose={() => setIsCameraDialogOpen(false)}
+      />
 
       {/* Import Success Dialog */}
       <Dialog 

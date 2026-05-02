@@ -5,6 +5,24 @@ import * as fsPromises from 'fs/promises';
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
+// GPU process can fail on some Windows setups (VM, RDP, driver quirks) with
+// error_code=18 → FATAL. `disableHardwareAcceleration()` alone is not always enough;
+// Chromium still spawns a GPU child unless command-line switches are set first.
+// Must run before `ready` (and before squirrel). Opt in: ELECTRON_ENABLE_GPU=1
+const shouldMitigateGpu =
+  process.env.ELECTRON_ENABLE_GPU !== '1' &&
+  (process.platform === 'win32' || process.env.ELECTRON_DISABLE_GPU === '1');
+
+if (shouldMitigateGpu) {
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+  app.commandLine.appendSwitch('disable-gpu-compositing');
+  app.disableHardwareAcceleration();
+  console.log(
+    '[trackIT] GPU mitigation on (disable-gpu switches + disableHardwareAcceleration). Set ELECTRON_ENABLE_GPU=1 to use the GPU.'
+  );
+}
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();

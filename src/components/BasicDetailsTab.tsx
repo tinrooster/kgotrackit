@@ -1,12 +1,18 @@
 import * as React from 'react';
 import { UseFormReturn } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CategoryNode, ItemWithSubcategories } from "@/types/inventory";
 import { Cabinet } from "@/types/cabinets";
-import { FinancialCodeEntry } from '@/lib/financialSettingsService';
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Combobox } from "@/components/ui/combobox";
+import {
+  getRackOptionsForFlatLocationLabel,
+  RACK_LOCATIONS_UPDATED_EVENT,
+} from "@/lib/rackLocationsConfig";
 
 interface BasicDetailsTabProps {
   form: UseFormReturn<any>;
@@ -14,8 +20,12 @@ interface BasicDetailsTabProps {
   locations: ItemWithSubcategories[];
   cabinets: Cabinet[];
   projects: ItemWithSubcategories[];
-  expenseTypes?: FinancialCodeEntry[];
-  costCenters?: FinancialCodeEntry[];
+  /** When true, item name is not required (e.g. templates — name is set when the template is used). */
+  itemNameOptional?: boolean;
+  /** Durable inventory record ID (next value on add, or saved `recordId` when editing). */
+  inventoryRecordLine?: string | null;
+  /** Physical asset tag pattern preview or saved tag (`assetId`). */
+  assetTagLine?: string | null;
 }
 
 export function BasicDetailsTab({ 
@@ -24,8 +34,9 @@ export function BasicDetailsTab({
   locations = [], 
   cabinets = [],
   projects = [],
-  expenseTypes = [],
-  costCenters = []
+  itemNameOptional = false,
+  inventoryRecordLine = null,
+  assetTagLine = null,
 }: BasicDetailsTabProps) {
   // Function to get flattened category options with subcategories inline
   const getFlattenedCategoryOptions = React.useMemo(() => {
@@ -77,35 +88,64 @@ export function BasicDetailsTab({
     return cabinets?.filter(cabinet => cabinet.locationId === locationId) || [];
   }, [form.watch('location'), cabinets]);
 
+  const watchedLocationId = form.watch("location");
+  const flatLocationLabel = React.useMemo(() => {
+    const opt = getFlattenedLocationOptions.find((o) => o.id === watchedLocationId);
+    return opt?.name ?? "";
+  }, [watchedLocationId, getFlattenedLocationOptions]);
+  const [rackConfigEpoch, setRackConfigEpoch] = React.useState(0);
+  React.useEffect(() => {
+    const onUpdate = () => setRackConfigEpoch((n) => n + 1);
+    window.addEventListener(RACK_LOCATIONS_UPDATED_EVENT, onUpdate);
+    return () => window.removeEventListener(RACK_LOCATIONS_UPDATED_EVENT, onUpdate);
+  }, []);
+
+  const rackOptions = React.useMemo(
+    () => getRackOptionsForFlatLocationLabel(flatLocationLabel),
+    [flatLocationLabel, rackConfigEpoch]
+  );
+
+  const locationComboboxOptions = React.useMemo(
+    () =>
+      getFlattenedLocationOptions.map((o) => ({
+        label: o.name,
+        value: o.id,
+      })),
+    [getFlattenedLocationOptions]
+  );
+
+  const rackComboboxOptions = React.useMemo(
+    () => rackOptions.map((o) => ({ label: o, value: o })),
+    [rackOptions]
+  );
+
   return (
     <div className="space-y-4">
+      {inventoryRecordLine || assetTagLine ? (
+        <div className="space-y-1 border-b border-border/40 pb-3 text-xs text-muted-foreground/90">
+          {inventoryRecordLine ? (
+            <p>
+              <span className="font-medium text-muted-foreground">Record ID:</span> {inventoryRecordLine}
+            </p>
+          ) : null}
+          {assetTagLine ? (
+            <p>
+              <span className="font-medium text-muted-foreground">Asset tag:</span> {assetTagLine}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Name and Description */}
       <FormField
         control={form.control}
         name="name"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Name*</FormLabel>
+            <FormLabel>{itemNameOptional ? "Item name (optional)" : "Name*"}</FormLabel>
             <FormControl>
               <Input {...field} placeholder="Enter item name" />
             </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="assetId"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Asset Tag</FormLabel>
-            <FormControl>
-              <Input {...field} value={field.value || ''} placeholder="Auto-assigned asset ID" />
-            </FormControl>
-            <FormDescription>
-              Unique identifier shown with this record.
-            </FormDescription>
             <FormMessage />
           </FormItem>
         )}
@@ -209,10 +249,54 @@ export function BasicDetailsTab({
                     <SelectItem value="in_service">In Service</SelectItem>
                     <SelectItem value="ready_decommission">Ready to Decommission</SelectItem>
                     <SelectItem value="slated_removal">Slated for Removal</SelectItem>
+                    <SelectItem value="cut_over_pending">Cut-over pending</SelectItem>
                     <SelectItem value="ewaste">E-Waste</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="assetTrackingMode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-muted-foreground font-normal">Units & tagging</FormLabel>
+                <FormControl>
+                  <div
+                    className="flex flex-col gap-1.5 sm:flex-row sm:gap-2"
+                    role="group"
+                    aria-label="Single or multiple unit record IDs"
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={field.value === "line_item" ? "secondary" : "ghost"}
+                      className={cn(
+                        "h-8 justify-start px-3 text-xs font-normal",
+                        field.value === "line_item" && "bg-muted"
+                      )}
+                      onClick={() => field.onChange("line_item")}
+                    >
+                      Single unit
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={field.value === "per_unit" ? "secondary" : "ghost"}
+                      className={cn(
+                        "h-8 justify-start px-3 text-xs font-normal",
+                        field.value === "per_unit" && "bg-muted"
+                      )}
+                      onClick={() => field.onChange("per_unit")}
+                    >
+                      Multiple units
+                    </Button>
+                  </div>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -227,27 +311,17 @@ export function BasicDetailsTab({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Location*</FormLabel>
-                <Select
-                  onValueChange={(value) => {
-                    field.onChange(value);
-                    // Clear cabinet when location changes
-                    form.setValue('cabinet', '');
-                  }}
+                <Combobox
+                  options={locationComboboxOptions}
                   value={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {getFlattenedLocationOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => {
+                    field.onChange(value);
+                    form.setValue("cabinet", "");
+                    form.setValue("rackLocation", "");
+                  }}
+                  placeholder="Search location (type to filter)…"
+                  emptyText="No location matches."
+                />
                 <FormMessage />
               </FormItem>
             )}
@@ -278,105 +352,32 @@ export function BasicDetailsTab({
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>
-                    Items in secure cabinets require checkout
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
           )}
 
-          <FormField
-            control={form.control}
-            name="expenseTypeCode"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Expense Type</FormLabel>
-                <Select
-                  onValueChange={(value) => {
-                    const selected = expenseTypes.find((entry) => entry.code === value);
-                    field.onChange(value);
-                    form.setValue('expenseTypeDescription', selected?.description || '');
-                  }}
-                  value={field.value || 'N/A'}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select expense type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="N/A">N/A</SelectItem>
-                    {expenseTypes.map((entry) => (
-                      <SelectItem key={entry.id} value={entry.code}>
-                        {entry.code} - {entry.description}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="costCenterCode"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cost Center / Allocation</FormLabel>
-                <Select
-                  onValueChange={(value) => {
-                    const selected = costCenters.find((entry) => entry.code === value);
-                    field.onChange(value);
-                    form.setValue('costCenterDescription', selected?.description || '');
-                  }}
-                  value={field.value || 'N/A'}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select cost center" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="N/A">N/A</SelectItem>
-                    {costCenters.map((entry) => (
-                      <SelectItem key={entry.id} value={entry.code}>
-                        {entry.code} - {entry.description}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="assetTrackingMode"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Asset Tagging Mode</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || 'line_item'}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select tagging mode" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="line_item">Single tag for this inventory line (box/case)</SelectItem>
-                    <SelectItem value="per_unit">Tag each unit individually</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormDescription>
-                  Use single-tag mode for consumables like tape boxes; per-unit for devices.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {rackOptions.length > 0 && (
+            <FormField
+              control={form.control}
+              name="rackLocation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rack location</FormLabel>
+                  <Combobox
+                    options={rackComboboxOptions}
+                    value={field.value || ""}
+                    onChange={(v) => field.onChange(v)}
+                    placeholder="Search rack (e.g. TD)…"
+                    emptyText="No rack matches."
+                    allowCustomValue
+                  />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
       </div>
     </div>

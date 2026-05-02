@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { Navigation } from './components/Navigation';
 import InventoryPage from './pages/InventoryPage';
 import DashboardPage from './pages/DashboardPage';
@@ -11,7 +12,9 @@ import { useAuth } from './contexts/AuthContext';
 import { initializeSettings } from './lib/dummyData';
 import CheckoutPage from './pages/CheckoutPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { SettingsService } from './lib/settingsService';
+import { SettingsService, DEFAULT_SETTINGS_CHANGED_EVENT } from './lib/settingsService';
+import { maybeRunDailyOfflineBackup } from './lib/trackItDailyBackup';
+import { refreshRackLocationsFromServer } from './lib/rackLocationsConfig';
 import HelpPage from './pages/HelpPage';
 import AboutPage from './pages/AboutPage';
 
@@ -27,13 +30,30 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const location = useLocation();
+  const inventoryFullBleed = location.pathname === '/inventory';
+
   useEffect(() => {
     initializeSettings();
+    void refreshRackLocationsFromServer();
     const uiSettings = SettingsService.loadDefaultSettings();
     const shouldUseDarkTheme = uiSettings.theme === 'dark'
       || (uiSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', shouldUseDarkTheme);
     document.body.classList.toggle('compact-ui', uiSettings.condensedView);
+    document.body.classList.toggle('mt-compact-ui', uiSettings.mobileTabletUi);
+  }, []);
+
+  useEffect(() => {
+    const tick = () => void maybeRunDailyOfflineBackup();
+    void tick();
+    const intervalId = window.setInterval(tick, 60 * 60 * 1000);
+    const onDefaultsChanged = () => void tick();
+    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, onDefaultsChanged);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, onDefaultsChanged);
+    };
   }, []);
 
   return (
@@ -41,7 +61,14 @@ export default function App() {
       <ErrorBoundary>
         <div className="min-h-screen bg-background">
           <Navigation />
-          <main className="container mx-auto py-6 px-4">
+          <main
+            className={cn(
+              'min-w-0 py-6',
+              inventoryFullBleed
+                ? 'box-border w-full max-w-full px-3 sm:px-4 lg:px-6'
+                : 'container mx-auto px-4'
+            )}
+          >
             <Routes>
               <Route
                 path="/"

@@ -306,9 +306,21 @@ export default function Settings() {
           <TabsContent value="data-backup">
             <DataBackupTab
               onExportData={handleExportData}
+              onExportExcel={() => {}}
               onImportData={handleImportData}
+              onImportExcel={async () => {}}
               onBackupData={handleBackupData}
               onRestoreData={handleRestoreData}
+              onExportSettingsSnapshot={() => {}}
+              onRestoreSettingsSnapshot={async () => {}}
+              dailyOfflineBackupEnabled={false}
+              onDailyOfflineBackupEnabledChange={() => {}}
+              onRunGroupInventoryReconcile={() => ({
+                itemsTouched: 0,
+                issues: [],
+                details: [],
+                detailsTruncated: false,
+              })}
             />
           </TabsContent>
 

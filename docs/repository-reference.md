@@ -17,7 +17,7 @@
 ## Core Application Paths
 
 - `src/pages/`  
-  Route-level pages (Dashboard, Inventory, Checkout, Reports, Settings, Help, About).
+  Route-level pages (Dashboard, Inventory, Check-In/Out → `CheckoutPage` `/checkout`, Reports, Settings, Help, About).
 
 - `src/components/`  
   Shared UI and workflow components.

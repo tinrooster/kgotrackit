@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Pencil, Trash2, GripVertical, Plus, Save, X, ChevronDown, ChevronRight } from 'lucide-react';
-import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Pencil, Trash2, GripVertical, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -23,14 +32,35 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { ItemWithSubcategories } from '@/types/inventory';
 
+function singularFormForListTitle(title: string): string {
+  const lower = title.trim().toLowerCase();
+  const irregular: Record<string, string> = {
+    categories: 'category',
+    suppliers: 'supplier',
+    units: 'unit',
+    locations: 'location',
+    projects: 'project',
+  };
+  if (irregular[lower]) {
+    return irregular[lower];
+  }
+  if (lower.endsWith('ies')) {
+    return `${lower.slice(0, -3)}y`;
+  }
+  if (lower.endsWith('s') && lower.length > 1) {
+    return lower.slice(0, -1);
+  }
+  return lower;
+}
+
 interface SortableItemProps {
   item: ItemWithSubcategories;
   onEdit: (id: string, newValue: string) => void;
   onEditColor?: (id: string, newColor: string) => void;
-  onDelete: (id: string) => void;
+  onRequestDeleteParent: (id: string) => void;
   onAddSubcategory: (id: string, subcategory: string) => void;
   onEditSubcategory: (id: string, oldValue: string, newValue: string) => void;
-  onDeleteSubcategory: (id: string, subcategory: string) => void;
+  onRequestDeleteSubcategory: (id: string, subcategory: string) => void;
 }
 
 const DEFAULT_CATEGORY_COLORS = [
@@ -44,21 +74,28 @@ const getFallbackColor = (item: ItemWithSubcategories) => {
   return DEFAULT_CATEGORY_COLORS[hashBase % DEFAULT_CATEGORY_COLORS.length];
 };
 
-function SortableItem({ 
-  item, 
-  onEdit, 
+function SortableItem({
+  item,
+  onEdit,
   onEditColor,
-  onDelete, 
-  onAddSubcategory, 
+  onRequestDeleteParent,
+  onAddSubcategory,
   onEditSubcategory,
-  onDeleteSubcategory,
+  onRequestDeleteSubcategory,
   showColorPicker = false,
   enableSubcategories = true,
-}: SortableItemProps & { enableSubcategories?: boolean; showColorPicker?: boolean }) {
+  colorPickerLabel = 'Category color',
+}: SortableItemProps & {
+  enableSubcategories?: boolean;
+  showColorPicker?: boolean;
+  colorPickerLabel?: string;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(item.name);
   const [newSubcategory, setNewSubcategory] = useState('');
+  const [subAddOpen, setSubAddOpen] = useState(false);
   const [editingSubcategory, setEditingSubcategory] = useState<string | null>(null);
+  const [subsExpanded, setSubsExpanded] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
 
   const style = {
@@ -90,85 +127,138 @@ function SortableItem({
     if (newSubcategory.trim()) {
       onAddSubcategory(item.id, newSubcategory.trim());
       setNewSubcategory('');
+      setSubAddOpen(false);
+      setSubsExpanded(true);
     }
   };
 
   return (
     <div ref={setNodeRef} style={style} className="space-y-2">
-      <div className="flex justify-between items-center p-2 rounded-md border bg-card text-card-foreground">
-        <div className="flex items-center flex-1">
-          <button {...attributes} {...listeners} className="p-1 mr-2 cursor-grab active:cursor-grabbing">
+      <div className="flex justify-between items-center gap-2 rounded-md border border-border/80 bg-muted/30 p-2 font-medium text-foreground shadow-sm">
+        <div className="flex min-w-0 flex-1 items-center">
+          <button {...attributes} {...listeners} className="mr-2 shrink-0 cursor-grab p-1 active:cursor-grabbing">
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </button>
-          {isEditing ? (
-            <Input
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={handleSave}
-              onKeyDown={handleKeyDown}
-              className="h-8"
-              autoFocus
-            />
+          {enableSubcategories && (item.children?.length ?? 0) > 0 ? (
+            <button
+              type="button"
+              className="mr-1 shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => setSubsExpanded((v) => !v)}
+              aria-expanded={subsExpanded}
+              aria-label={subsExpanded ? 'Collapse subcategories' : 'Expand subcategories'}
+            >
+              {subsExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
           ) : (
-            <div className="flex items-center gap-2">
+            <span className="mr-1 w-7 shrink-0" aria-hidden />
+          )}
+          {isEditing ? (
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <Input
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleSave}
+                onKeyDown={handleKeyDown}
+                className="h-8 min-w-0 flex-1 basis-[8rem]"
+                autoFocus
+              />
+              {showColorPicker && onEditColor && (
+                <Input
+                  type="color"
+                  value={getFallbackColor(item)}
+                  onChange={(e) => onEditColor(item.id, e.target.value)}
+                  className="h-8 w-12 shrink-0 p-1"
+                  title={colorPickerLabel}
+                  aria-label={`${colorPickerLabel} for ${item.name}`}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               {showColorPicker && (
                 <span
-                  className="h-3 w-3 rounded-full border border-border"
+                  className="h-3 w-3 shrink-0 rounded-full border border-border"
                   style={{ backgroundColor: getFallbackColor(item) }}
                   aria-hidden="true"
                 />
               )}
-              <span>{item.name}</span>
+              <span className="truncate">{item.name}</span>
             </div>
           )}
         </div>
-        <div className="flex gap-2">
-          {showColorPicker && onEditColor && (
-            <Input
-              type="color"
-              value={getFallbackColor(item)}
-              onChange={(e) => onEditColor(item.id, e.target.value)}
-              className="h-8 w-10 p-1"
-              title="Category color"
-              aria-label={`Category color for ${item.name}`}
-            />
-          )}
+        <div className="flex shrink-0 gap-2">
           <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onDelete(item.id)} className="text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onRequestDeleteParent(item.id)}
+            className="text-muted-foreground hover:text-foreground"
+          >
             <Trash2 className="h-4 w-4" />
           </Button>
+          {enableSubcategories && (
+            <Popover
+              open={subAddOpen}
+              onOpenChange={(open) => {
+                setSubAddOpen(open);
+                if (!open) setNewSubcategory('');
+              }}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  title="Add subcategory"
+                  aria-label={`Add subcategory under ${item.name}`}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[min(100vw-2rem,20rem)] p-3" align="end">
+                <div className="space-y-2">
+                  <Input
+                    type="text"
+                    placeholder="Subcategory name"
+                    value={newSubcategory}
+                    onChange={(e) => setNewSubcategory(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddSubcategory();
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => { setSubAddOpen(false); setNewSubcategory(''); }}>
+                      Cancel
+                    </Button>
+                    <Button type="button" size="sm" onClick={handleAddSubcategory}>
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </div>
 
-      {enableSubcategories && (
-        <div className="pl-8 space-y-2">
-          <div className="flex space-x-2">
-            <Input
-              type="text"
-              className="flex-1"
-              placeholder="Add subcategory"
-              value={newSubcategory}
-              onChange={(e) => setNewSubcategory(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddSubcategory();
-                }
-              }}
-            />
-            <Button 
-              onClick={handleAddSubcategory}
-              variant="outline"
-              className="border-border"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add
-            </Button>
-          </div>
-
+      {enableSubcategories && subsExpanded && (item.children?.length ?? 0) > 0 && (
+        <div className="ml-1 space-y-1 border-l-2 border-primary/30 pl-3 sm:ml-2 sm:pl-4">
           {item.children?.map((child) => (
-            <div key={child.name} className="flex justify-between items-center p-2 rounded-md border bg-background text-foreground">
+            <div
+              key={child.name}
+              className="flex min-w-0 items-center justify-between gap-2 rounded-r-md border border-border/60 border-l-transparent bg-muted/15 py-1.5 pl-2 pr-2 text-sm text-muted-foreground"
+            >
               {editingSubcategory === child.name ? (
                 <Input
                   value={editValue}
@@ -189,20 +279,28 @@ function SortableItem({
                       setEditingSubcategory(null);
                     }
                   }}
-                  className="h-8"
+                  className="h-8 min-w-0 flex-1"
                   autoFocus
                 />
               ) : (
                 <>
-                  <span>{child.name}</span>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingSubcategory(child.name)} className="text-muted-foreground hover:text-foreground">
+                  <span className="min-w-0 flex-1 truncate italic">{child.name}</span>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditValue(child.name);
+                        setEditingSubcategory(child.name);
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => onDeleteSubcategory(item.id, child.name)} 
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRequestDeleteSubcategory(item.id, child.name)}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -223,20 +321,35 @@ interface EditableItemWithSubcategoriesListProps {
   setItems: (items: ItemWithSubcategories[]) => void;
   title: string;
   description?: string;
+  /** Hide the built-in H3 title when the parent card already shows the same heading. */
+  hideListTitle?: boolean;
   enableSubcategories?: boolean;
   showColorPicker?: boolean;
+  /** Accessible label for the color input when `showColorPicker` is on. */
+  colorPickerLabel?: string;
   onCheckBeforeDelete?: (value: string, onSafeToDelete: () => void) => void;
 }
+
+type DeleteTarget =
+  | null
+  | { kind: 'parent'; id: string }
+  | { kind: 'sub'; parentId: string; subName: string };
 
 export function EditableItemWithSubcategoriesList({
   items,
   setItems,
   title,
   description,
+  hideListTitle = false,
   enableSubcategories = true,
   showColorPicker = false,
+  colorPickerLabel = 'Category color',
   onCheckBeforeDelete,
 }: EditableItemWithSubcategoriesListProps) {
+  const addInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const addPlaceholder = `Add new ${singularFormForListTitle(title)}`;
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -254,29 +367,35 @@ export function EditableItemWithSubcategoriesList({
   };
 
   const handleAddItem = () => {
-    const input = document.querySelector(`input[placeholder="Add new ${title.toLowerCase().slice(0, -1)}"]`) as HTMLInputElement;
-    if (input && input.value.trim()) {
-      const newItem: ItemWithSubcategories = {
-        id: Date.now().toString(),
-        name: input.value.trim(),
-        ...(showColorPicker ? { color: DEFAULT_CATEGORY_COLORS[items.length % DEFAULT_CATEGORY_COLORS.length] } : {}),
-        children: [],
-      };
-      setItems([...items, newItem]);
-      input.value = '';
+    const value = addInputRef.current?.value?.trim();
+    if (!value) {
+      return;
+    }
+    const newItem: ItemWithSubcategories = {
+      id: Date.now().toString(),
+      name: value,
+      ...(showColorPicker ? { color: DEFAULT_CATEGORY_COLORS[items.length % DEFAULT_CATEGORY_COLORS.length] } : {}),
+      children: [],
+    };
+    setItems([...items, newItem]);
+    if (addInputRef.current) {
+      addInputRef.current.value = '';
     }
   };
 
   const handleEditItem = (id: string, newValue: string) => {
-    const newItems = items.map((item) => 
+    const newItems = items.map((item) =>
       item.id === id ? { ...item, name: newValue } : item
     );
     setItems(newItems);
   };
 
-  const handleDeleteItem = (id: string) => {
-    const itemToDelete = items.find(item => item.id === id);
-    if (itemToDelete && onCheckBeforeDelete) {
+  const runParentDelete = (id: string) => {
+    const itemToDelete = items.find((item) => item.id === id);
+    if (!itemToDelete) {
+      return;
+    }
+    if (onCheckBeforeDelete) {
       onCheckBeforeDelete(itemToDelete.name, () => {
         setItems(items.filter((item) => item.id !== id));
       });
@@ -313,7 +432,7 @@ export function EditableItemWithSubcategoriesList({
       if (item.id === id) {
         return {
           ...item,
-          children: item.children?.map((child) => 
+          children: item.children?.map((child) =>
             child.name === oldValue ? { ...child, name: newValue } : child
           ),
         };
@@ -342,28 +461,52 @@ export function EditableItemWithSubcategoriesList({
     }
   };
 
+  const confirmDelete = () => {
+    if (!deleteTarget) {
+      return;
+    }
+    if (deleteTarget.kind === 'parent') {
+      runParentDelete(deleteTarget.id);
+    } else {
+      handleDeleteSubcategory(deleteTarget.parentId, deleteTarget.subName);
+    }
+    setDeleteTarget(null);
+  };
+
+  const parentLabel =
+    deleteTarget?.kind === 'parent'
+      ? items.find((i) => i.id === deleteTarget.id)?.name
+      : deleteTarget?.kind === 'sub'
+        ? deleteTarget.subName
+        : '';
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="text-lg font-medium text-foreground">{title}</h3>
-          {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      {!hideListTitle && (
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-medium text-foreground">{title}</h3>
+            {description && <p className="text-sm text-muted-foreground">{description}</p>}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex space-x-2">
+      <div className="flex min-w-0 gap-2">
         <Input
+          ref={addInputRef}
           type="text"
-          className="flex-1"
-          placeholder={`Add new ${title.toLowerCase().slice(0, -1)}`}
+          className="min-w-0 flex-1"
+          placeholder={addPlaceholder}
           onKeyDown={handleKeyDown}
+          aria-label={addPlaceholder}
         />
-        <Button 
+        <Button
+          type="button"
           onClick={handleAddItem}
-          className="border-border"
+          className="shrink-0 border-border"
           variant="outline"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Add
         </Button>
       </div>
@@ -377,17 +520,37 @@ export function EditableItemWithSubcategoriesList({
                 item={item}
                 onEdit={handleEditItem}
                 onEditColor={handleEditColor}
-                onDelete={handleDeleteItem}
+                onRequestDeleteParent={(id) => setDeleteTarget({ kind: 'parent', id })}
                 onAddSubcategory={handleAddSubcategory}
                 onEditSubcategory={handleEditSubcategory}
-                onDeleteSubcategory={handleDeleteSubcategory}
+                onRequestDeleteSubcategory={(parentId, subName) =>
+                  setDeleteTarget({ kind: 'sub', parentId, subName })
+                }
                 enableSubcategories={enableSubcategories}
                 showColorPicker={showColorPicker}
+                colorPickerLabel={colorPickerLabel}
               />
             ))}
           </div>
         </SortableContext>
       </DndContext>
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.kind === 'sub' ? 'subcategory' : 'entry'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes &quot;{parentLabel}&quot; from the list. This cannot be undone from here (use app Undo where available).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
-} 
+}

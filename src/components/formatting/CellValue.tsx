@@ -1,8 +1,10 @@
 import * as React from 'react';
 import { format } from 'date-fns';
-import { InventoryItem } from '@/types/inventory';
+import { InventoryItem, ItemWithSubcategories } from '@/types/inventory';
 import { formatCurrency } from '@/lib/utils';
 import { getSettings } from '@/lib/storageService';
+import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
+import { accentColorForLocation, accentColorForProject } from '@/lib/lookupAccentColors';
 import { Badge } from "@/components/ui/badge";
 import { BarChart2, StickyNote } from "lucide-react";
 import {
@@ -126,10 +128,47 @@ export function FormatCellValue({ item, column }: { item: InventoryItem; column:
     );
   }
   if (column === 'location') {
-    return getResolvedLabel(item.location, 'locations');
+    const locLabel = resolveLocationDisplay(item.location, (settings.locations || []) as ItemWithSubcategories[]);
+    const locColor = accentColorForLocation(item.location, (settings.locations || []) as ItemWithSubcategories[]);
+    return (
+      <div className="flex items-center gap-2">
+        <span
+          className="inline-block h-4 w-1.5 rounded-sm border border-border/60"
+          style={{ backgroundColor: locColor }}
+          aria-hidden="true"
+        />
+        <span>{locLabel}</span>
+      </div>
+    );
   }
   if (column === 'project') {
-    return getResolvedLabel(item.project, 'projects');
+    const projectLabel = getResolvedLabel(item.project, 'projects');
+    const projectColor = accentColorForProject(item.project, (settings.projects || []) as ItemWithSubcategories[]);
+    return (
+      <div className="flex items-center gap-2">
+        <span
+          className="inline-block h-4 w-1.5 rounded-sm border border-border/60"
+          style={{ backgroundColor: projectColor }}
+          aria-hidden="true"
+        />
+        <span>{projectLabel}</span>
+      </div>
+    );
+  }
+  if (column === 'recordId') {
+    return item.recordId || '—';
+  }
+  if (column === 'photoUrl') {
+    if (!item.photoUrl) {
+      return '—';
+    }
+    return (
+      <img
+        src={item.photoUrl}
+        alt=""
+        className="h-9 w-9 rounded border object-cover"
+      />
+    );
   }
   const value = item[column as keyof typeof item];
   return value?.toString() || '-';
