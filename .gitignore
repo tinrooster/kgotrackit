@@ -34,3 +34,5 @@ graphify-out/cache/
 *.njsproj
 *.sln
 *.sw?
+
+supabase/.temp/
