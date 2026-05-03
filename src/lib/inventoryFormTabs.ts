@@ -1,6 +1,14 @@
 import type { FieldErrors } from "react-hook-form";
 
-export type InventoryFormTabId = "details" | "inventory" | "additional";
+export type InventoryFormTabId = "details" | "inventory" | "additional" | "decommissioning";
+
+/** Default tab order for validation error navigation. */
+export const INVENTORY_FORM_TAB_ORDER: InventoryFormTabId[] = [
+  "details",
+  "inventory",
+  "additional",
+  "decommissioning",
+];
 
 /** Maps each inventory form field to the tab that contains it (create item / template dialogs). */
 const FIELD_TO_TAB: Record<string, InventoryFormTabId> = {
@@ -38,10 +46,10 @@ const FIELD_TO_TAB: Record<string, InventoryFormTabId> = {
   maintenanceNotes: "additional",
   additionalNotes: "additional",
   photoUrl: "additional",
-  decomEOLDate: "additional",
-  decomCutoverDate: "additional",
-  decomLastAuditAt: "additional",
-  decomNotes: "additional",
+  decomEOLDate: "decommissioning",
+  decomCutoverDate: "decommissioning",
+  decomLastAuditAt: "decommissioning",
+  decomNotes: "decommissioning",
   cableColor: "additional",
   fiberMode: "additional",
   connectorType: "additional",
@@ -72,7 +80,7 @@ function collectRootFieldNames(errors: FieldErrors | undefined): string[] {
 /** First tab (in display order) that has a validation error. */
 export function getFirstTabWithErrors(
   errors: FieldErrors | undefined,
-  tabOrder: InventoryFormTabId[] = ["details", "inventory", "additional"]
+  tabOrder: InventoryFormTabId[] = INVENTORY_FORM_TAB_ORDER,
 ): InventoryFormTabId | null {
   const fields = collectRootFieldNames(errors);
   if (fields.length === 0) {

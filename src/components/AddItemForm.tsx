@@ -17,6 +17,7 @@ import { BarcodeScannerDialog } from "@/components/BarcodeScannerDialog";
 import { BasicDetailsTab } from "@/components/BasicDetailsTab";
 import { InventorySupplyTab } from "@/components/InventorySupplyTab";
 import { AdditionalInfoTab } from "@/components/AdditionalInfoTab";
+import { DecommissioningTab } from "@/components/DecommissioningTab";
 import { Cabinet } from "@/types/cabinets";
 import { ensureUrlProtocol } from "@/utils/url";
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
@@ -66,7 +67,7 @@ const formSchema = z.object({
   decomLastAuditAt: z.string().optional(),
   decomNotes: z.string().optional(),
   cableColor: z.string().optional(),
-  fiberMode: z.enum(['sm', 'mm', 'na']).default('na'),
+  fiberMode: z.enum(['sm', 'mm', 'na', 'mtp_mpo']).default('na'),
   connectorType: z.string().optional(),
   cableLotNumber: z.string().optional(),
 });
@@ -172,7 +173,10 @@ export function AddItemForm({
       decomNotes: initialValues?.decomNotes || "",
       cableColor: initialValues?.cableColor || "",
       fiberMode:
-        initialValues?.fiberMode === 'sm' || initialValues?.fiberMode === 'mm' || initialValues?.fiberMode === 'na'
+        initialValues?.fiberMode === 'sm' ||
+        initialValues?.fiberMode === 'mm' ||
+        initialValues?.fiberMode === 'na' ||
+        initialValues?.fiberMode === 'mtp_mpo'
           ? initialValues.fiberMode
           : 'na',
       connectorType: initialValues?.connectorType || "",
@@ -242,10 +246,23 @@ export function AddItemForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmitForm, onInvalid)} className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="details">Item Details</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory & Supply</TabsTrigger>
-            <TabsTrigger value="additional">Additional Info</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4 sm:gap-0">
+            <TabsTrigger value="details" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Item Details</span>
+              <span className="sm:hidden">Details</span>
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Inventory &amp; Supply</span>
+              <span className="sm:hidden">Supply</span>
+            </TabsTrigger>
+            <TabsTrigger value="additional" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Additional Info</span>
+              <span className="sm:hidden">More</span>
+            </TabsTrigger>
+            <TabsTrigger value="decommissioning" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Decommissioning</span>
+              <span className="sm:hidden">EOL</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="details">
@@ -268,7 +285,7 @@ export function AddItemForm({
             />
           </TabsContent>
 
-          <TabsContent value="additional">
+          <TabsContent value="additional" className="mt-4">
             <AdditionalInfoTab
               form={form}
               onScanBarcode={() => setIsScannerOpen(true)}
@@ -276,6 +293,10 @@ export function AddItemForm({
               costCenters={costCenters}
               supplierNames={suppliers.map((s) => s.name)}
             />
+          </TabsContent>
+
+          <TabsContent value="decommissioning" className="mt-4">
+            <DecommissioningTab form={form} />
           </TabsContent>
         </Tabs>
 

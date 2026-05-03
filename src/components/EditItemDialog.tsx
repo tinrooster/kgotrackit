@@ -140,7 +140,10 @@ export function EditItemDialog({
           typeof values.decomNotes === "string" ? values.decomNotes.trim() || undefined : item.decomNotes,
         cableColor:
           typeof values.cableColor === "string" ? values.cableColor.trim() || undefined : item.cableColor,
-        fiberMode: values.fiberMode === "sm" || values.fiberMode === "mm" ? values.fiberMode : undefined,
+        fiberMode:
+          values.fiberMode === "sm" || values.fiberMode === "mm" || values.fiberMode === "mtp_mpo"
+            ? values.fiberMode
+            : undefined,
         connectorType:
           typeof values.connectorType === "string" ? values.connectorType.trim() || undefined : item.connectorType,
         cableLotNumber:
@@ -169,7 +172,7 @@ export function EditItemDialog({
       <DialogContent
         nonModalBackdrop
         className={cn(
-          "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-2xl",
+          "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-3xl md:max-w-4xl lg:max-w-5xl",
           "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
           "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"
         )}

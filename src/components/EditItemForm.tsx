@@ -19,6 +19,7 @@ import { Cabinet } from "@/types/cabinets";
 import { Slider } from "@/components/ui/slider";
 import { BasicDetailsTab } from "./BasicDetailsTab";
 import { AdditionalInfoTab } from "@/components/AdditionalInfoTab";
+import { DecommissioningTab } from "@/components/DecommissioningTab";
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
 import { resolveProjectValue } from "@/lib/projectOptions";
 
@@ -74,7 +75,7 @@ const formSchema = z.object({
   decomLastAuditAt: z.string().optional(),
   decomNotes: z.string().optional(),
   cableColor: z.string().optional(),
-  fiberMode: z.enum(['sm', 'mm', 'na']).default('na'),
+  fiberMode: z.enum(['sm', 'mm', 'na', 'mtp_mpo']).default('na'),
   connectorType: z.string().optional(),
   cableLotNumber: z.string().optional(),
 });
@@ -153,8 +154,8 @@ const InventorySupplyTab = ({ form, units, suppliers }: {
   }, [form.watch('unit'), units]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="mx-auto w-full max-w-[56rem] space-y-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Unit fields with subcategories */}
         <FormField
           control={form.control}
@@ -490,7 +491,12 @@ export function EditItemForm({
       decomNotes: item.decomNotes || '',
       cableColor: item.cableColor || '',
       fiberMode:
-        item.fiberMode === 'sm' || item.fiberMode === 'mm' || item.fiberMode === 'na' ? item.fiberMode : 'na',
+        item.fiberMode === 'sm' ||
+        item.fiberMode === 'mm' ||
+        item.fiberMode === 'na' ||
+        item.fiberMode === 'mtp_mpo'
+          ? item.fiberMode
+          : 'na',
       connectorType: item.connectorType || '',
       cableLotNumber: item.cableLotNumber || '',
     };
@@ -540,10 +546,23 @@ export function EditItemForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="details">Item Details</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory & Supply</TabsTrigger>
-            <TabsTrigger value="additional">Additional Info</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4 sm:gap-0">
+            <TabsTrigger value="details" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Item Details</span>
+              <span className="sm:hidden">Details</span>
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Inventory &amp; Supply</span>
+              <span className="sm:hidden">Supply</span>
+            </TabsTrigger>
+            <TabsTrigger value="additional" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Additional Info</span>
+              <span className="sm:hidden">More</span>
+            </TabsTrigger>
+            <TabsTrigger value="decommissioning" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Decommissioning</span>
+              <span className="sm:hidden">EOL</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="details">
@@ -566,13 +585,17 @@ export function EditItemForm({
             />
           </TabsContent>
 
-          <TabsContent value="additional">
+          <TabsContent value="additional" className="mt-4">
             <AdditionalInfoTab
               form={form}
               expenseTypes={expenseTypes}
               costCenters={costCenters}
               supplierNames={suppliers.map((s) => s.name)}
             />
+          </TabsContent>
+
+          <TabsContent value="decommissioning" className="mt-4">
+            <DecommissioningTab form={form} />
           </TabsContent>
         </Tabs>
 

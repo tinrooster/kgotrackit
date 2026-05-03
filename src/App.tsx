@@ -66,7 +66,7 @@ export default function App() {
               'min-w-0 py-6',
               inventoryFullBleed
                 ? 'box-border w-full max-w-full px-3 sm:px-4 lg:px-6'
-                : 'container mx-auto px-4'
+                : 'mx-auto box-border w-full max-w-[min(100%,1200px)] px-4 sm:px-6 xl:max-w-[1400px]'
             )}
           >
             <Routes>

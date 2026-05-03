@@ -122,7 +122,7 @@ export function BasicDetailsTab({
   const flattenedProjectOptions = React.useMemo(() => flattenProjectOptions(projects), [projects]);
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-[56rem] space-y-4">
       {inventoryRecordLine || assetTagLine ? (
         <div className="space-y-1 border-b border-border/40 pb-3 text-xs text-muted-foreground/90">
           {inventoryRecordLine ? (
@@ -171,8 +171,8 @@ export function BasicDetailsTab({
         )}
       />
 
-      {/* Two column layout */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Tablet-friendly: single column on narrow viewports, two columns from md up */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Left Column - Category and Project */}
         <div className="space-y-4">
           <FormField

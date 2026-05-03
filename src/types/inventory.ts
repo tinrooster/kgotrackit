@@ -7,7 +7,7 @@ export enum OrderStatus {
 }
 
 /** Fiber optic characterization for cable inventory (optional). */
-export type FiberOpticMode = 'sm' | 'mm' | 'na';
+export type FiberOpticMode = 'sm' | 'mm' | 'na' | 'mtp_mpo';
 
 export interface InventoryItem {
   id: string;

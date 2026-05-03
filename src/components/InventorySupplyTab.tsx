@@ -20,8 +20,8 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
   }, [form.watch('unit'), units]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="mx-auto w-full max-w-[56rem] space-y-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Unit fields with subcategories */}
         <FormField
           control={form.control}

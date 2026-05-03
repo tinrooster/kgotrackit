@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { BasicDetailsTab } from "@/components/BasicDetailsTab";
 import { InventorySupplyTab } from "@/components/InventorySupplyTab";
 import { AdditionalInfoTab } from "@/components/AdditionalInfoTab";
+import { DecommissioningTab } from "@/components/DecommissioningTab";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Cabinet } from "@/types/cabinets";
@@ -57,6 +58,14 @@ const templateFormSchema = z
     assetTrackingMode: z.enum(["line_item", "per_unit"]).default("line_item"),
     assetTagEnd: z.string().optional(),
     photoUrl: z.string().optional(),
+    cableColor: z.string().optional(),
+    fiberMode: z.enum(["sm", "mm", "na", "mtp_mpo"]).default("na"),
+    connectorType: z.string().optional(),
+    cableLotNumber: z.string().optional(),
+    decomEOLDate: z.string().optional(),
+    decomCutoverDate: z.string().optional(),
+    decomLastAuditAt: z.string().optional(),
+    decomNotes: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.name.trim().length > 0 && data.name.trim().length < 2) {
@@ -126,7 +135,7 @@ export function TemplateForm({
       dateInService: template?.dateInService
         ? String(template.dateInService).slice(0, 10)
         : todayDate,
-      manufacturerNotes: "",
+      manufacturerNotes: template?.manufacturerNotes || "",
       maintenanceNotes: template?.maintenanceNotes || "",
       additionalNotes: template?.notes || "",
       supplier: template?.supplier || "",
@@ -141,6 +150,20 @@ export function TemplateForm({
       assetTrackingMode: template?.assetTrackingMode || "line_item",
       assetTagEnd: template?.assetTagEnd || "",
       photoUrl: template?.photoUrl || "",
+      cableColor: template?.cableColor || "",
+      fiberMode:
+        template?.fiberMode === "sm" ||
+        template?.fiberMode === "mm" ||
+        template?.fiberMode === "na" ||
+        template?.fiberMode === "mtp_mpo"
+          ? template.fiberMode
+          : "na",
+      connectorType: template?.connectorType || "",
+      cableLotNumber: template?.cableLotNumber || "",
+      decomEOLDate: template?.decomEOLDate || "",
+      decomCutoverDate: template?.decomCutoverDate || "",
+      decomLastAuditAt: template?.decomLastAuditAt || "",
+      decomNotes: template?.decomNotes || "",
     },
   });
 
@@ -213,8 +236,17 @@ export function TemplateForm({
       manufacturer: data.manufacturer || "",
       modelNumber: data.modelNumber || "",
       dateInService: data.dateInService || undefined,
+      manufacturerNotes: data.manufacturerNotes || "",
       maintenanceNotes: data.maintenanceNotes || "",
       photoUrl: data.photoUrl?.trim() || undefined,
+      cableColor: data.cableColor?.trim() || undefined,
+      fiberMode: data.fiberMode !== "na" ? data.fiberMode : undefined,
+      connectorType: data.connectorType?.trim() || undefined,
+      cableLotNumber: data.cableLotNumber?.trim() || undefined,
+      decomEOLDate: data.decomEOLDate?.trim() || undefined,
+      decomCutoverDate: data.decomCutoverDate?.trim() || undefined,
+      decomLastAuditAt: data.decomLastAuditAt?.trim() || undefined,
+      decomNotes: data.decomNotes?.trim() || undefined,
       qrCode: template?.qrCode,
       customFields: template?.customFields,
     };
@@ -245,10 +277,23 @@ export function TemplateForm({
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col gap-4">
-          <TabsList className="grid w-full shrink-0 grid-cols-3">
-            <TabsTrigger value="details">Item Details</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory & Supply</TabsTrigger>
-            <TabsTrigger value="additional">Additional Info</TabsTrigger>
+          <TabsList className="grid w-full shrink-0 grid-cols-2 gap-1 sm:grid-cols-4 sm:gap-0">
+            <TabsTrigger value="details" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Item Details</span>
+              <span className="sm:hidden">Details</span>
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Inventory &amp; Supply</span>
+              <span className="sm:hidden">Supply</span>
+            </TabsTrigger>
+            <TabsTrigger value="additional" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Additional Info</span>
+              <span className="sm:hidden">More</span>
+            </TabsTrigger>
+            <TabsTrigger value="decommissioning" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+              <span className="hidden sm:inline">Decommissioning</span>
+              <span className="sm:hidden">EOL</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent
@@ -283,6 +328,10 @@ export function TemplateForm({
               costCenters={costCenters}
               supplierNames={suppliers.map((s) => s.name)}
             />
+          </TabsContent>
+
+          <TabsContent value="decommissioning" className="mt-0 min-h-[min(22rem,50vh)] space-y-4">
+            <DecommissioningTab form={form} />
           </TabsContent>
         </Tabs>
 
