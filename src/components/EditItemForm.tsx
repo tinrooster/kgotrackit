@@ -591,6 +591,7 @@ export function EditItemForm({
               expenseTypes={expenseTypes}
               costCenters={costCenters}
               supplierNames={suppliers.map((s) => s.name)}
+              unitNames={units.map((u) => u.name)}
             />
           </TabsContent>
 

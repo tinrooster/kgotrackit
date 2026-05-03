@@ -1,5 +1,5 @@
 import { STORAGE_KEYS } from '@/lib/storageService';
-import type { DeviceLibraryEntry } from '@/types/deviceLibrary';
+import type { DeviceLibraryEntry, DeviceLibraryKind } from '@/types/deviceLibrary';
 import { requestCloudSync } from '@/lib/cloudSyncEvents';
 
 /** Fired after device library rows are written (same tab + other listeners). */
@@ -14,6 +14,26 @@ function notifyDeviceLibraryUpdated(): void {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function parseKind(value: unknown): DeviceLibraryKind {
+  if (value === 'cable' || value === 'media_converter' || value === 'display' || value === 'generic') {
+    return value;
+  }
+  return 'generic';
+}
+
+function parseRestockQty(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const n = Number(value.trim());
+    if (Number.isFinite(n) && n > 0) {
+      return n;
+    }
+  }
+  return undefined;
 }
 
 function normalizeEntry(raw: unknown): DeviceLibraryEntry | null {
@@ -37,11 +57,24 @@ function normalizeEntry(raw: unknown): DeviceLibraryEntry | null {
       ? String(record.defaultSupplierWebsite).trim()
       : undefined;
   const notes = isNonEmptyString(record.notes) ? String(record.notes).trim() : undefined;
+  const kind = parseKind(record.kind);
+  const defaultStockUnit =
+    isNonEmptyString(record.defaultStockUnit) ? String(record.defaultStockUnit).trim() : undefined;
+  const defaultCableColor =
+    isNonEmptyString(record.defaultCableColor) ? String(record.defaultCableColor).trim() : undefined;
+  const conversionSpec =
+    isNonEmptyString(record.conversionSpec) ? String(record.conversionSpec).trim() : undefined;
+  const restockPackageQuantity = parseRestockQty(record.restockPackageQuantity);
 
   return {
     id,
+    kind,
     manufacturer,
     modelNumber,
+    defaultStockUnit,
+    defaultCableColor,
+    conversionSpec,
+    restockPackageQuantity,
     defaultSupplier,
     defaultSupplierWebsite,
     notes,
@@ -118,32 +151,17 @@ export function saveDeviceLibrary(entries: DeviceLibraryEntry[]): void {
   }
 }
 
-export function createDeviceLibraryEntry(input: {
-  manufacturer: string;
-  modelNumber: string;
-  defaultSupplier?: string;
-  defaultSupplierWebsite?: string;
-  notes?: string;
-}): DeviceLibraryEntry {
-  const manufacturer = input.manufacturer.trim();
-  if (!manufacturer) {
-    throw new Error('Manufacturer is required.');
-  }
-  const entry: DeviceLibraryEntry = {
-    id: crypto.randomUUID(),
-    manufacturer,
-    modelNumber: (input.modelNumber ?? '').trim(),
-    defaultSupplier: input.defaultSupplier?.trim() || undefined,
-    defaultSupplierWebsite: input.defaultSupplierWebsite?.trim() || undefined,
-    notes: input.notes?.trim() || undefined,
-    createdAt: new Date().toISOString(),
-  };
-  const next = [...getDeviceLibrary(), entry];
-  saveDeviceLibrary(next);
-  return entry;
-}
-
 export function deleteDeviceLibraryEntry(id: string): void {
   const next = getDeviceLibrary().filter((e) => e.id !== id);
   saveDeviceLibrary(next);
+}
+
+export function newDeviceLibraryDraft(): DeviceLibraryEntry {
+  return {
+    id: crypto.randomUUID(),
+    kind: 'generic',
+    manufacturer: '',
+    modelNumber: '',
+    createdAt: new Date().toISOString(),
+  };
 }

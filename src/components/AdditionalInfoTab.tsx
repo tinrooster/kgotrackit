@@ -22,6 +22,8 @@ interface AdditionalInfoTabProps {
   costCenters?: FinancialCodeEntry[];
   /** Top-level supplier names from settings (used to match device library default supplier). */
   supplierNames?: string[];
+  /** Top-level unit names (used to match device library default stock unit). */
+  unitNames?: string[];
 }
 
 export function AdditionalInfoTab({
@@ -30,6 +32,7 @@ export function AdditionalInfoTab({
   expenseTypes = [],
   costCenters = [],
   supplierNames = [],
+  unitNames = [],
 }: AdditionalInfoTabProps) {
   const [deviceLibraryEpoch, setDeviceLibraryEpoch] = React.useState(0);
   const [deviceLibraryPickerKey, setDeviceLibraryPickerKey] = React.useState(0);
@@ -136,7 +139,7 @@ export function AdditionalInfoTab({
             onChange={(id) => {
               const entry = deviceLibraryEntries.find((e) => e.id === id);
               if (entry) {
-                applyDeviceLibraryEntryToForm(form, entry, supplierNames);
+                applyDeviceLibraryEntryToForm(form, entry, supplierNames, unitNames);
                 setDeviceLibraryPickerKey((k) => k + 1);
               }
             }}
