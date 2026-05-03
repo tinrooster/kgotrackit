@@ -281,6 +281,7 @@ export function TemplateForm({
               onScanBarcode={() => setIsScannerOpen(true)}
               expenseTypes={expenseTypes}
               costCenters={costCenters}
+              supplierNames={suppliers.map((s) => s.name)}
             />
           </TabsContent>
         </Tabs>

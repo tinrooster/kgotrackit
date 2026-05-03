@@ -567,7 +567,12 @@ export function EditItemForm({
           </TabsContent>
 
           <TabsContent value="additional">
-            <AdditionalInfoTab form={form} expenseTypes={expenseTypes} costCenters={costCenters} />
+            <AdditionalInfoTab
+              form={form}
+              expenseTypes={expenseTypes}
+              costCenters={costCenters}
+              supplierNames={suppliers.map((s) => s.name)}
+            />
           </TabsContent>
         </Tabs>
 

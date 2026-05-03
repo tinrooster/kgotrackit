@@ -33,7 +33,7 @@ todos:
     content: "Settings Backup & Restore tab: shorten redundant Settings snapshot copy; clarify Create Backup vs Restore vs settings-only vs Import/Export (clearer layout). Lookup Lists: default open to Categories (first list) not empty overview"
     status: completed
   - id: p2-inventory-domain
-    content: "Phase 1 done: cableColor, fiberMode (SM/MM/N/A), connectorType, cableLotNumber on InventoryItem + Add/Edit Additional Info + reports column options + inventory search. Nested project selection in Add/Edit/Template forms now supports parent/child path ids. Supplier read-only panel shipped in ItemDetails. Device library MVP: Settings tab + local/Electron storage + full backup/restore when backup includes deviceLibrary key. Deferred: spool/lot usage entity, project hierarchy features beyond selection, linking device library to templates/items."
+    content: "Phase 1 done: cableColor, fiberMode (SM/MM/N/A), connectorType, cableLotNumber on InventoryItem + Add/Edit Additional Info + reports column options + inventory search. Nested project selection in Add/Edit/Template forms now supports parent/child path ids. Supplier read-only panel shipped in ItemDetails. Device library: Settings tab + backup/restore + Additional Info combobox (add/edit/template) applies manufacturer, model, website, supplier when name matches list. Deferred: spool/lot usage entity, project hierarchy features beyond selection, optional deviceLibraryId on items."
     status: pending
   - id: p3-org-rbac-auth
     content: Workspace shared DB + RBAC; Supabase MFA/email; admin user management via service role backend

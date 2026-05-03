@@ -2,6 +2,16 @@ import { STORAGE_KEYS } from '@/lib/storageService';
 import type { DeviceLibraryEntry } from '@/types/deviceLibrary';
 import { requestCloudSync } from '@/lib/cloudSyncEvents';
 
+/** Fired after device library rows are written (same tab + other listeners). */
+export const DEVICE_LIBRARY_UPDATED_EVENT = 'trackit:device-library-updated';
+
+function notifyDeviceLibraryUpdated(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent(DEVICE_LIBRARY_UPDATED_EVENT));
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -95,11 +105,13 @@ export function saveDeviceLibrary(entries: DeviceLibraryEntry[]): void {
     }
     localStorage.setItem(STORAGE_KEYS.DEVICE_LIBRARY, JSON.stringify(valid));
     requestCloudSync();
+    notifyDeviceLibraryUpdated();
   } catch (error) {
     console.error('Error saving device library:', error);
     try {
       localStorage.setItem(STORAGE_KEYS.DEVICE_LIBRARY, JSON.stringify(valid));
       requestCloudSync();
+      notifyDeviceLibraryUpdated();
     } catch {
       throw error;
     }
