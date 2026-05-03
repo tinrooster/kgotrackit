@@ -3,6 +3,7 @@
 const STORAGE_CABLE_COLORS = 'inventory-user-cable-colors';
 const STORAGE_CONNECTOR_TYPES = 'inventory-user-connector-types';
 
+/** Default jacket / trace colors (dropdown order; “Not set” is a separate SelectItem in UIs). */
 export const DEFAULT_CABLE_COLORS = [
   'Yellow',
   'Blue',
@@ -51,15 +52,34 @@ export function getUserConnectorTypes(): string[] {
   return readStringArray(STORAGE_CONNECTOR_TYPES);
 }
 
-/** Merged dropdown values including current item value if not already listed. */
+function pushUnique(out: string[], value: string) {
+  const t = value.trim();
+  if (!t) {
+    return;
+  }
+  if (out.some((x) => x.toLowerCase() === t.toLowerCase())) {
+    return;
+  }
+  out.push(t);
+}
+
+/** Merged dropdown values: preset order, then user-added colors, then current value if still missing. */
 export function getCableColorDropdownValues(currentValue?: string | null): string[] {
-  const user = getUserCableColors();
-  const set = new Set<string>([...DEFAULT_CABLE_COLORS, ...user]);
+  const out: string[] = [];
+  for (const c of DEFAULT_CABLE_COLORS) {
+    pushUnique(out, c);
+  }
+  for (const u of getUserCableColors()) {
+    if (DEFAULT_CABLE_COLORS.some((c) => c.toLowerCase() === u.toLowerCase())) {
+      continue;
+    }
+    pushUnique(out, u);
+  }
   const cur = currentValue?.trim();
   if (cur) {
-    set.add(cur);
+    pushUnique(out, cur);
   }
-  return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  return out;
 }
 
 export function addUserCableColor(name: string): boolean {

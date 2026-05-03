@@ -1,15 +1,8 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash2, Copy } from "lucide-react";
+import { Plus } from "lucide-react";
 import { ItemTemplate } from '@/types/templates';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +28,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AddItemDialog } from '@/components/AddItemDialog';
 import { useInventory } from "@/hooks/useInventory";
 import { cn } from "@/lib/utils";
+import { TemplatesSortableList } from "@/components/settings/TemplatesSortableList";
 
 export function TemplatesPage() {
   const [templates, setTemplates] = useState<ItemTemplate[]>([]);
@@ -53,7 +47,6 @@ export function TemplatesPage() {
   useEffect(() => {
     try {
       const loadedTemplates = getTemplates();
-      console.log('Loaded templates:', loadedTemplates);
       setTemplates(loadedTemplates);
     } catch (error) {
       console.error('Error loading templates:', error);
@@ -179,45 +172,13 @@ export function TemplatesPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {templates.map((template) => (
-          <Card key={template.templateId}>
-            <CardHeader>
-              <CardTitle>{template.templateName}</CardTitle>
-              <CardDescription>{template.category}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                {template.description}
-              </p>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEditTemplate(template)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPendingDeleteTemplateId(template.templateId)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => handleUseTemplate(template)}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Use Template
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <TemplatesSortableList
+        templates={templates}
+        onTemplatesOrderChange={setTemplates}
+        onEdit={handleEditTemplate}
+        onRequestDelete={(id) => setPendingDeleteTemplateId(id)}
+        onUseTemplate={handleUseTemplate}
+      />
 
       <AlertDialog open={pendingDeleteTemplateId !== null} onOpenChange={(open) => !open && setPendingDeleteTemplateId(null)}>
         <AlertDialogContent>

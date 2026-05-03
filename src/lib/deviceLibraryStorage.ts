@@ -1,5 +1,5 @@
 import { STORAGE_KEYS } from '@/lib/storageService';
-import type { DeviceLibraryEntry, DeviceLibraryKind } from '@/types/deviceLibrary';
+import type { DeviceLibraryEntry } from '@/types/deviceLibrary';
 import { requestCloudSync } from '@/lib/cloudSyncEvents';
 
 /** Fired after device library rows are written (same tab + other listeners). */
@@ -16,11 +16,11 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function parseKind(value: unknown): DeviceLibraryKind {
-  if (value === 'cable' || value === 'media_converter' || value === 'display' || value === 'generic') {
-    return value;
+function parseKind(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return 'generic';
   }
-  return 'generic';
+  return value.trim();
 }
 
 function parseRestockQty(value: unknown): number | undefined {

@@ -143,7 +143,7 @@ export function AdditionalInfoTab({
                 setDeviceLibraryPickerKey((k) => k + 1);
               }
             }}
-            placeholder="Apply manufacturer, model, and supplier hints from catalog…"
+            placeholder="Select catalog row to apply hints…"
             emptyText="No catalog rows match."
           />
         </OptionalFormCollapsible>

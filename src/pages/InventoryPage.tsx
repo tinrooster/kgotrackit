@@ -1449,7 +1449,7 @@ export default function InventoryPage() {
       />
 
       <Dialog open={!!printItem} onOpenChange={(open) => !open && setPrintItem(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent dismissOnOutsidePointer className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Print Label</DialogTitle>
             <DialogDescription>Choose compact code label or detailed sticker.</DialogDescription>
@@ -1502,7 +1502,7 @@ export default function InventoryPage() {
       </Dialog>
 
       <Dialog open={isBulkPrintDialogOpen} onOpenChange={setIsBulkPrintDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent dismissOnOutsidePointer className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Bulk Label Print</DialogTitle>
             <DialogDescription>Select Avery sheet format and content options.</DialogDescription>

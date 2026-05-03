@@ -1,5 +1,9 @@
 /** Catalog row for parts / devices (local + full backup); used from item & template forms. */
-export type DeviceLibraryKind = 'generic' | 'cable' | 'media_converter' | 'display';
+export type DeviceLibraryKind = string;
+
+/** Built-in kind values used for extra fields (cable color, conversion spec). */
+export const DEVICE_LIBRARY_KIND_PRESETS = ['generic', 'cable', 'media_converter', 'display'] as const;
+export type DeviceLibraryKindPreset = (typeof DEVICE_LIBRARY_KIND_PRESETS)[number];
 
 export interface DeviceLibraryEntry {
   id: string;

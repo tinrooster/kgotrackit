@@ -22,6 +22,7 @@ import {
   Copy,
   ImagePlus,
   Layers,
+  LayoutList,
   MapPin,
   Mic,
   Minus,
@@ -30,6 +31,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  Type,
   Warehouse,
   X,
   Zap,
@@ -41,9 +43,9 @@ import { Combobox } from "@/components/ui/combobox";
 import {
   getRackOptionsForFlatLocationLabel,
   getRackOptionsForSubLocationKey,
-  hasRackLocationRules,
   RACK_LOCATIONS_UPDATED_EVENT,
 } from "@/lib/rackLocationsConfig";
+import { findLocationByFlatId } from "@/lib/locationOptions";
 
 const PREFS_KEY = "trackit:quickAddPrefs";
 const LAST_KEY = "trackit:quickAddLast";
@@ -249,7 +251,7 @@ export function MobileQuickAddDialog({
   const [projFilter, setProjFilter] = React.useState("");
 
   const sectionNameRef = React.useRef<HTMLDivElement>(null);
-  const sectionRackRef = React.useRef<HTMLDivElement>(null);
+  const sectionRackInLocRef = React.useRef<HTMLDivElement>(null);
   const sectionQuickRef = React.useRef<HTMLDivElement>(null);
   const sectionMetaRef = React.useRef<HTMLDivElement>(null);
   const sectionAllLocRef = React.useRef<HTMLDivElement>(null);
@@ -257,11 +259,56 @@ export function MobileQuickAddDialog({
   const sectionUnitRef = React.useRef<HTMLDivElement>(null);
   const sectionProjectRef = React.useRef<HTMLDivElement>(null);
 
+  type JumpHighlight = "name" | "shortcuts" | "details" | "location" | "category" | "unit" | "project";
+  const [jumpHighlight, setJumpHighlight] = React.useState<JumpHighlight | null>(null);
+  const jumpTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const quickAddSectionClass = (active: boolean) =>
+    cn(
+      "overflow-hidden rounded-lg border border-border/60 bg-muted/10 shadow-sm transition-[box-shadow,background-color] duration-300",
+      active && "ring-2 ring-primary/45 bg-primary/[0.09] shadow-md",
+    );
+
+  const flashJump = React.useCallback((id: JumpHighlight) => {
+    if (jumpTimerRef.current) {
+      clearTimeout(jumpTimerRef.current);
+    }
+    setJumpHighlight(id);
+    jumpTimerRef.current = setTimeout(() => {
+      setJumpHighlight(null);
+      jumpTimerRef.current = null;
+    }, 2200);
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (jumpTimerRef.current) {
+        clearTimeout(jumpTimerRef.current);
+      }
+    };
+  }, []);
+
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     requestAnimationFrame(() => {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
+
+  const jumpTo = (id: JumpHighlight, ref: React.RefObject<HTMLDivElement | null>) => {
+    flashJump(id);
+    scrollToSection(ref);
+  };
+
+  const goToRack = React.useCallback(() => {
+    setAllLocOpen(true);
+    flashJump("location");
+    requestAnimationFrame(() => {
+      sectionAllLocRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(() => {
+        sectionRackInLocRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 200);
+    });
+  }, [flashJump]);
 
   const categoryPaths = React.useMemo(() => flattenCategoryPaths(categories), [categories]);
   const defaultUnitName = React.useMemo(() => resolveDefaultUnitName(units), [units]);
@@ -318,9 +365,12 @@ export function MobileQuickAddDialog({
     return resolved ? resolved.replace(/\s*\/\s*/g, "/") : "";
   }, [flatLocationPickOptions, locationId, locations]);
 
-  const hasRackRules = React.useMemo(() => hasRackLocationRules(), [rackCfgEpoch]);
+  const selectedLocationRow = React.useMemo(
+    () => findLocationByFlatId(locations, locationId),
+    [locations, locationId],
+  );
 
-  const quickRackOptions = React.useMemo(() => {
+  const presetRackOptionsFromConfig = React.useMemo(() => {
     let opts = getRackOptionsForFlatLocationLabel(flatLocationLabelForRack);
     if (opts.length > 0) {
       return opts;
@@ -339,14 +389,28 @@ export function MobileQuickAddDialog({
     return opts;
   }, [flatLocationLabelForRack, locationId, locations, rackCfgEpoch]);
 
+  const useCustomRacks = selectedLocationRow?.rackLocationEnabled === true;
+  const customRackSlots = React.useMemo(() => {
+    if (!useCustomRacks || !Array.isArray(selectedLocationRow?.rackSlots)) {
+      return null as string[] | null;
+    }
+    return selectedLocationRow!.rackSlots!.map((s) => String(s).trim()).filter(Boolean);
+  }, [useCustomRacks, selectedLocationRow]);
+
+  const quickRackOptions = React.useMemo(() => {
+    if (useCustomRacks) {
+      return customRackSlots ?? [];
+    }
+    return presetRackOptionsFromConfig;
+  }, [useCustomRacks, customRackSlots, presetRackOptionsFromConfig]);
+
   const quickRackComboboxOptions = React.useMemo(
     () => quickRackOptions.map((o) => ({ label: o, value: o })),
-    [quickRackOptions]
+    [quickRackOptions],
   );
 
-  /** Show rack field whenever presets exist, or any sub-location is selected while rack config is enabled (custom-only). */
-  const showRackLocationRow =
-    quickRackOptions.length > 0 || (hasRackRules && locationId.includes("/"));
+  /** Match BasicDetailsTab: settings rack slots and/or rack-location JSON presets. */
+  const showRackLocationRow = useCustomRacks || presetRackOptionsFromConfig.length > 0;
 
   const projectStripLabel = React.useMemo(() => {
     if (!project) return "";
@@ -813,7 +877,7 @@ export function MobileQuickAddDialog({
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
                   setAllLocOpen(true);
-                  scrollToSection(sectionAllLocRef);
+                  jumpTo("location", sectionAllLocRef);
                 }}
               >
                 <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -824,7 +888,7 @@ export function MobileQuickAddDialog({
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
                   setAllCatOpen(true);
-                  scrollToSection(sectionAllCatRef);
+                  jumpTo("category", sectionAllCatRef);
                 }}
               >
                 <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -835,7 +899,7 @@ export function MobileQuickAddDialog({
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
                   setAllUnitOpen(true);
-                  scrollToSection(sectionUnitRef);
+                  jumpTo("unit", sectionUnitRef);
                 }}
               >
                 <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -846,7 +910,7 @@ export function MobileQuickAddDialog({
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
                   setAllProjOpen(true);
-                  scrollToSection(sectionProjectRef);
+                  jumpTo("project", sectionProjectRef);
                 }}
               >
                 <Briefcase className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -858,65 +922,89 @@ export function MobileQuickAddDialog({
               <span className="mr-0.5 self-center text-[10px] text-muted-foreground">Go to</span>
               <Button
                 type="button"
-                variant="outline"
+                variant={jumpHighlight === "name" ? "secondary" : "outline"}
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
-                onClick={() => scrollToSection(sectionNameRef)}
+                onClick={() => jumpTo("name", sectionNameRef)}
               >
                 Name
               </Button>
               {showRackLocationRow ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={jumpHighlight === "location" ? "secondary" : "outline"}
                   size="sm"
                   className="h-7 touch-manipulation px-2 text-[11px]"
-                  onClick={() => scrollToSection(sectionRackRef)}
+                  onClick={() => goToRack()}
                 >
                   Rack
                 </Button>
               ) : null}
               <Button
                 type="button"
-                variant="outline"
+                variant={jumpHighlight === "shortcuts" ? "secondary" : "outline"}
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
-                onClick={() => scrollToSection(sectionQuickRef)}
+                onClick={() => jumpTo("shortcuts", sectionQuickRef)}
               >
                 Shortcuts
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant={jumpHighlight === "details" ? "secondary" : "outline"}
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
                 onClick={() => {
                   setDetailsOpen(true);
-                  scrollToSection(sectionMetaRef);
+                  jumpTo("details", sectionMetaRef);
                 }}
               >
                 Details
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant={jumpHighlight === "location" ? "secondary" : "outline"}
+                size="sm"
+                className="h-7 touch-manipulation px-2 text-[11px]"
+                onClick={() => {
+                  setAllLocOpen(true);
+                  jumpTo("location", sectionAllLocRef);
+                }}
+              >
+                Location
+              </Button>
+              <Button
+                type="button"
+                variant={jumpHighlight === "category" ? "secondary" : "outline"}
+                size="sm"
+                className="h-7 touch-manipulation px-2 text-[11px]"
+                onClick={() => {
+                  setAllCatOpen(true);
+                  jumpTo("category", sectionAllCatRef);
+                }}
+              >
+                Category
+              </Button>
+              <Button
+                type="button"
+                variant={jumpHighlight === "unit" ? "secondary" : "outline"}
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
                 onClick={() => {
                   setAllUnitOpen(true);
-                  scrollToSection(sectionUnitRef);
+                  jumpTo("unit", sectionUnitRef);
                 }}
               >
                 Unit
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant={jumpHighlight === "project" ? "secondary" : "outline"}
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
                 onClick={() => {
                   setAllProjOpen(true);
-                  scrollToSection(sectionProjectRef);
+                  jumpTo("project", sectionProjectRef);
                 }}
               >
                 Project
@@ -926,13 +1014,15 @@ export function MobileQuickAddDialog({
 
           <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 [-webkit-overflow-scrolling:touch] sm:px-6">
             <div className="space-y-3 py-3 pr-0 pb-6 sm:space-y-4 sm:py-4">
-              <div
-                ref={sectionNameRef}
-                className="rounded-lg border-2 border-primary/40 bg-primary/[0.07] p-3 shadow-sm ring-1 ring-primary/15"
-              >
+              <div ref={sectionNameRef} className={quickAddSectionClass(jumpHighlight === "name")}>
+                <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
+                  <Type className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="text-xs font-semibold text-foreground">Name</span>
+                </div>
+                <div className="p-3">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <Label htmlFor="quick-name" className="text-xs font-semibold text-foreground">
-                    Name
+                  <Label htmlFor="quick-name" className="sr-only">
+                    Item name
                   </Label>
                   <div className="flex flex-wrap items-center gap-1">
                     {lastSnapshot?.name ? (
@@ -955,7 +1045,7 @@ export function MobileQuickAddDialog({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Item name"
-                    className="h-11 min-w-0 flex-1 border-primary/25 text-base touch-manipulation"
+                    className="h-11 min-w-0 flex-1 text-base touch-manipulation"
                     autoComplete="off"
                     enterKeyHint="done"
                   />
@@ -974,37 +1064,15 @@ export function MobileQuickAddDialog({
                 {listening ? (
                   <p className="mt-1 text-[10px] leading-tight text-muted-foreground">Listening…</p>
                 ) : null}
+                </div>
               </div>
 
-              {showRackLocationRow ? (
-                <div
-                  ref={sectionRackRef}
-                  className="rounded-lg border border-amber-500/35 bg-amber-500/[0.06] p-3 shadow-sm ring-1 ring-inset ring-amber-500/20"
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <Warehouse className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-                    <span className="text-xs font-semibold text-foreground">Rack location</span>
-                  </div>
-                  {quickRackOptions.length === 0 ? (
-                    <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
-                      No rack presets for this sub-location. Type a custom rack ID below.
-                    </p>
-                  ) : null}
-                  <Combobox
-                      options={quickRackComboboxOptions}
-                      value={rackLocation}
-                      onChange={(v) => setRackLocation(v)}
-                      placeholder="Search rack (e.g. TD)…"
-                      emptyText="No rack matches."
-                      allowCustomValue
-                    />
+              <div ref={sectionQuickRef} className={quickAddSectionClass(jumpHighlight === "shortcuts")}>
+                <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
+                  <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="text-xs font-semibold text-foreground">Shortcuts</span>
                 </div>
-              ) : null}
-
-              <div
-                ref={sectionQuickRef}
-                className="rounded-lg border border-border/70 bg-muted/25 p-2.5 ring-1 ring-border/30"
-              >
+                <div className="p-2.5 sm:p-3">
                 {lastSnapshot ? (
                   <div
                     className="mb-2 flex min-h-0 items-center gap-2 rounded-md border border-border/60 bg-background/60 py-1.5 pl-2 pr-1.5"
@@ -1089,23 +1157,27 @@ export function MobileQuickAddDialog({
                 ) : !lastSnapshot ? (
                   <p className="text-[11px] text-muted-foreground">Shortcuts appear after you add items.</p>
                 ) : null}
+                </div>
               </div>
 
-              <div ref={sectionMetaRef} className="overflow-hidden rounded-lg border border-border/80 bg-muted/15">
+              <div ref={sectionMetaRef} className={quickAddSectionClass(jumpHighlight === "details")}>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-muted/40"
+                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
                   onClick={() => setDetailsOpen((o) => !o)}
                   aria-expanded={detailsOpen}
                 >
-                  <span className="text-xs font-semibold">Details</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <LayoutList className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="text-xs font-semibold">Details</span>
+                  </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", detailsOpen && "rotate-180")}
                     aria-hidden
                   />
                 </button>
                 {detailsOpen ? (
-                  <div className="border-t border-border/60 bg-card/50 px-2.5 pb-2.5 pt-2 ring-1 ring-inset ring-border/20">
+                  <div className="border-t border-border/50 bg-muted/5 px-3 pb-3 pt-2.5">
                 <div className="space-y-0">
                   <div className="space-y-1 pb-2">
                     <Label className="text-[11px] font-medium text-muted-foreground">Asset status</Label>
@@ -1288,14 +1360,17 @@ export function MobileQuickAddDialog({
                 )}
               </div>
 
-              <div ref={sectionAllLocRef} className="overflow-hidden rounded-lg border border-border/80 bg-muted/15">
+              <div ref={sectionAllLocRef} className={quickAddSectionClass(jumpHighlight === "location")}>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-muted/40"
+                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
                   onClick={() => setAllLocOpen((o) => !o)}
                   aria-expanded={allLocOpen}
                 >
-                  <span className="text-xs font-semibold">All locations</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="text-xs font-semibold">All locations</span>
+                  </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allLocOpen && "rotate-180")}
                     aria-hidden
@@ -1304,20 +1379,20 @@ export function MobileQuickAddDialog({
                 {allLocOpen ? (
                   <div className="border-t border-border/60 px-2.5 pb-2.5 pt-2">
                     <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                      Search location
+                      Location
                     </Label>
                     <Combobox
                       options={flatLocationPickOptions}
                       value={locationId}
                       onChange={(id) => applyLocationId(id)}
-                      placeholder="Type to filter (e.g. TD, Server)…"
+                      placeholder="Select location"
                       emptyText="No location matches."
                     />
                     <Input
                       value={locFilter}
                       onChange={(e) => setLocFilter(e.target.value)}
                       placeholder="Filter chip lists…"
-                      className="mb-2 mt-2 h-9 text-sm"
+                      className="mb-2 mt-2 h-9 text-sm placeholder:text-muted-foreground/50"
                       aria-label="Filter location chip list"
                     />
                     <div className="flex flex-wrap gap-1">
@@ -1360,22 +1435,51 @@ export function MobileQuickAddDialog({
                           ))}
                       </div>
                     )}
+                    {showRackLocationRow ? (
+                      <div
+                        ref={sectionRackInLocRef}
+                        className="mt-3 border-t border-dashed border-border/50 bg-muted/5 px-0.5 pt-3"
+                      >
+                        <div className="mb-2 flex items-center gap-2">
+                          <Warehouse className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                          <span className="text-xs font-semibold text-foreground">Rack location</span>
+                        </div>
+                        {quickRackOptions.length === 0 ? (
+                          <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
+                            No rack presets for this location. Enter a custom rack ID.
+                          </p>
+                        ) : null}
+                        <Combobox
+                          options={quickRackComboboxOptions}
+                          value={rackLocation}
+                          onChange={(v) => setRackLocation(v)}
+                          placeholder="Select rack or type…"
+                          emptyText="No rack matches."
+                          allowCustomValue
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    {locationStripLabel ? `Selected: ${locationStripLabel}` : "Collapsed — tap header to expand."}
+                    {locationStripLabel
+                      ? `Selected: ${locationStripLabel}${rackLocation ? ` · Rack: ${rackLocation}` : ""}`
+                      : "Collapsed — tap header to expand."}
                   </p>
                 )}
               </div>
 
-              <div ref={sectionAllCatRef} className="overflow-hidden rounded-lg border border-border/80 bg-muted/15">
+              <div ref={sectionAllCatRef} className={quickAddSectionClass(jumpHighlight === "category")}>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-muted/40"
+                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
                   onClick={() => setAllCatOpen((o) => !o)}
                   aria-expanded={allCatOpen}
                 >
-                  <span className="text-xs font-semibold">All categories</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <Tag className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="text-xs font-semibold">All categories</span>
+                  </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allCatOpen && "rotate-180")}
                     aria-hidden
@@ -1387,7 +1491,7 @@ export function MobileQuickAddDialog({
                       value={catFilter}
                       onChange={(e) => setCatFilter(e.target.value)}
                       placeholder="Filter categories…"
-                      className="mb-2 h-9 text-sm"
+                      className="mb-2 h-9 text-sm placeholder:text-muted-foreground/50"
                       aria-label="Filter category list"
                     />
                     <div className="flex flex-wrap gap-1">
@@ -1414,14 +1518,17 @@ export function MobileQuickAddDialog({
                 )}
               </div>
 
-              <div ref={sectionUnitRef} className="overflow-hidden rounded-lg border border-border/80 bg-muted/15">
+              <div ref={sectionUnitRef} className={quickAddSectionClass(jumpHighlight === "unit")}>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-muted/40"
+                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
                   onClick={() => setAllUnitOpen((o) => !o)}
                   aria-expanded={allUnitOpen}
                 >
-                  <span className="text-xs font-semibold">Unit</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <Layers className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="text-xs font-semibold">Unit</span>
+                  </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allUnitOpen && "rotate-180")}
                     aria-hidden
@@ -1433,7 +1540,7 @@ export function MobileQuickAddDialog({
                       value={unitFilter}
                       onChange={(e) => setUnitFilter(e.target.value)}
                       placeholder="Filter units…"
-                      className="mb-2 h-9 text-sm"
+                      className="mb-2 h-9 text-sm placeholder:text-muted-foreground/50"
                       aria-label="Filter units"
                     />
                     <div className="flex flex-wrap gap-1">
@@ -1493,14 +1600,17 @@ export function MobileQuickAddDialog({
                 )}
               </div>
 
-              <div ref={sectionProjectRef} className="overflow-hidden rounded-lg border border-border/80 bg-muted/15">
+              <div ref={sectionProjectRef} className={quickAddSectionClass(jumpHighlight === "project")}>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-muted/40"
+                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
                   onClick={() => setAllProjOpen((o) => !o)}
                   aria-expanded={allProjOpen}
                 >
-                  <span className="text-xs font-semibold">Project (optional)</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <Briefcase className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="text-xs font-semibold">Project</span>
+                  </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allProjOpen && "rotate-180")}
                     aria-hidden
@@ -1512,7 +1622,7 @@ export function MobileQuickAddDialog({
                       value={projFilter}
                       onChange={(e) => setProjFilter(e.target.value)}
                       placeholder="Filter projects…"
-                      className="mb-2 h-9 text-sm"
+                      className="mb-2 h-9 text-sm placeholder:text-muted-foreground/50"
                       aria-label="Filter projects"
                     />
                     <div className="flex flex-wrap gap-1">

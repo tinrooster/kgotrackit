@@ -95,47 +95,23 @@ export default function CheckoutPage() {
 
   const handleAction = async (action: 'check-in' | 'check-out') => {
     try {
-      console.log(`[${action.toUpperCase()}] Starting ${action} action`, {
-        itemId: selectedItemId,
-        quantity,
-        cabinetId: selectedCabinetId
-      });
-
       if (!selectedItemId || !quantity || isNaN(Number(quantity)) || Number(quantity) <= 0) {
-        const error = 'Invalid item or quantity';
-        console.log(`[ERROR] ${error}`, { selectedItemId, quantity });
-        logger.error('audit', error, { selectedItemId, quantity }, 'CheckoutPage');
         toast.error('Please select an item and enter a valid quantity');
         return;
       }
 
       if (!selectedCabinetId) {
-        const error = 'No cabinet selected';
-        console.log(`[ERROR] ${error}`);
-        logger.error('audit', error, {}, 'CheckoutPage');
         toast.error('Please select a cabinet');
         return;
       }
 
       const selectedCabinet = cabinets.find(c => c.id === selectedCabinetId);
       if (!selectedCabinet) {
-        const error = 'Selected cabinet not found';
-        console.log(`[ERROR] ${error}`, { cabinetId: selectedCabinetId });
-        logger.error('audit', error, { cabinetId: selectedCabinetId }, 'CheckoutPage');
         toast.error('Selected cabinet not found');
         return;
       }
 
-      // Check if cabinet is secure and requires checkout
-      if (settings.requireCheckoutForSecureCabinets && selectedCabinet.isSecure) {
-        console.log('[INFO] Processing secure cabinet transaction', {
-          cabinet: selectedCabinet.name,
-          isSecure: selectedCabinet.isSecure
-        });
-      } else {
-        const error = 'Cabinet does not require check-in/out';
-        console.log(`[ERROR] ${error}`, { cabinet: selectedCabinet });
-        logger.error('audit', error, { cabinetId: selectedCabinetId, cabinetName: selectedCabinet.name, isSecure: selectedCabinet.isSecure }, 'CheckoutPage');
+      if (!(settings.requireCheckoutForSecureCabinets && selectedCabinet.isSecure)) {
         toast.error('This cabinet does not require check-in/out');
         return;
       }

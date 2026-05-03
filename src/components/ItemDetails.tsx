@@ -78,7 +78,7 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent dismissOnOutsidePointer>
                   <DialogHeader>
                     <DialogTitle>Delete Item</DialogTitle>
                     <DialogDescription>

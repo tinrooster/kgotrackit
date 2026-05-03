@@ -5,14 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ItemWithSubcategories } from "@/types/inventory";
 import { SupplierWebsiteStatusBlock } from "@/components/SupplierWebsiteStatusBlock";
-
-function ReqAsterisk() {
-  return (
-    <span className="ml-0.5 text-destructive" title="Required" aria-hidden>
-      *
-    </span>
-  );
-}
+import { ReqAsterisk } from "@/components/forms/ReqAsterisk";
 
 interface InventorySupplyTabProps {
   form: UseFormReturn<any>;

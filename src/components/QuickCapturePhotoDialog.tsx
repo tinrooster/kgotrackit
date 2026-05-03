@@ -125,7 +125,7 @@ export function QuickCapturePhotoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md gap-3 p-4 sm:max-w-md">
+      <DialogContent dismissOnOutsidePointer className="max-w-md gap-3 p-4 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Camera className="h-5 w-5" />

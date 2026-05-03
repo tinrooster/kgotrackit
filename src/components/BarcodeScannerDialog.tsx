@@ -90,7 +90,7 @@ export function BarcodeScannerDialog({ open, onOpenChange, onScan }: BarcodeScan
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent dismissOnOutsidePointer className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Scan code</DialogTitle>
           <DialogDescription>Allow camera access when prompted. Point at a QR or barcode.</DialogDescription>

@@ -15,14 +15,7 @@ import {
   RACK_LOCATIONS_UPDATED_EVENT,
 } from "@/lib/rackLocationsConfig";
 import { findLocationByFlatId } from "@/lib/locationOptions";
-
-function ReqAsterisk() {
-  return (
-    <span className="ml-0.5 text-destructive" title="Required" aria-hidden>
-      *
-    </span>
-  );
-}
+import { ReqAsterisk } from "@/components/forms/ReqAsterisk";
 
 interface BasicDetailsTabProps {
   form: UseFormReturn<any>;
@@ -152,6 +145,15 @@ export function BasicDetailsTab({
     [flattenedProjectOptions],
   );
 
+  const categoryComboboxOptions = React.useMemo(
+    () =>
+      getFlattenedCategoryOptions.map((o) => ({
+        label: o.name,
+        value: o.id,
+      })),
+    [getFlattenedCategoryOptions],
+  );
+
   return (
     <div className="mx-auto w-full max-w-[56rem] space-y-4">
       {inventoryRecordLine || assetTagLine ? (
@@ -218,23 +220,13 @@ export function BasicDetailsTab({
                   Category
                   <ReqAsterisk />
                 </FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {getFlattenedCategoryOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={categoryComboboxOptions}
+                  value={field.value || ""}
+                  onChange={(value) => field.onChange(value)}
+                  placeholder="Select category"
+                  emptyText="No category matches."
+                />
                 <FormMessage />
               </FormItem>
             )}
@@ -250,7 +242,7 @@ export function BasicDetailsTab({
                   options={[{ label: "None", value: "__none__" }, ...projectComboboxOptions]}
                   value={field.value ? field.value : "__none__"}
                   onChange={(value) => field.onChange(value === "__none__" ? "" : value)}
-                  placeholder="Search project (type to filter)…"
+                  placeholder="Select project"
                   emptyText="No project matches."
                 />
                 <FormMessage />
@@ -350,7 +342,7 @@ export function BasicDetailsTab({
                     form.setValue("cabinet", "");
                     form.setValue("rackLocation", "");
                   }}
-                  placeholder="Search location (type to filter)…"
+                  placeholder="Select location"
                   emptyText="No location matches."
                 />
                 <FormMessage />
@@ -400,7 +392,7 @@ export function BasicDetailsTab({
                     options={rackComboboxOptions}
                     value={field.value || ""}
                     onChange={(v) => field.onChange(v)}
-                    placeholder="Search rack (e.g. TD)…"
+                    placeholder="Select rack or type…"
                     emptyText="No rack matches."
                     allowCustomValue
                   />

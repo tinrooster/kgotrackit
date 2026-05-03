@@ -3,8 +3,7 @@ import { UseFormReturn, useWatch } from 'react-hook-form';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+import { Combobox } from '@/components/ui/combobox';
 import {
   addUserCableColor,
   addUserConnectorType,
@@ -20,6 +19,13 @@ interface BulkCableFiberSectionProps {
 const CABLE_COLOR_NONE = '__none__';
 const CONNECTOR_NONE = '__none__';
 
+const FIBER_COMBO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'na', label: 'N/A (not fiber)' },
+  { value: 'sm', label: 'Single-mode (SM)' },
+  { value: 'mm', label: 'Multimode (MM)' },
+  { value: 'mtp_mpo', label: 'MTP/MPO' },
+];
+
 export function BulkCableFiberSection({ form }: BulkCableFiberSectionProps) {
   const [picklistEpoch, setPicklistEpoch] = React.useState(0);
   const [newColorDraft, setNewColorDraft] = React.useState('');
@@ -33,9 +39,20 @@ export function BulkCableFiberSection({ form }: BulkCableFiberSectionProps) {
     [picklistEpoch, cableColorValue],
   );
 
-  const connectorModel = React.useMemo(
-    () => getConnectorSelectModel(connectorValue),
-    [picklistEpoch, connectorValue],
+  const connectorComboboxOptions = React.useMemo(() => {
+    const m = getConnectorSelectModel(connectorValue);
+    const opts: { label: string; value: string }[] = [{ label: 'Not set', value: CONNECTOR_NONE }];
+    m.presets.forEach((p) => opts.push({ label: p, value: p }));
+    m.userDefined.forEach((p) => opts.push({ label: p, value: p }));
+    if (m.orphan) {
+      opts.push({ label: `${m.orphan} (from record)`, value: m.orphan });
+    }
+    return opts;
+  }, [connectorValue, picklistEpoch]);
+
+  const colorComboboxOptions = React.useMemo(
+    () => [{ label: 'Not set', value: CABLE_COLOR_NONE }, ...colorOptions.map((c) => ({ label: c, value: c }))],
+    [colorOptions],
   );
 
   const bump = () => setPicklistEpoch((n) => n + 1);
@@ -48,9 +65,10 @@ export function BulkCableFiberSection({ form }: BulkCableFiberSectionProps) {
         render={({ field }) => (
           <FormItem>
             <FormLabel>Color</FormLabel>
-            <Select
+            <Combobox
+              options={colorComboboxOptions}
               value={field.value?.trim() ? field.value : CABLE_COLOR_NONE}
-              onValueChange={(v) => {
+              onChange={(v) => {
                 const next = v === CABLE_COLOR_NONE ? '' : v;
                 field.onChange(next);
                 if (next) {
@@ -58,21 +76,9 @@ export function BulkCableFiberSection({ form }: BulkCableFiberSectionProps) {
                   bump();
                 }
               }}
-            >
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select color" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value={CABLE_COLOR_NONE}>Not set</SelectItem>
-                {colorOptions.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select color"
+              emptyText="No color matches."
+            />
             <div className="mt-1 flex flex-wrap gap-2">
               <Input
                 value={newColorDraft}
@@ -112,19 +118,13 @@ export function BulkCableFiberSection({ form }: BulkCableFiberSectionProps) {
         render={({ field }) => (
           <FormItem>
             <FormLabel>Fiber type</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value || 'na'}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value="na">N/A (not fiber)</SelectItem>
-                <SelectItem value="sm">Single-mode (SM)</SelectItem>
-                <SelectItem value="mm">Multimode (MM)</SelectItem>
-                <SelectItem value="mtp_mpo">MTP/MPO</SelectItem>
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={FIBER_COMBO_OPTIONS}
+              value={field.value || 'na'}
+              onChange={(v) => field.onChange(v)}
+              placeholder="Select fiber type"
+              emptyText="No matches."
+            />
             <FormMessage />
           </FormItem>
         )}
@@ -136,39 +136,13 @@ export function BulkCableFiberSection({ form }: BulkCableFiberSectionProps) {
         render={({ field }) => (
           <FormItem className="sm:col-span-2">
             <FormLabel>Connector type</FormLabel>
-            <Select
+            <Combobox
+              options={connectorComboboxOptions}
               value={field.value?.trim() ? field.value : CONNECTOR_NONE}
-              onValueChange={(v) => {
-                field.onChange(v === CONNECTOR_NONE ? '' : v);
-              }}
-            >
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select connector" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value={CONNECTOR_NONE}>Not set</SelectItem>
-                {connectorModel.presets.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-                {connectorModel.userDefined.length > 0 ? (
-                  <>
-                    <Separator className="my-1" />
-                    {connectorModel.userDefined.map((p) => (
-                      <SelectItem key={`user:${p}`} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </>
-                ) : null}
-                {connectorModel.orphan ? (
-                  <SelectItem value={connectorModel.orphan}>{connectorModel.orphan} (from record)</SelectItem>
-                ) : null}
-              </SelectContent>
-            </Select>
+              onChange={(v) => field.onChange(v === CONNECTOR_NONE ? '' : v)}
+              placeholder="Select connector type"
+              emptyText="No connector matches."
+            />
             <div className="mt-1 flex flex-wrap gap-2">
               <Input
                 value={newConnectorDraft}
@@ -209,7 +183,11 @@ export function BulkCableFiberSection({ form }: BulkCableFiberSectionProps) {
           <FormItem className="sm:col-span-2">
             <FormLabel>Lot / reel #</FormLabel>
             <FormControl>
-              <Input {...field} value={field.value || ''} placeholder="Manufacturer or reel lot" />
+              <Input
+                {...field}
+                value={field.value || ''}
+                placeholder="Manufacturer or reel lot"
+              />
             </FormControl>
             <FormMessage />
           </FormItem>

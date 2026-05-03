@@ -60,15 +60,35 @@ function isInsideRadixPortaledLayer(target: EventTarget | null): boolean {
 
 export type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   /**
-   * Use with `<Dialog modal={false}>`. Renders a dimmed fullscreen close target (Radix omits overlay when modal is false).
+   * Use with `<Dialog modal={false}>`. Renders a dimmed fullscreen backdrop (Radix omits overlay when modal is false).
+   * Clicks on the backdrop do not close the dialog; use Cancel / explicit actions.
    */
   nonModalBackdrop?: boolean;
+  /**
+   * When false (default), pointer / focus outside the dialog does not dismiss it — use Cancel or the X control.
+   * Set true for lightweight dialogs that should close on an outside click (e.g. print preview).
+   */
+  dismissOnOutsidePointer?: boolean;
 };
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, onInteractOutside, onPointerDownOutside, onFocusOutside, nonModalBackdrop, ...props }, ref) => {
+>(
+  (
+    {
+      className,
+      children,
+      onInteractOutside,
+      onPointerDownOutside,
+      onFocusOutside,
+      nonModalBackdrop,
+      dismissOnOutsidePointer: dismissOnOutsidePointerProp,
+      ...props
+    },
+    ref,
+  ) => {
+  const dismissOnOutsidePointer = dismissOnOutsidePointerProp ?? false;
   const [nestedPortalHost, setNestedPortalHost] = React.useState<HTMLElement | null>(null);
 
   const setContentNode = React.useCallback(
@@ -86,13 +106,10 @@ const DialogContent = React.forwardRef<
   return (
     <DialogPortal>
       {nonModalBackdrop ? (
-        <DialogPrimitive.Close asChild>
-          <button
-            type="button"
-            className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-            aria-label="Close dialog"
-          />
-        </DialogPrimitive.Close>
+        <div
+          className="pointer-events-auto fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          aria-hidden
+        />
       ) : null}
       <DialogOverlay
         className={cn(nonModalBackdrop && "pointer-events-none")}
@@ -107,17 +124,23 @@ const DialogContent = React.forwardRef<
         onInteractOutside={(event) => {
           if (isInsideRadixPortaledLayer(outsideEventTarget(event))) {
             event.preventDefault();
+          } else if (!dismissOnOutsidePointer) {
+            event.preventDefault();
           }
           onInteractOutside?.(event);
         }}
         onPointerDownOutside={(event) => {
           if (isInsideRadixPortaledLayer(outsideEventTarget(event))) {
             event.preventDefault();
+          } else if (!dismissOnOutsidePointer) {
+            event.preventDefault();
           }
           onPointerDownOutside?.(event);
         }}
         onFocusOutside={(event) => {
           if (isInsideRadixPortaledLayer(outsideEventTarget(event))) {
+            event.preventDefault();
+          } else if (!dismissOnOutsidePointer) {
             event.preventDefault();
           }
           onFocusOutside?.(event);

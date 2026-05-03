@@ -204,10 +204,15 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-full justify-between font-normal"
           disabled={disabled}
         >
-          <span className="truncate">
+          <span
+            className={cn(
+              "truncate",
+              !displayValue && "text-muted-foreground/45",
+            )}
+          >
             {displayValue || placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -232,7 +237,7 @@ export function Combobox({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onSearchKeyDown}
               placeholder={placeholder}
-              className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
+              className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground/50"
               aria-autocomplete="list"
               aria-controls={listId}
             />

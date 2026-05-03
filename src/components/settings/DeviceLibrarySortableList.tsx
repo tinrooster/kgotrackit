@@ -35,13 +35,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logging';
 import { cn } from '@/lib/utils';
-import type { DeviceLibraryEntry, DeviceLibraryKind } from '@/types/deviceLibrary';
+import type { DeviceLibraryEntry } from '@/types/deviceLibrary';
 import { getCableColorDropdownValues } from '@/lib/cableFacetPicklists';
 import { getDeviceLibrary, newDeviceLibraryDraft, saveDeviceLibrary } from '@/lib/deviceLibraryStorage';
 import { entryLabel } from '@/lib/deviceLibraryFormApply';
+
+const KIND_COMBO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'generic', label: 'Generic part' },
+  { value: 'cable', label: 'Cable / bulk wire' },
+  { value: 'media_converter', label: 'Media converter' },
+  { value: 'display', label: 'Display / TV' },
+];
+
+const KIND_LABELS: Record<string, string> = {
+  generic: 'Generic',
+  cable: 'Cable',
+  media_converter: 'Converter',
+  display: 'Display',
+};
 
 function SortableDeviceRow({
   entry,
@@ -60,14 +75,7 @@ function SortableDeviceRow({
     transition,
   };
 
-  const kindLabel =
-    entry.kind === 'cable'
-      ? 'Cable'
-      : entry.kind === 'media_converter'
-        ? 'Converter'
-        : entry.kind === 'display'
-          ? 'Display'
-          : 'Generic';
+  const kindLabel = KIND_LABELS[entry.kind] ?? entry.kind;
 
   return (
     <div
@@ -111,13 +119,6 @@ function SortableDeviceRow({
     </div>
   );
 }
-
-const KIND_OPTIONS: { value: DeviceLibraryKind; label: string }[] = [
-  { value: 'generic', label: 'Generic part' },
-  { value: 'cable', label: 'Cable / bulk wire' },
-  { value: 'media_converter', label: 'Media converter' },
-  { value: 'display', label: 'Display / TV' },
-];
 
 interface DeviceLibrarySortableListProps {
   entries: DeviceLibraryEntry[];
@@ -242,21 +243,17 @@ export function DeviceLibrarySortableList({ entries, onEntriesChange }: DeviceLi
           <div className="grid gap-3 py-2">
             <div className="space-y-2">
               <Label>Kind</Label>
-              <Select
+              <Combobox
+                options={KIND_COMBO_OPTIONS}
                 value={draft.kind}
-                onValueChange={(v) => setDraft((d) => ({ ...d, kind: v as DeviceLibraryKind }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {KIND_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => setDraft((d) => ({ ...d, kind: v }))}
+                placeholder="Preset or custom kind (type to add)…"
+                emptyText="Type a custom kind and pick “Use …” or press Enter in the list."
+                allowCustomValue
+              />
+              <p className="text-xs text-muted-foreground">
+                Presets unlock cable jacket color and converter signal-path fields when kind matches exactly.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="dl-manufacturer">Manufacturer</Label>
