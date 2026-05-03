@@ -17,6 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from "@/components/ui/use-toast";
 import { TemplateForm } from '@/components/TemplateForm';
 import { useNavigate } from 'react-router-dom';
@@ -24,12 +34,14 @@ import { getTemplates, saveTemplates, getSettings, SETTINGS_UPDATED_EVENT } from
 import { v4 as uuidv4 } from 'uuid';
 import { AddItemDialog } from '@/components/AddItemDialog';
 import { useInventory } from "@/hooks/useInventory";
+import { cn } from "@/lib/utils";
 
 export function TemplatesPage() {
   const [templates, setTemplates] = useState<ItemTemplate[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ItemTemplate | null>(null);
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { items: existingItems } = useInventory();
@@ -74,7 +86,11 @@ export function TemplatesPage() {
     setIsCreateDialogOpen(true);
   };
 
-  const handleDeleteTemplate = (templateId: string) => {
+  const confirmDeleteTemplate = () => {
+    if (!pendingDeleteTemplateId) {
+      return;
+    }
+    const templateId = pendingDeleteTemplateId;
     try {
       const newTemplates = templates.filter(t => t.templateId !== templateId);
       saveTemplates(newTemplates);
@@ -90,6 +106,8 @@ export function TemplatesPage() {
         description: "Failed to delete template",
         variant: "destructive",
       });
+    } finally {
+      setPendingDeleteTemplateId(null);
     }
   };
 
@@ -154,9 +172,6 @@ export function TemplatesPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Item Templates</h1>
-          <p className="text-muted-foreground">
-            Create and manage templates for frequently added items
-          </p>
         </div>
         <Button onClick={handleCreateTemplate}>
           <Plus className="mr-2 h-4 w-4" />
@@ -186,7 +201,7 @@ export function TemplatesPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDeleteTemplate(template.templateId)}
+                  onClick={() => setPendingDeleteTemplateId(template.templateId)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -204,26 +219,58 @@ export function TemplatesPage() {
         ))}
       </div>
 
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedTemplate ? "Edit Template" : "Create Template"}
-            </DialogTitle>
-            <DialogDescription>
-              Fill in the template details below. Templates can be used to quickly create new inventory items.
-            </DialogDescription>
-          </DialogHeader>
-          <TemplateForm
-            template={selectedTemplate || undefined}
-            onSubmit={handleSubmitTemplate}
-            onCancel={() => setIsCreateDialogOpen(false)}
-            categories={categories}
-            units={units}
-            locations={locations}
-            suppliers={suppliers}
-            projects={projects}
-          />
+      <AlertDialog open={pendingDeleteTemplateId !== null} onOpenChange={(open) => !open && setPendingDeleteTemplateId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the template
+              {pendingDeleteTemplateId
+                ? ` "${templates.find((t) => t.templateId === pendingDeleteTemplateId)?.templateName ?? ''}"`
+                : ''}{' '}
+              permanently.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmDeleteTemplate}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} modal={false}>
+        <DialogContent
+          nonModalBackdrop
+          className={cn(
+            "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-3xl",
+            "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
+            "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"
+          )}
+        >
+          <div className="shrink-0 border-b px-6 pb-4 pt-6">
+            <DialogHeader className="space-y-2 p-0 text-left">
+              <DialogTitle>
+                {selectedTemplate ? "Edit Template" : "Create Template"}
+              </DialogTitle>
+              <DialogDescription>
+                Fill in the template details below. Templates can be used to quickly create new inventory items.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <TemplateForm
+              template={selectedTemplate || undefined}
+              onSubmit={handleSubmitTemplate}
+              onCancel={() => setIsCreateDialogOpen(false)}
+              categories={categories}
+              units={units}
+              locations={locations}
+              suppliers={suppliers}
+              projects={projects}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

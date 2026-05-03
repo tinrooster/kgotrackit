@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { Cabinet, CabinetWithItems } from "@/types/cabinets";
 import { SETTINGS_UPDATED_EVENT } from "@/lib/storageService";
+import { requestCloudSync } from "@/lib/cloudSyncEvents";
+
+/** Dispatched on window after default UI settings are persisted (theme, density, mobile layout). */
+export const DEFAULT_SETTINGS_CHANGED_EVENT = "trackit:default-settings-changed";
 
 declare global {
   interface Window {
-    electronStore: {
+    electronStore?: {
       getData: (key: string) => any;
       setData: (key: string, value: any) => void;
       deleteData: (key: string) => void;
@@ -13,7 +17,7 @@ declare global {
 }
 
 // Define the settings schema
-const defaultSettingsSchema = z.object({
+export const defaultSettingsSchema = z.object({
   defaultLocation: z.string().optional(),
   defaultUnit: z.string().optional(),
   defaultCategory: z.string().optional(),
@@ -26,13 +30,25 @@ const defaultSettingsSchema = z.object({
   defaultMinQuantity: z.number().min(0).default(0),
   defaultReorderLevel: z.number().min(0).default(5),
   theme: z.enum(['light', 'dark', 'system']).default('light'),
-  condensedView: z.boolean().default(false),
-  assetCodeMode: z.enum(['qr', 'barcode', 'both', 'none']).default('both'),
+  condensedView: z.boolean().default(true),
+  /** Narrow / tablet widths: icon-first nav, shorter settings tab labels when space is tight. */
+  mobileTabletUi: z.boolean().default(true),
+  assetCodeMode: z.enum(['qr', 'barcode', 'both', 'none']).default('qr'),
+  /** Auto-generate physical asset tags (label/QR pattern), not the durable record ID. */
   autoAssignAssetId: z.boolean().default(true),
+  /** Prefix for durable inventory record IDs (e.g. REC-000001). */
+  recordIdPrefix: z.string().default('REC'),
+  recordIdSequence: z.number().int().min(0).default(0),
+  /** Prefix embedded in asset tags: `{prefix}_{YYMMDD}_{seq}` using in-service date. */
   assetIdPrefix: z.string().default('AST'),
+  /** Monotonic counter for asset tag sequence (shared across dates). */
   assetIdSequence: z.number().int().min(0).default(0),
   deleteConfirmationByUser: z.record(z.string(), z.boolean()).default({}),
   undoByUser: z.record(z.string(), z.boolean()).default({}),
+  /** When true, a full JSON backup is downloaded once per local calendar day while the app is open. */
+  dailyOfflineBackupEnabled: z.boolean().default(false),
+  /** YYYY-MM-DD (local) of the last successful daily backup download. */
+  dailyOfflineBackupLastDate: z.string().optional(),
 });
 
 export type DefaultSettings = z.infer<typeof defaultSettingsSchema>;
@@ -63,11 +79,15 @@ export class SettingsService {
     try {
       const validated = defaultSettingsSchema.parse(settings);
       try {
-        window.electronStore.setData(this.SETTINGS_KEY, validated);
+        window.electronStore?.setData?.(this.SETTINGS_KEY, validated);
       } catch {
         // Fall back to localStorage when Electron bridge is unavailable.
       }
       localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(validated));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(DEFAULT_SETTINGS_CHANGED_EVENT));
+      }
+      requestCloudSync();
     } catch (error) {
       console.error('Error saving settings:', error);
       throw error;
@@ -84,14 +104,34 @@ export class SettingsService {
       defaultMinQuantity: 0,
       defaultReorderLevel: 5,
       theme: 'light',
-      condensedView: false,
-      assetCodeMode: 'both',
+      condensedView: true,
+      mobileTabletUi: true,
+      assetCodeMode: 'qr',
       autoAssignAssetId: true,
+      recordIdPrefix: 'REC',
+      recordIdSequence: 0,
       assetIdPrefix: 'AST',
       assetIdSequence: 0,
       deleteConfirmationByUser: {},
       undoByUser: {},
+      dailyOfflineBackupEnabled: false,
+      dailyOfflineBackupLastDate: undefined,
     };
+  }
+
+  /** Replace all cabinets (used by settings snapshot restore). */
+  static async replaceAllCabinets(cabinets: Cabinet[]): Promise<void> {
+    const list = Array.isArray(cabinets) ? cabinets : [];
+    try {
+      window.electronStore?.setData?.(this.CABINETS_KEY, list);
+    } catch {
+      // localStorage fallback below
+    }
+    localStorage.setItem(this.CABINETS_KEY, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
+    }
+    requestCloudSync();
   }
 
   // Cabinet Management
@@ -128,6 +168,7 @@ export class SettingsService {
       }
       localStorage.setItem(this.CABINETS_KEY, JSON.stringify(cabinets));
       window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
+      requestCloudSync();
     } catch (error) {
       console.error('Error saving cabinet:', error);
       throw error;
@@ -145,6 +186,7 @@ export class SettingsService {
       }
       localStorage.setItem(this.CABINETS_KEY, JSON.stringify(filtered));
       window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
+      requestCloudSync();
     } catch (error) {
       console.error('Error deleting cabinet:', error);
       throw error;

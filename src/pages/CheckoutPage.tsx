@@ -168,8 +168,12 @@ export default function CheckoutPage() {
         return item
       })
 
-      // Save the updated items to storage
-      saveItems(updatedItems)
+      if (!saveItems(updatedItems)) {
+        toast.error('Could not save inventory after check-in/out.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
       setItems(updatedItems)
       
       // Log the activity
@@ -332,14 +336,14 @@ export default function CheckoutPage() {
               <div className="flex gap-4 pt-4">
                 <Button
                   variant="outline"
-                  className="flex-1 border-green-600/50 bg-green-700/20 text-green-200 hover:bg-green-700/30"
+                  className="flex-1 border-green-600 bg-green-50 text-green-900 hover:bg-green-100 dark:border-green-700 dark:bg-green-950/50 dark:text-green-50 dark:hover:bg-green-900/40"
                   onClick={() => handleAction('check-in')}
                 >
                   Check In
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1 border-red-600/50 bg-red-700/20 text-red-200 hover:bg-red-700/30"
+                  className="flex-1 border-red-600 bg-red-50 text-red-900 hover:bg-red-100 dark:border-red-700 dark:bg-red-950/50 dark:text-red-50 dark:hover:bg-red-900/40"
                   onClick={() => handleAction('check-out')}
                 >
                   Check Out

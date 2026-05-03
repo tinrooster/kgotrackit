@@ -9,7 +9,7 @@ The in-app Help page provides operational guidance for end users and administrat
 ### Quick Navigation
 - Dashboard: status and quick checks
 - Inventory: item lifecycle and editing workflows
-- Checkout: secure cabinet movement operations
+- Check-In/Out: secure cabinet movement operations (`/checkout`)
 - Reports: report creation and export workflows
 - Settings: configuration and data governance
 - About: product profile and build context
@@ -21,9 +21,10 @@ The in-app Help page provides operational guidance for end users and administrat
 
 ### Inventory Workflow
 - Create item/template
+- **Quick add** (Inventory toolbar): fast capture with selection strip, collapsible lists, voice/last name, barcode/camera, units with sub-sizes (e.g. Spools), and device-local shortcuts — see in-app Help → Quick add
 - Classify and assign location/project
 - Use bulk edit for large updates
-- Use checkout for movement operations
+- Use Check-In/Out for movement operations
 - Print labels and run reports
 
 ### Reports & Exports

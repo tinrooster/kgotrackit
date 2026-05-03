@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { InventoryItem, CategoryNode, ItemWithSubcategories, OrderStatus } from '@/types/inventory'
-import { getItems, saveItems, getSettings, saveSettings } from '@/lib/storageService' 
+import { getItems, saveItems, getSettings, saveSettings } from '@/lib/storageService'
+import { requestCloudSync } from '@/lib/cloudSyncEvents'
 import { DUMMY_INVENTORY_DATA } from '@/lib/dummyData'; 
 import { toast } from 'sonner'; 
 import { Settings } from '@/lib/storageService'
@@ -30,15 +31,15 @@ export function useInventory() {
       loadedItems = getItems();
       console.log('Loaded items from localStorage:', loadedItems.length);
       
-      if (loadedItems.length === 0) {
-        console.log('localStorage empty, loading dummy data...');
-        loadedItems = DUMMY_INVENTORY_DATA.map(item => ({ 
+      if (import.meta.env.DEV && loadedItems.length === 0) {
+        console.log('localStorage empty, loading dummy data (dev only)...');
+        loadedItems = DUMMY_INVENTORY_DATA.map(item => ({
           ...item,
           lastUpdated: new Date(item.lastUpdated),
-          expectedDeliveryDate: item.expectedDeliveryDate ? new Date(item.expectedDeliveryDate) : undefined
+          expectedDeliveryDate: item.expectedDeliveryDate ? new Date(item.expectedDeliveryDate) : undefined,
         }));
-        saveItems(loadedItems); 
-        toast.info("Loaded dummy inventory data.");
+        saveItems(loadedItems);
+        toast.info('Loaded dummy inventory data (development only).');
       }
       
       setItems(loadedItems);
@@ -103,6 +104,7 @@ export function useInventory() {
            timestamp: entry.timestamp instanceof Date ? entry.timestamp.toISOString() : new Date().toISOString()
          }));
          localStorage.setItem('inventoryHistory', JSON.stringify(historyToSave));
+         requestCloudSync();
        } catch (error) { console.error("Error saving history:", error); }
      } 
   }, [history, loading]);

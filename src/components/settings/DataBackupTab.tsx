@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, Save, RefreshCw, FileJson, Database, GitMerge } from 'lucide-react';
+import { Download, Save, RefreshCw, FileJson, Database, GitMerge, Upload } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import type { GroupReconcileResult } from '@/lib/groupInventoryReconciliation';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 
 interface DataBackupTabProps {
   onExportData: () => void;
@@ -14,6 +17,10 @@ interface DataBackupTabProps {
   onBackupData: () => void;
   onRestoreData: (file: File) => Promise<void>;
   onExportSettingsSnapshot: () => void;
+  onRestoreSettingsSnapshot: (file: File) => Promise<void>;
+  dailyOfflineBackupEnabled: boolean;
+  onDailyOfflineBackupEnabledChange: (enabled: boolean) => void;
+  dailyOfflineBackupLastDate?: string;
   onRunGroupInventoryReconcile: () => GroupReconcileResult;
 }
 
@@ -56,16 +63,22 @@ export function DataBackupTab({
   onBackupData,
   onRestoreData,
   onExportSettingsSnapshot,
+  onRestoreSettingsSnapshot,
+  dailyOfflineBackupEnabled,
+  onDailyOfflineBackupEnabledChange,
+  dailyOfflineBackupLastDate,
   onRunGroupInventoryReconcile,
 }: DataBackupTabProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('import-export');
   const [isImporting, setIsImporting] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isRestoringSettingsSnapshot, setIsRestoringSettingsSnapshot] = useState(false);
   const [reconcileReport, setReconcileReport] = useState<string | null>(null);
   const jsonImportRef = React.useRef<HTMLInputElement>(null);
   const excelImportRef = React.useRef<HTMLInputElement>(null);
   const restoreRef = React.useRef<HTMLInputElement>(null);
+  const settingsSnapshotRestoreRef = React.useRef<HTMLInputElement>(null);
 
   const handleJsonFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -136,6 +149,31 @@ export function DataBackupTab({
     }
   };
 
+  const handleSettingsSnapshotFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsRestoringSettingsSnapshot(true);
+      await onRestoreSettingsSnapshot(file);
+      toast({
+        title: 'Settings snapshot restored',
+        description: 'Lists, financial codes, cabinets, and general preferences were replaced from the file.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Restore failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRestoringSettingsSnapshot(false);
+      if (settingsSnapshotRestoreRef.current) {
+        settingsSnapshotRestoreRef.current.value = '';
+      }
+    }
+  };
+
   const handleRunGroupReconcile = () => {
     const result = onRunGroupInventoryReconcile();
     setReconcileReport(formatReconcileReport(result));
@@ -181,10 +219,22 @@ export function DataBackupTab({
                     Export your current data to a JSON file that can be used for imports.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={onExportData} variant="outline">
+                    <Button
+                      type="button"
+                      onClick={onExportData}
+                      variant="outline"
+                      size="sm"
+                      className="active:bg-accent"
+                    >
                       Export as JSON
                     </Button>
-                    <Button onClick={onExportExcel} variant="outline">
+                    <Button
+                      type="button"
+                      onClick={onExportExcel}
+                      variant="outline"
+                      size="sm"
+                      className="active:bg-accent"
+                    >
                       Export as Excel
                     </Button>
                   </div>
@@ -196,7 +246,13 @@ export function DataBackupTab({
                     Import data from a JSON file. This will merge with your current data.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => jsonImportRef.current?.click()}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="active:bg-accent"
+                      onClick={() => jsonImportRef.current?.click()}
+                    >
                       Import JSON
                     </Button>
                     <input
@@ -207,7 +263,13 @@ export function DataBackupTab({
                       className="hidden"
                     />
 
-                    <Button variant="outline" onClick={() => excelImportRef.current?.click()}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="active:bg-accent"
+                      onClick={() => excelImportRef.current?.click()}
+                    >
                       Import Excel
                     </Button>
                     <input
@@ -232,30 +294,71 @@ export function DataBackupTab({
                 Backup & Restore
               </CardTitle>
               <CardDescription>
-                Create a complete backup of your system or restore from a previous backup.
+                Full app file backup/restore vs settings-only JSON — use the scope labels below.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Create Backup</h3>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch md:gap-6">
+                <div className="flex flex-col space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-medium">Create Backup</h3>
+                    <Badge variant="secondary">Full app</Badge>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    Create a complete backup of your data, settings, and configurations.
+                    One file: inventory rows, lists, financial codes, preferences, cabinets, templates. For CSV/Excel
+                    inventory only, use <strong>Import &amp; Export</strong>.
                   </p>
-                  <Button onClick={onBackupData} className="w-full">
-                    <Save className="mr-2 h-4 w-4" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onBackupData}
+                    className="mt-auto inline-flex w-fit items-center justify-center gap-2 active:bg-accent"
+                  >
+                    <Save className="h-4 w-4 shrink-0" />
                     Create Backup
                   </Button>
+                  <div className="mt-3 flex flex-col gap-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="daily-offline-backup" className="text-sm font-medium leading-snug">
+                        Daily offline backup
+                      </Label>
+                      <Switch
+                        id="daily-offline-backup"
+                        checked={dailyOfflineBackupEnabled}
+                        onCheckedChange={onDailyOfflineBackupEnabledChange}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      While the app is open, downloads one full JSON backup per calendar day (lists, inventory,
+                      financial codes, preferences, cabinets, templates). Uses your browser download folder.
+                    </p>
+                    {dailyOfflineBackupLastDate ? (
+                      <p className="text-xs text-muted-foreground">
+                        Last daily file: <span className="font-mono text-foreground">{dailyOfflineBackupLastDate}</span>
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Restore Backup</h3>
+                <div className="flex flex-col space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-medium">Restore Backup</h3>
+                    <Badge variant="secondary">Full app</Badge>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    Restore from a <strong>.backup</strong> or <strong>.json</strong> file (both are shown in the file
-                    picker). App-generated backups use the <code className="rounded bg-muted px-1">.backup</code>{' '}
-                    extension.
+                    Choose a <strong>.backup</strong> (app export) or compatible <strong>.json</strong> full snapshot.
+                    This replaces the in-browser dataset for everything in the backup.
                   </p>
-                  <Button variant="outline" onClick={() => restoreRef.current?.click()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => restoreRef.current?.click()}
+                    disabled={isRestoring}
+                    className="mt-auto inline-flex w-fit items-center justify-center gap-2 active:bg-accent"
+                  >
+                    <Upload className="h-4 w-4 shrink-0" />
                     Restore from Backup
                   </Button>
                   <input
@@ -269,15 +372,45 @@ export function DataBackupTab({
               </div>
 
               <div className="border-t pt-4">
-                <h3 className="mb-2 text-sm font-medium">Settings snapshot (JSON)</h3>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-medium">Settings snapshot (JSON)</h3>
+                  <Badge variant="outline">No inventory rows</Badge>
+                </div>
                 <p className="mb-3 text-sm text-muted-foreground">
-                  Download general preferences, user-defined lists, financial codes, and cabinets in one portable file.
-                  For full inventory rows, use Import &amp; Export.
+                  Portable JSON: general preferences, lookup lists, financial codes, and cabinets only. Inventory lines
+                  stay as they are — use <strong>Import &amp; Export</strong> for inventory, or <strong>Create Backup</strong> for a
+                  full app file.
                 </p>
-                <Button type="button" variant="outline" onClick={onExportSettingsSnapshot}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download settings snapshot
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="active:bg-accent"
+                    onClick={onExportSettingsSnapshot}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download settings snapshot
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="active:bg-accent"
+                    disabled={isRestoringSettingsSnapshot}
+                    onClick={() => settingsSnapshotRestoreRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Restore settings snapshot
+                  </Button>
+                  <input
+                    type="file"
+                    ref={settingsSnapshotRestoreRef}
+                    onChange={handleSettingsSnapshotFile}
+                    accept=".json,.JSON,application/json"
+                    className="hidden"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -303,12 +436,24 @@ export function DataBackupTab({
                 not blank and not N/A.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="default" onClick={handleRunGroupReconcile}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="active:bg-accent"
+                  onClick={handleRunGroupReconcile}
+                >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Run group reconciliation
                 </Button>
                 {reconcileReport !== null && (
-                  <Button type="button" variant="outline" onClick={() => setReconcileReport(null)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="active:bg-accent"
+                    onClick={() => setReconcileReport(null)}
+                  >
                     Clear report
                   </Button>
                 )}

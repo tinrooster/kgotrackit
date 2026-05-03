@@ -6,6 +6,7 @@ import './index.css'
 import { Toaster } from 'sonner'
 import { AuthProvider } from './contexts/AuthContext'
 import { LoginPage } from './components/LoginPage'
+import { SupabaseSyncBridge } from './components/SupabaseSyncBridge'
 
 // Initialize the application data
 // Removed dummy data initialization
@@ -22,7 +23,9 @@ const router = createBrowserRouter(
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />
+      <SupabaseSyncBridge>
+        <RouterProvider router={router} />
+      </SupabaseSyncBridge>
       <Toaster 
         position="bottom-right"
         richColors

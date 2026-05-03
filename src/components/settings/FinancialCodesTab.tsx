@@ -1,8 +1,19 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Trash2 } from 'lucide-react';
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface FinancialCodesTabProps {
   expenseTypes: FinancialCodeEntry[];
@@ -13,21 +24,25 @@ interface FinancialCodesTabProps {
 
 const FinancialCodeEditor = ({
   title,
-  description,
   entries,
   onChange,
 }: {
   title: string;
-  description: string;
   entries: FinancialCodeEntry[];
   onChange: (entries: FinancialCodeEntry[]) => void;
 }) => {
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
   const updateEntry = (id: string, updates: Partial<FinancialCodeEntry>) => {
     onChange(entries.map((entry) => (entry.id === id ? { ...entry, ...updates } : entry)));
   };
 
-  const deleteEntry = (id: string) => {
-    onChange(entries.filter((entry) => entry.id !== id));
+  const confirmDelete = () => {
+    if (!pendingDeleteId) {
+      return;
+    }
+    onChange(entries.filter((entry) => entry.id !== pendingDeleteId));
+    setPendingDeleteId(null);
   };
 
   const addEntry = () => {
@@ -41,11 +56,12 @@ const FinancialCodeEditor = ({
     ]);
   };
 
+  const pendingEntry = pendingDeleteId ? entries.find((e) => e.id === pendingDeleteId) : undefined;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-12 gap-2 px-2 text-sm font-medium text-muted-foreground">
@@ -70,7 +86,12 @@ const FinancialCodeEditor = ({
               />
             </div>
             <div className="col-span-1">
-              <Button type="button" variant="ghost" size="icon" onClick={() => deleteEntry(entry.id)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setPendingDeleteId(entry.id)}
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -80,6 +101,25 @@ const FinancialCodeEditor = ({
           Add Entry
         </Button>
       </CardContent>
+
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingEntry?.code?.trim()
+                ? `Delete code "${pendingEntry.code}" and its description from this list.`
+                : 'Delete this row from the list.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
@@ -92,18 +132,8 @@ export function FinancialCodesTab({
 }: FinancialCodesTabProps) {
   return (
     <div className="space-y-4">
-      <FinancialCodeEditor
-        title="Expense Type"
-        description="Code and description are stored separately."
-        entries={expenseTypes}
-        onChange={onChangeExpenseTypes}
-      />
-      <FinancialCodeEditor
-        title="Cost Center / Allocation"
-        description="Code and description are stored separately."
-        entries={costCenters}
-        onChange={onChangeCostCenters}
-      />
+      <FinancialCodeEditor title="Expense Type" entries={expenseTypes} onChange={onChangeExpenseTypes} />
+      <FinancialCodeEditor title="Cost Center / Allocation" entries={costCenters} onChange={onChangeCostCenters} />
     </div>
   );
 }

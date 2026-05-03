@@ -1,3 +1,5 @@
+import { requestCloudSync } from '@/lib/cloudSyncEvents';
+
 export interface FinancialCodeEntry {
   id: string;
   code: string;
@@ -82,4 +84,5 @@ export const getFinancialSettings = (): FinancialSettings => {
 export const saveFinancialSettings = (settings: FinancialSettings) => {
   writeKey(STORAGE_KEYS.expenseTypes, normalizeEntries(settings.expenseTypes));
   writeKey(STORAGE_KEYS.costCenters, normalizeEntries(settings.costCenters));
+  requestCloudSync();
 };

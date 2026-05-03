@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AddItemForm } from "@/components/AddItemForm";
 import { InventoryItem, CategoryNode, ItemWithSubcategories } from "@/types/inventory";
@@ -7,20 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { ItemTemplate } from "@/types/templates";
-import { FinancialCodeEntry } from '@/lib/financialSettingsService';
-
-type OrderStatus = 'delivered' | 'partially_delivered' | 'backordered' | 'on_order' | 'not_ordered';
-
-interface Template extends Omit<InventoryItem, 'id' | 'lastUpdated' | 'createdBy' | 'lastModifiedBy'> {
-  templateName: string;
-  templateId: string;
-}
+import { FinancialCodeEntry } from "@/lib/financialSettingsService";
+import { Cabinet } from "@/types/cabinets";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AddItemDialogProps {
-  onSubmit: (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => void;
+  onSubmit: (item: Omit<InventoryItem, "id" | "lastUpdated">) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categories: CategoryNode[];
@@ -32,10 +26,56 @@ interface AddItemDialogProps {
   costCenters?: FinancialCodeEntry[];
   selectedTemplate?: ItemTemplate | null;
   existingItems: InventoryItem[];
+  cabinets?: Cabinet[];
 }
 
-export function AddItemDialog({ 
-  open, 
+function buildValuesFromTemplate(
+  selected: ItemTemplate,
+  suppliers: ItemWithSubcategories[],
+  locations: ItemWithSubcategories[],
+  units: ItemWithSubcategories[],
+  projects: ItemWithSubcategories[]
+): Partial<Omit<InventoryItem, "id" | "lastUpdated">> {
+  const supplierMatch = suppliers.find((s) => s.name === selected.supplier);
+  const locationMatch = locations.find((l) => l.id === selected.location);
+  const unitMatch = units.find((u) => u.name === selected.unit);
+  const projectMatch = projects.find(
+    (p) => p.id === selected.project || p.name === selected.project
+  );
+
+  return {
+    name: selected.name,
+    description: selected.description,
+    quantity: 0,
+    minQuantity: selected.minQuantity,
+    unit: unitMatch ? unitMatch.name : "",
+    costPerUnit: selected.costPerUnit,
+    category: selected.category,
+    location: locationMatch ? locationMatch.id : "",
+    supplier: supplierMatch ? supplierMatch.name : "",
+    supplierWebsite: selected.supplierWebsite,
+    project: projectMatch ? projectMatch.id : "",
+    dateInService: selected.dateInService
+      ? String(selected.dateInService).slice(0, 10)
+      : undefined,
+    assetStatus: selected.assetStatus,
+    expenseCode: selected.expenseCode,
+    expenseTypeCode: selected.expenseTypeCode,
+    expenseTypeDescription: selected.expenseTypeDescription,
+    costCenterCode: selected.costCenterCode,
+    costCenterDescription: selected.costCenterDescription,
+    assetTrackingMode: selected.assetTrackingMode,
+    assetTagEnd: selected.assetTagEnd,
+    companyAssetTag: selected.companyAssetTag,
+    photoUrl: selected.photoUrl,
+    notes: selected.notes,
+    orderStatus: selected.orderStatus,
+    deliveryPercentage: selected.deliveryPercentage,
+  };
+}
+
+export function AddItemDialog({
+  open,
   onOpenChange,
   onSubmit,
   categories,
@@ -46,177 +86,181 @@ export function AddItemDialog({
   expenseTypes = [],
   costCenters = [],
   selectedTemplate: externalSelectedTemplate,
-  existingItems
+  existingItems,
+  cabinets = [],
 }: AddItemDialogProps) {
   const [templates, setTemplates] = useState<ItemTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<ItemTemplate | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"new" | "template">("new");
-  const [formValues, setFormValues] = useState<Omit<InventoryItem, 'id' | 'lastUpdated'> | undefined>(undefined);
-  const [lastAction, setLastAction] = useState<string>("");
+  const [formValues, setFormValues] = useState<
+    Partial<Omit<InventoryItem, "id" | "lastUpdated">> | undefined
+  >(undefined);
+  const [formInstanceKey, setFormInstanceKey] = useState(0);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [pendingTemplateName, setPendingTemplateName] = useState<string>("");
 
   useEffect(() => {
-    if (open) {
-      console.error('[DEBUG] Dialog opened');
-      try {
-        const loadedTemplates = getTemplates();
-        console.error('[DEBUG] Templates loaded:', loadedTemplates);
-        
-        if (Array.isArray(loadedTemplates)) {
-          const validTemplates = loadedTemplates
-            .map(template => {
-              if (typeof template === 'object' && template !== null && template.templateName) {
-                return template as ItemTemplate;
-              }
-              console.error('[DEBUG] Invalid template found:', template);
-              return null;
-            })
-            .filter((t): t is ItemTemplate => t !== null);
-          
-          console.error('[DEBUG] Valid templates:', validTemplates);
-          setTemplates(validTemplates);
-        } else {
-          console.error('[DEBUG] Loaded templates is not an array:', loadedTemplates);
-          setTemplates([]);
-        }
-      } catch (error) {
-        console.error('[DEBUG] Error loading templates:', error);
-        toast.error('Failed to load templates');
+    if (!open) {
+      return;
+    }
+    try {
+      const loadedTemplates = getTemplates();
+      if (Array.isArray(loadedTemplates)) {
+        const validTemplates = loadedTemplates
+          .map((template) => {
+            if (typeof template === "object" && template !== null && template.templateName) {
+              return template as ItemTemplate;
+            }
+            return null;
+          })
+          .filter((t): t is ItemTemplate => t !== null);
+        setTemplates(validTemplates);
+      } else {
         setTemplates([]);
       }
+    } catch {
+      toast.error("Failed to load templates");
+      setTemplates([]);
     }
   }, [open]);
 
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (externalSelectedTemplate) {
-      // Find matching supplier from the suppliers list
-      const supplierMatch = suppliers.find(s => s.name === externalSelectedTemplate.supplier);
-      const locationMatch = locations.find(l => l.id === externalSelectedTemplate.location);
-      const unitMatch = units.find(u => u.name === externalSelectedTemplate.unit);
-      const projectMatch = projects.find(p => p.name === externalSelectedTemplate.project);
-
-      const templateValues = {
-        name: externalSelectedTemplate.name,
-        description: externalSelectedTemplate.description,
-        quantity: 0,
-        minQuantity: externalSelectedTemplate.minQuantity,
-        unit: unitMatch ? unitMatch.name : '',
-        costPerUnit: externalSelectedTemplate.costPerUnit,
-        category: externalSelectedTemplate.category,
-        location: locationMatch ? locationMatch.id : '',
-        supplier: supplierMatch ? supplierMatch.name : '',
-        supplierWebsite: externalSelectedTemplate.supplierWebsite,
-        project: projectMatch ? projectMatch.name : '',
-        assetStatus: externalSelectedTemplate.assetStatus,
-        expenseCode: externalSelectedTemplate.expenseCode,
-        expenseTypeCode: externalSelectedTemplate.expenseTypeCode,
-        expenseTypeDescription: externalSelectedTemplate.expenseTypeDescription,
-        costCenterCode: externalSelectedTemplate.costCenterCode,
-        costCenterDescription: externalSelectedTemplate.costCenterDescription,
-        assetTrackingMode: externalSelectedTemplate.assetTrackingMode,
-        assetTagEnd: externalSelectedTemplate.assetTagEnd,
-        notes: externalSelectedTemplate.notes,
-        orderStatus: externalSelectedTemplate.orderStatus,
-        deliveryPercentage: externalSelectedTemplate.deliveryPercentage
-      };
-      setFormValues(templateValues);
-      setSelectedTemplate(externalSelectedTemplate);
-      setActiveTab("new");
+    if (!open) {
+      wasOpenRef.current = false;
+      setPendingTemplateName("");
+      return;
     }
-  }, [externalSelectedTemplate, suppliers, locations, units, projects]);
 
-  const handleTemplateSelect = (templateName: string) => {
-    console.error('[DEBUG] Template selected:', templateName);
-    const selectedTemplate = templates.find(t => t.templateName === templateName);
-    if (selectedTemplate) {
-      console.error('[DEBUG] Found template:', selectedTemplate);
-      
-      // Find matching values from the current settings
-      const supplierMatch = suppliers.find(s => s.name === selectedTemplate.supplier);
-      const locationMatch = locations.find(l => l.id === selectedTemplate.location);
-      const unitMatch = units.find(u => u.name === selectedTemplate.unit);
-      const projectMatch = projects.find(p => p.name === selectedTemplate.project);
-
-      const newFormValues = {
-        name: selectedTemplate.name,
-        description: selectedTemplate.description,
-        quantity: 0,
-        minQuantity: selectedTemplate.minQuantity,
-        unit: unitMatch ? unitMatch.name : '',
-        costPerUnit: selectedTemplate.costPerUnit,
-        category: selectedTemplate.category,
-        location: locationMatch ? locationMatch.id : '',
-        supplier: supplierMatch ? supplierMatch.name : '',
-        supplierWebsite: selectedTemplate.supplierWebsite,
-        project: projectMatch ? projectMatch.name : '',
-        assetStatus: selectedTemplate.assetStatus,
-        expenseCode: selectedTemplate.expenseCode,
-        expenseTypeCode: selectedTemplate.expenseTypeCode,
-        expenseTypeDescription: selectedTemplate.expenseTypeDescription,
-        costCenterCode: selectedTemplate.costCenterCode,
-        costCenterDescription: selectedTemplate.costCenterDescription,
-        assetTrackingMode: selectedTemplate.assetTrackingMode,
-        assetTagEnd: selectedTemplate.assetTagEnd,
-        notes: selectedTemplate.notes,
-        orderStatus: selectedTemplate.orderStatus,
-        deliveryPercentage: selectedTemplate.deliveryPercentage
-      };
-      
-      console.error('[DEBUG] Setting form values:', newFormValues);
-      setFormValues(newFormValues);
-      setSelectedTemplate(selectedTemplate);
-      setActiveTab("new");
-      toast.success(`Template "${templateName}" loaded`);
+    if (!wasOpenRef.current) {
+      wasOpenRef.current = true;
+      if (externalSelectedTemplate) {
+        setFormValues(
+          buildValuesFromTemplate(externalSelectedTemplate, suppliers, locations, units, projects)
+        );
+      } else {
+        setFormValues(undefined);
+      }
+      setFormInstanceKey((k) => k + 1);
+      setTemplatePickerOpen(false);
     }
+
+    setPendingTemplateName((prev) => {
+      if (prev && templates.some((t) => t.templateName === prev)) {
+        return prev;
+      }
+      return templates[0]?.templateName ?? "";
+    });
+  }, [open, externalSelectedTemplate, suppliers, locations, units, projects, templates]);
+
+  const applySelectedTemplate = () => {
+    const picked = templates.find((t) => t.templateName === pendingTemplateName);
+    if (!picked) {
+      toast.error("Choose a template first");
+      return;
+    }
+    const newFormValues = buildValuesFromTemplate(picked, suppliers, locations, units, projects);
+    setFormValues(newFormValues);
+    setFormInstanceKey((k) => k + 1);
+    setTemplatePickerOpen(false);
+    toast.success(`Template "${picked.templateName}" applied to the form below.`);
   };
 
-  const handleTabChange = (value: string) => {
-    console.error('[DEBUG] Tab changed to:', value);
-    setActiveTab(value as "new" | "template");
-    if (value === "new" && !selectedTemplate) {
-      console.error('[DEBUG] Resetting form values');
-      setFormValues(undefined);
-    }
-  };
-
-  const handleSubmit = async (values: Omit<InventoryItem, 'id' | 'lastUpdated'>) => {
-    console.log("[AddItemDialog] Received values for submit:", values);
+  const handleSubmit = async (values: Omit<InventoryItem, "id" | "lastUpdated">) => {
     setIsSubmitting(true);
     try {
       await onSubmit(values);
       onOpenChange(false);
     } catch (error) {
-      console.error('Error submitting form:', error);
-      toast.error('Failed to add item');
+      console.error("Error submitting form:", error);
+      toast.error("Failed to add item");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleDialogOpenChange = (newOpen: boolean) => {
+    onOpenChange(newOpen);
+    if (!newOpen) {
+      setTemplatePickerOpen(false);
+      setPendingTemplateName("");
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(newOpen) => {
-      setLastAction(`Dialog ${newOpen ? 'opened' : 'closed'}`);
-      if (!selectedTemplate || !newOpen) {
-        onOpenChange(newOpen);
-      }
-    }}>
-      <DialogContent className="sm:max-w-[625px]">
-        <DialogHeader>
-          <DialogTitle>Add New Inventory Item</DialogTitle>
-        </DialogHeader>
-        
-        <div className="text-xs text-muted-foreground mb-2">
-          Last Action: {lastAction}
+    <Dialog open={open} onOpenChange={handleDialogOpenChange} modal={false}>
+      <DialogContent
+        nonModalBackdrop
+        className={cn(
+          "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-2xl",
+          // Top-anchored: tab/content height changes must not re-center the dialog vertically
+          "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"
+        )}
+      >
+        <div className="shrink-0 border-b px-6 pb-4 pt-6">
+          <DialogHeader className="space-y-0 p-0 text-left">
+            <DialogTitle>Add New Inventory Item</DialogTitle>
+          </DialogHeader>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid grid-cols-2 mb-4">
-            <TabsTrigger value="new">New Item</TabsTrigger>
-            <TabsTrigger value="template">From Template</TabsTrigger>
-          </TabsList>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border/60 bg-muted/20">
+              <button
+                type="button"
+                onClick={() => setTemplatePickerOpen((o) => !o)}
+                className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
+              >
+                <span>Start from a template</span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                    templatePickerOpen && "rotate-180"
+                  )}
+                />
+              </button>
+              <div
+                className={cn(
+                  "grid transition-[grid-template-rows] duration-200 ease-out",
+                  templatePickerOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                )}
+              >
+                <div className="overflow-hidden min-h-0">
+                  <div className="space-y-3 border-t border-border/50 px-3 pb-3 pt-2">
+                    {templates.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No templates.</p>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="template-select">Template</Label>
+                          <Select
+                            value={pendingTemplateName || undefined}
+                            onValueChange={setPendingTemplateName}
+                          >
+                            <SelectTrigger id="template-select">
+                              <SelectValue placeholder="Choose a template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {templates.map((template) => (
+                                <SelectItem key={template.templateId} value={template.templateName}>
+                                  {template.templateName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button type="button" className="w-full sm:w-auto" onClick={applySelectedTemplate}>
+                          Apply template to form
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          <TabsContent value="new">
             <AddItemForm
+              key={formInstanceKey}
               onSubmit={handleSubmit}
               onCancel={() => onOpenChange(false)}
               categories={categories}
@@ -226,48 +270,13 @@ export function AddItemDialog({
               projects={projects}
               expenseTypes={expenseTypes}
               costCenters={costCenters}
+              cabinets={cabinets}
               isSubmitting={isSubmitting}
               existingItems={existingItems}
               initialValues={formValues}
             />
-          </TabsContent>
-
-          <TabsContent value="template">
-            <div className="space-y-4">
-              {templates.length === 0 ? (
-                <Card>
-                  <CardContent className="pt-6">
-                    <CardDescription>
-                      No templates available. Create templates from existing items to reuse them later.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  <Label>Select a Template</Label>
-                  <Select 
-                    onValueChange={handleTemplateSelect} 
-                    defaultValue={templates[0]?.templateName || ""}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templates.map((template) => (
-                        <SelectItem 
-                          key={template.templateId} 
-                          value={template.templateName}
-                        >
-                          {template.templateName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -4,13 +4,13 @@ This guide provides detailed instructions on how to use the Inventory Tracking S
 
 ## Navigation
 
-The application has five main sections accessible from the navigation bar:
+The main top navigation bar includes:
 
 - **Dashboard**: Overview of inventory status and low stock alerts
 - **Inventory**: Complete list of inventory items with search and filter capabilities
-- **Templates**: Manage item templates for quick creation
+- **Check-In/Out**: Secure cabinet check-in and check-out (`/checkout`)
 - **Reports**: Generate and export various inventory reports
-- **Settings**: Configure categories, units, locations, suppliers, and projects
+- **Settings**: Configure categories, units, locations, suppliers, projects, and related lists (including **Templates** under user-defined lists)
 
 ## Dashboard
 
@@ -46,6 +46,18 @@ To add a new inventory item:
 3. Fill in the required fields (Name, Quantity, Unit)
 4. Add optional details (Description, Category, Location, etc.)
 5. Click "Add Item" to save
+
+### Quick add (fast capture)
+For rapid entry—especially on phones—use **Quick add** (lightning icon) on the Inventory toolbar:
+
+- The **Current** row shows location, category, unit, and project; tap to open that section.
+- Enter the **Name** first; use the mic for voice, or **Last name** to reuse the last saved name.
+- **Shortcuts** includes “Same as last” and **Often used** chips for locations and categories.
+- Open **Details** for barcode, photo (camera or gallery), and quantity.
+- **All locations**, **All categories**, **Unit**, **Project**, and **Details** are collapsible; use the filter in each when expanded.
+- If a **unit** has sub-sizes in Settings (e.g. *Spools* with roll widths), pick the unit type, then a **Size** under the dashed line—required before save when sizes exist.
+
+Full step-by-step text is under **Help** → **Quick add** in the app.
 
 ### Using Templates
 To create items from templates:

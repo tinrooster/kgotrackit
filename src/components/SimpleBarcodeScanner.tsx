@@ -8,10 +8,14 @@ interface SimpleBarcodeScannerProps {
   isOpen: boolean;
   onClose: () => void;
   onScan: (barcodeValue: string) => void;
+  /** When true, do not show the default success toast (caller may toast instead). */
+  quiet?: boolean;
 }
 
-export function SimpleBarcodeScanner({ isOpen, onClose, onScan }: SimpleBarcodeScannerProps) {
+export function SimpleBarcodeScanner({ isOpen, onClose, onScan, quiet = false }: SimpleBarcodeScannerProps) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const quietRef = useRef(quiet);
+  quietRef.current = quiet;
   
   // Load saved camera device ID from localStorage
   useEffect(() => {
@@ -33,7 +37,9 @@ export function SimpleBarcodeScanner({ isOpen, onClose, onScan }: SimpleBarcodeS
       console.log('Barcode scanned:', barcodeValue);
       onScan(barcodeValue);
       onClose();
-      toast.success(`Barcode scanned: ${barcodeValue}`);
+      if (!quietRef.current) {
+        toast.success(`Barcode scanned: ${barcodeValue}`);
+      }
     },
     onError(error) {
       console.error('Scan error:', error);

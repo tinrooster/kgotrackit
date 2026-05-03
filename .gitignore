@@ -17,6 +17,13 @@ out
 *.tsbuildinfo
 *.local
 
+# electron-vite bundled config temp (should never be committed)
+electron.vite.config.*.mjs
+
+# Local tooling / generated caches (keep graph reports if committed intentionally)
+.specstory/
+graphify-out/cache/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

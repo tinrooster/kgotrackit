@@ -9,6 +9,7 @@ import { Cabinet } from '@/types/cabinets';
 import { toast } from 'sonner';
 import { Trash2, Edit2 } from 'lucide-react';
 import { getSettings, saveItems } from '@/lib/storageService';
+import { recordInventorySnapshotBeforeChange } from '@/lib/inventoryUndo';
 import { useAuth } from '@/contexts/AuthContext';
 import { logger } from '@/lib/logging';
 
@@ -179,13 +180,20 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
       const startTime = performance.now();
       // Use the parent list as source of truth for UI consistency.
       const currentItems = allItems;
-      
+      recordInventorySnapshotBeforeChange(currentItems);
+
       // Filter out the selected items
       const updatedItems = currentItems.filter(item => !selectedItems.some(selected => selected.id === item.id));
-      
-      saveItems(updatedItems);
+
+      const saved = saveItems(updatedItems);
+      if (!saved) {
+        toast.error('Could not save after delete.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
       onReplaceItems(updatedItems);
-      
+
       // Clear selection and close dialog
       onClearSelection();
       setIsDeleteDialogOpen(false);
@@ -238,6 +246,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
       const startTime = performance.now();
       // Use the parent list as source of truth for UI consistency.
       const currentItems = allItems;
+      recordInventorySnapshotBeforeChange(currentItems);
       logger.info('system', 'Starting batch edit', { 
         selectedCount: selectedItems.length,
         batchEditValues 
@@ -289,9 +298,15 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
         return item;
       });
 
-      saveItems(updatedItems);
+      const saved = saveItems(updatedItems);
+      if (!saved) {
+        toast.error('Could not save batch changes.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
       onReplaceItems(updatedItems);
-      
+
       if (successCount > 0) {
         // Reset form and close dialog
         setBatchEditValues({});

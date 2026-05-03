@@ -7,8 +7,17 @@ import { InventoryItem, CategoryNode, ItemWithSubcategories } from '@/types/inve
 import BatchOperations from '@/components/BatchOperations';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-import { getSettings, SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
-import { SettingsService } from '@/lib/settingsService';
+import { getSettings, saveItems, SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
+import {
+  applyInventoryState,
+  canRedoInventory,
+  canUndoInventory,
+  recordInventorySnapshotBeforeChange,
+  redoInventoryMutation,
+  undoInventoryMutation,
+} from '@/lib/inventoryUndo';
+import { SettingsService, DEFAULT_SETTINGS_CHANGED_EVENT } from '@/lib/settingsService';
+import { allocateRecordId, allocateAssetTags, coerceDateInServiceForTag } from '@/lib/inventoryIdGeneration';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -26,9 +35,13 @@ import {
   FileText,
   LayoutList,
   LayoutGrid,
-  Printer
+  Printer,
+  Undo2,
+  Redo2,
+  Zap,
 } from 'lucide-react';
 import { AddItemDialog } from '@/components/AddItemDialog';
+import { MobileQuickAddDialog } from '@/components/MobileQuickAddDialog';
 import { EditItemDialog } from '@/components/EditItemDialog';
 import { DuplicateItemDialog } from '@/components/DuplicateItemDialog';
 import { ExportDialog } from '@/components/ExportDialog';
@@ -53,6 +66,38 @@ import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import { FinancialCodeEntry, getFinancialSettings } from '@/lib/financialSettingsService';
 import { logger } from '@/lib/logging';
+import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
+
+function normalizeLocationPath(value: string): string {
+  return value.replace(/\s*\/\s*/g, '/').trim();
+}
+
+/** Items store `location` as list ids (`parent` or `parent/child`); the filter uses parent/sub names like the table. */
+function itemMatchesLocationFilter(
+  itemLocation: string | undefined,
+  selectedFilter: string,
+  locTree: ItemWithSubcategories[]
+): boolean {
+  if (!selectedFilter) {
+    return true;
+  }
+  if (!itemLocation) {
+    return false;
+  }
+  const label = resolveLocationDisplay(itemLocation, locTree);
+  if (label === '-' || label === '') {
+    return false;
+  }
+  const filterNorm = normalizeLocationPath(selectedFilter);
+  const labelNorm = normalizeLocationPath(label);
+  if (labelNorm === filterNorm) {
+    return true;
+  }
+  if (!filterNorm.includes('/')) {
+    return labelNorm === filterNorm || labelNorm.startsWith(`${filterNorm}/`);
+  }
+  return false;
+}
 
 // Helper function to flatten categories
 function flattenCategories(categories: CategoryNode[]): string[] {
@@ -124,6 +169,10 @@ export default function InventoryPage() {
 
   // State for dialogs
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [mobileTabletUi, setMobileTabletUi] = useState(
+    () => SettingsService.loadDefaultSettings().mobileTabletUi
+  );
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -132,7 +181,13 @@ export default function InventoryPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [printItem, setPrintItem] = useState<InventoryItem | null>(null);
   const [printLayout, setPrintLayout] = useState<'compact' | 'detailed'>('detailed');
-  const [printCodeType, setPrintCodeType] = useState<'qr' | 'barcode' | 'both'>('both');
+  const [printCodeType, setPrintCodeType] = useState<'qr' | 'barcode' | 'both'>(() => {
+    const mode = SettingsService.loadDefaultSettings().assetCodeMode;
+    if (mode === 'qr' || mode === 'barcode' || mode === 'both') {
+      return mode;
+    }
+    return 'qr';
+  });
   const [isBulkPrintDialogOpen, setIsBulkPrintDialogOpen] = useState(false);
   const [bulkPrintSku, setBulkPrintSku] = useState<'5160' | '5161' | '5162'>('5160');
   const [bulkPrintCodeType, setBulkPrintCodeType] = useState<'none' | 'qr' | 'barcode' | 'both'>('none');
@@ -179,8 +234,8 @@ export default function InventoryPage() {
     };
   }, []);
 
-  // Get template from navigation state if available
-  const template = location.state?.template as ItemTemplate | undefined;
+  /** Holds "Use template" navigation payload until the add dialog closes (survives `navigate` replacing location state). */
+  const [addDialogTemplate, setAddDialogTemplate] = useState<ItemTemplate | undefined>(undefined);
 
   // Add sorting state
   const [sortField, setSortField] = useState<keyof InventoryItem>('name');
@@ -189,6 +244,34 @@ export default function InventoryPage() {
   const [updateTrigger, setUpdateTrigger] = useState(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const resizeStateRef = React.useRef<{ column: string; startX: number; startWidth: number } | null>(null);
+  const [invUndoAvail, setInvUndoAvail] = useState(false);
+  const [invRedoAvail, setInvRedoAvail] = useState(false);
+
+  const [inventoryUndoEnabled, setInventoryUndoEnabled] = useState(() => {
+    const s = SettingsService.loadDefaultSettings();
+    const key = currentUser?.username || currentUser?.displayName || 'admin';
+    return s.undoByUser?.[key] ?? true;
+  });
+
+  useEffect(() => {
+    const syncUndoSetting = () => {
+      const s = SettingsService.loadDefaultSettings();
+      const key = currentUser?.username || currentUser?.displayName || 'admin';
+      setInventoryUndoEnabled(s.undoByUser?.[key] ?? true);
+    };
+    syncUndoSetting();
+    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncUndoSetting);
+    return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncUndoSetting);
+  }, [currentUser?.username, currentUser?.displayName]);
+
+  useEffect(() => {
+    const syncMobileUi = () => {
+      setMobileTabletUi(SettingsService.loadDefaultSettings().mobileTabletUi);
+    };
+    syncMobileUi();
+    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileUi);
+    return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileUi);
+  }, []);
 
   const printAssetSticker = async (item: InventoryItem, layout: 'compact' | 'detailed', codeType: 'qr' | 'barcode' | 'both') => {
     const escapeHtml = (value: string) =>
@@ -202,16 +285,18 @@ export default function InventoryPage() {
     const popup = window.open('', '_blank', 'width=460,height=340');
     if (!popup) return;
 
-    const assetIdentifier = escapeHtml(item.assetId || item.id);
+    const tagForDisplay = item.assetId || item.recordId || item.id;
+    const assetIdentifier = escapeHtml(tagForDisplay);
     const assetIdentifierRange = item.assetTagEnd
-      ? `${assetIdentifier} - ${escapeHtml(item.assetTagEnd)}`
+      ? `${assetIdentifier} – ${escapeHtml(item.assetTagEnd)}`
       : assetIdentifier;
+    const recordForDisplay = item.recordId ? escapeHtml(item.recordId) : '';
     const safeName = escapeHtml(item.name || '');
     const safeCategory = escapeHtml(item.category || '-');
     const safeLocation = escapeHtml(item.location || '-');
     const defaults = SettingsService.loadDefaultSettings();
-    const safeCodeMode = escapeHtml((defaults.assetCodeMode || 'both').toUpperCase());
-    const encodedValue = item.assetId || item.id;
+    const safeCodeMode = escapeHtml((defaults.assetCodeMode || 'qr').toUpperCase());
+    const encodedValue = item.assetId || item.recordId || item.id;
 
     const shouldShowQr = codeType === 'qr' || codeType === 'both';
     const shouldShowBarcode = codeType === 'barcode' || codeType === 'both';
@@ -236,7 +321,8 @@ export default function InventoryPage() {
     const compactBody = `
       <div style="border: 2px solid #111; border-radius: 8px; padding: 10px; width: 260px;">
         <div style="font-size: 12px; font-weight: 600; margin-bottom: 6px;">${safeName}</div>
-        <div style="font-size: 11px; margin-bottom: 8px;">ID: <strong>${assetIdentifierRange}</strong></div>
+        ${recordForDisplay ? `<div style="font-size: 10px; margin-bottom: 4px;">Inventory record: <strong>${recordForDisplay}</strong></div>` : ''}
+        <div style="font-size: 11px; margin-bottom: 8px;">Asset tag: <strong>${assetIdentifierRange}</strong></div>
         <div style="display: flex; gap: 8px; align-items: center; justify-content: center;">
           ${shouldShowQr ? `<img src="${qrDataUrl}" alt="QR Code" style="width: 120px; height: 120px;" />` : ''}
           ${shouldShowBarcode ? `<div style="max-width: 220px;">${barcodeSvg}</div>` : ''}
@@ -248,7 +334,8 @@ export default function InventoryPage() {
       <div style="border: 2px solid #111; border-radius: 8px; padding: 14px;">
         <div style="font-size: 12px; color: #555;">TEd_trackIT Asset</div>
         <div style="font-size: 20px; font-weight: 700; margin-top: 4px;">${safeName}</div>
-        <div style="font-size: 14px; margin-top: 8px;">Asset ID: <strong>${assetIdentifierRange}</strong></div>
+        ${recordForDisplay ? `<div style="font-size: 12px; margin-top: 6px;">Inventory record: <strong>${recordForDisplay}</strong></div>` : ''}
+        <div style="font-size: 14px; margin-top: 8px;">Asset tag: <strong>${assetIdentifierRange}</strong></div>
         <div style="font-size: 12px; margin-top: 4px;">Code Mode: ${safeCodeMode}</div>
         <div style="font-size: 12px; margin-top: 6px;">Category: ${safeCategory}</div>
         <div style="font-size: 12px;">Location: ${safeLocation}</div>
@@ -313,18 +400,18 @@ export default function InventoryPage() {
         .replace(/'/g, '&#039;');
 
     const labelsMarkupList = await Promise.all(selectedRecords.map(async (item) => {
-        const assetIdValue = escapeHtml(item.assetId || item.id);
+        const assetIdValue = escapeHtml(item.assetId || item.recordId || item.id);
         const itemName = escapeHtml(item.name || '');
         let qrMarkup = '';
         let barcodeMarkup = '';
 
         if (bulkPrintCodeType === 'qr' || bulkPrintCodeType === 'both') {
-          const qrDataUrl = await QRCode.toDataURL(item.assetId || item.id, { margin: 0, width: 72 });
+          const qrDataUrl = await QRCode.toDataURL(item.assetId || item.recordId || item.id, { margin: 0, width: 72 });
           qrMarkup = `<img src="${qrDataUrl}" alt="QR code" style="width: 0.6in; height: 0.6in;" />`;
         }
         if (bulkPrintCodeType === 'barcode' || bulkPrintCodeType === 'both') {
           const barcodeTarget = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          JsBarcode(barcodeTarget, item.assetId || item.id, {
+          JsBarcode(barcodeTarget, item.assetId || item.recordId || item.id, {
             format: 'CODE128',
             width: 1.2,
             height: 26,
@@ -379,15 +466,21 @@ export default function InventoryPage() {
               row-gap: ${sheetSpec.gapY}in;
             }
             .label {
-              border: 1px dashed #d1d5db; border-radius: 4px; padding: 4px;
-              display: flex; flex-direction: column; justify-content: center;
+              border: 1px dashed #d1d5db; border-radius: 4px; padding: 3px 4px 4px;
+              display: flex; flex-direction: column; justify-content: flex-start;
+              align-items: stretch;
               overflow: hidden;
             }
             .label-title {
-              font-size: 11px; font-weight: 700; line-height: 1.2;
-              white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+              font-size: 10px; font-weight: 700; line-height: 1.25;
+              max-height: 2.5em;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+              word-break: break-word;
             }
-            .label-id { margin-top: 6px; font-size: 10px; font-family: "Courier New", monospace; }
+            .label-id { margin-top: 2px; font-size: 9px; font-family: "Courier New", monospace; line-height: 1.2; }
             .label-codes { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
             .label-codes svg { max-width: 100%; height: 0.36in; }
             @media print {
@@ -410,22 +503,6 @@ export default function InventoryPage() {
     toast.success(`Prepared ${selectedRecords.length} labels for Avery ${bulkPrintSku}.`);
   };
 
-  const generateAssetIds = (quantity: number, trackingMode: 'line_item' | 'per_unit') => {
-    const defaults = SettingsService.loadDefaultSettings();
-    const prefix = (defaults.assetIdPrefix || 'AST').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const sequenceStart = (defaults.assetIdSequence || 0) + 1;
-    const count = trackingMode === 'per_unit' ? Math.max(quantity, 1) : 1;
-    const startId = `${prefix}-${String(sequenceStart).padStart(5, '0')}`;
-    const endId = `${prefix}-${String(sequenceStart + count - 1).padStart(5, '0')}`;
-
-    SettingsService.saveDefaultSettings({
-      ...defaults,
-      assetIdSequence: sequenceStart + count - 1,
-    });
-
-    return { startId, endId: count > 1 ? endId : undefined };
-  };
-
   const appendAuditLog = (
     action: 'CREATE' | 'UPDATE',
     item: InventoryItem,
@@ -440,6 +517,7 @@ export default function InventoryPage() {
         id: crypto.randomUUID(),
         action,
         itemId: item.id,
+        recordId: item.recordId || null,
         assetId: item.assetId || null,
         name: item.name,
         timestamp: new Date().toISOString(),
@@ -452,6 +530,7 @@ export default function InventoryPage() {
       action === 'CREATE' ? 'INVENTORY_ITEM_CREATED' : 'INVENTORY_ITEM_UPDATED',
       {
         itemId: item.id,
+        recordId: item.recordId || null,
         assetId: item.assetId || null,
         name: item.name,
         user: currentUser?.username || currentUser?.displayName || 'Unknown',
@@ -502,17 +581,21 @@ export default function InventoryPage() {
     const filtered = items.filter(item => {
       const searchFields = [
         item.name,
+        item.recordId,
+        item.assetId,
         item.category,
         item.location,
         item.project,
-        item.notes
+        item.notes,
+        item.rackLocation,
+        item.decomNotes,
       ].map(field => field?.toLowerCase() || '');
 
       const matchesSearch = !searchQuery || 
         searchFields.some(field => field.includes(searchQuery.toLowerCase()));
       
       const matchesCategory = !selectedCategory || item.category === selectedCategory;
-      const matchesLocation = !selectedLocation || item.location === selectedLocation;
+      const matchesLocation = itemMatchesLocationFilter(item.location, selectedLocation, locations);
       const matchesProject = !selectedProject || item.project === selectedProject;
 
       return matchesSearch && matchesCategory && matchesLocation && matchesProject;
@@ -520,17 +603,28 @@ export default function InventoryPage() {
 
     // Sort the filtered items
     return [...filtered].sort((a, b) => {
+      if (sortField === 'photoUrl') {
+        const aHas = a.photoUrl ? 1 : 0;
+        const bHas = b.photoUrl ? 1 : 0;
+        if (aHas !== bHas) {
+          const cmp = aHas - bHas;
+          return sortDirection === 'asc' ? cmp : -cmp;
+        }
+        const nameCmp = String(a.name || '').localeCompare(String(b.name || ''));
+        return sortDirection === 'asc' ? nameCmp : -nameCmp;
+      }
+
       const aValue = a[sortField];
       const bValue = b[sortField];
-      
+
       if (aValue === bValue) return 0;
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
-      
+
       const comparison = String(aValue).localeCompare(String(bValue));
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [items, searchQuery, selectedCategory, selectedLocation, selectedProject, sortField, sortDirection]);
+  }, [items, searchQuery, selectedCategory, selectedLocation, selectedProject, sortField, sortDirection, locations]);
 
   const inventoryTotals = useMemo(() => {
     let totalQuantity = 0;
@@ -587,9 +681,17 @@ export default function InventoryPage() {
   const confirmDelete = () => {
     if (!itemToDelete) return;
     try {
+      recordInventorySnapshotBeforeChange(items);
       const updatedItems = items.filter(item => item.id !== itemToDelete.id);
-      saveItems(updatedItems);
+      if (!saveItems(updatedItems)) {
+        toast.error('Could not save after delete.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
       setItems(updatedItems);
+      setInvUndoAvail(canUndoInventory());
+      setInvRedoAvail(canRedoInventory());
       logger.info(
         'audit',
         'INVENTORY_ITEM_DELETED',
@@ -651,37 +753,79 @@ export default function InventoryPage() {
     }
   }, [highlightedItemId]);
 
-  // Handle adding a new item
+  const addInventoryItemFromFormData = React.useCallback(
+    async (
+      newItemData: Omit<InventoryItem, "id" | "lastUpdated">,
+      options?: { toastMessage?: string }
+    ) => {
+      recordInventorySnapshotBeforeChange(items);
+      const defaults = SettingsService.loadDefaultSettings();
+      const trackingMode = (newItemData.assetTrackingMode || "line_item") as "line_item" | "per_unit";
+      const recordId = allocateRecordId();
+      let computedAssetId: string | undefined;
+      let computedAssetTagEnd: string | undefined;
+      if (defaults.autoAssignAssetId) {
+        const gen = allocateAssetTags(
+          coerceDateInServiceForTag(newItemData.dateInService),
+          newItemData.quantity || 1,
+          trackingMode
+        );
+        computedAssetId = gen.startId;
+        computedAssetTagEnd = gen.endId;
+      }
+      const selectedExpenseType = expenseTypes.find((entry) => entry.code === newItemData.expenseTypeCode);
+      const selectedCostCenter = costCenters.find((entry) => entry.code === newItemData.costCenterCode);
+      const newItem: InventoryItem = {
+        ...newItemData,
+        recordId,
+        assetId: computedAssetId,
+        assetTagEnd: newItemData.assetTagEnd || computedAssetTagEnd,
+        assetTrackingMode: trackingMode,
+        expenseTypeDescription: newItemData.expenseTypeDescription || selectedExpenseType?.description,
+        costCenterDescription: newItemData.costCenterDescription || selectedCostCenter?.description,
+        id: uuidv4(),
+        lastUpdated: new Date(),
+        lastModifiedBy: currentUser?.username || currentUser?.displayName || "Unknown",
+      };
+
+      const addSaveResult = { ok: true };
+      setItems((prev) => {
+        const next = [...prev, newItem];
+        addSaveResult.ok = saveItems(next);
+        return addSaveResult.ok ? next : prev;
+      });
+      if (!addSaveResult.ok) {
+        toast.error('Could not save new item.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
+      setInvUndoAvail(canUndoInventory());
+      setInvRedoAvail(canRedoInventory());
+      appendAuditLog("CREATE", newItem);
+      setHighlightedItemId(newItem.id);
+      toast.success(options?.toastMessage ?? `Added "${newItem.name}" to inventory`);
+    },
+    [items, expenseTypes, costCenters, currentUser]
+  );
+
   const handleAddItem = async (newItemData: Omit<InventoryItem, "id" | "lastUpdated">) => {
-    const defaults = SettingsService.loadDefaultSettings();
-    const trackingMode = (newItemData.assetTrackingMode || 'line_item') as 'line_item' | 'per_unit';
-    const generatedIds = defaults.autoAssignAssetId
-      ? generateAssetIds(newItemData.quantity || 1, trackingMode)
-      : { startId: undefined, endId: undefined };
-    const computedAssetId = defaults.autoAssignAssetId
-      ? (newItemData.assetId?.trim() || generatedIds.startId)
-      : (newItemData.assetId?.trim() || undefined);
-    const selectedExpenseType = expenseTypes.find((entry) => entry.code === newItemData.expenseTypeCode);
-    const selectedCostCenter = costCenters.find((entry) => entry.code === newItemData.costCenterCode);
-    const newItem: InventoryItem = {
-      ...newItemData,
-      assetId: computedAssetId,
-      assetTagEnd: newItemData.assetTagEnd || generatedIds.endId,
-      assetTrackingMode: trackingMode,
-      expenseTypeDescription: newItemData.expenseTypeDescription || selectedExpenseType?.description,
-      costCenterDescription: newItemData.costCenterDescription || selectedCostCenter?.description,
-      id: uuidv4(),
-      lastUpdated: new Date(),
-      lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown'
-    };
-    
-    setItems([...items, newItem]);
-    appendAuditLog('CREATE', newItem);
-    setHighlightedItemId(newItem.id);
-    toast.success(`Added "${newItem.name}" to inventory`);
-    setIsAddDialogOpen(false); // Close the dialog after successful save
+    await addInventoryItemFromFormData(newItemData);
+    setIsAddDialogOpen(false);
     return Promise.resolve();
   };
+
+  const handleQuickAddSubmit = React.useCallback(
+    async (payload: Omit<InventoryItem, "id" | "lastUpdated">, mode: "once" | "next") => {
+      const toastMessage =
+        mode === "next" ? `Added "${payload.name.trim()}" — add next` : undefined;
+      await addInventoryItemFromFormData(payload, { toastMessage });
+      if (mode === "once") {
+        setIsQuickAddOpen(false);
+      }
+    },
+    [addInventoryItemFromFormData]
+  );
 
   // Handle editing an item
   const handleEditItem = (item: InventoryItem) => {
@@ -694,6 +838,7 @@ export default function InventoryPage() {
 
   const handleSaveEdit = async (updatedItem: InventoryItem) => {
     try {
+      recordInventorySnapshotBeforeChange(items);
       const previousItem = originalEditItem || items.find((item) => item.id === updatedItem.id) || null;
       const updatedItems = items.map(item => 
         item.id === updatedItem.id ? { 
@@ -702,7 +847,15 @@ export default function InventoryPage() {
           lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown'
         } : item
       );
+      if (!saveItems(updatedItems)) {
+        toast.error('Could not save changes.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
       setItems(updatedItems);
+      setInvUndoAvail(canUndoInventory());
+      setInvRedoAvail(canRedoInventory());
       appendAuditLog('UPDATE', updatedItem, previousItem ? getUpdatedFieldChanges(previousItem, updatedItem) : []);
       toast.success(`Updated "${updatedItem.name}"`);
       setIsEditDialogOpen(false);
@@ -717,17 +870,79 @@ export default function InventoryPage() {
 
   // Handle duplicating an item
   const handleDuplicateItem = async (newItemData: Partial<InventoryItem>) => {
+    recordInventorySnapshotBeforeChange(items);
+    const defaults = SettingsService.loadDefaultSettings();
+    const trackingMode = (newItemData.assetTrackingMode || 'line_item') as 'line_item' | 'per_unit';
+    const quantity = Number(newItemData.quantity ?? 0);
+    const recordId = allocateRecordId();
+    let nextAssetId: string | undefined;
+    let nextTagEnd: string | undefined;
+    if (defaults.autoAssignAssetId) {
+      const gen = allocateAssetTags(
+        coerceDateInServiceForTag(newItemData.dateInService),
+        Math.max(quantity, 1),
+        trackingMode
+      );
+      nextAssetId = gen.startId;
+      nextTagEnd = gen.endId;
+    }
     const newItem: InventoryItem = {
       ...newItemData,
+      recordId,
+      assetId: nextAssetId,
+      assetTagEnd: newItemData.assetTagEnd || nextTagEnd,
       id: uuidv4(),
       lastUpdated: new Date(),
       lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown'
     } as InventoryItem;
     
-    setItems([...items, newItem]);
+    const nextItems = [...items, newItem];
+    if (!saveItems(nextItems)) {
+      toast.error('Could not save duplicated item.', {
+        description: 'Browser storage may be full. Export a backup or free space, then try again.',
+      });
+      return;
+    }
+    setItems(nextItems);
+    setInvUndoAvail(canUndoInventory());
+    setInvRedoAvail(canRedoInventory());
     setHighlightedItemId(newItem.id);
     setIsDuplicateDialogOpen(false);
     toast.success(`Duplicated "${selectedItem?.name}" successfully`);
+  };
+
+  const handleInventoryUndo = () => {
+    const restored = undoInventoryMutation(items);
+    if (!restored) {
+      toast.info('Nothing to undo');
+      return;
+    }
+    if (!applyInventoryState(restored, setItems)) {
+      toast.error('Could not save undo.', {
+        description: 'Browser storage may be full. Export a backup or free space, then try again.',
+      });
+      return;
+    }
+    toast.success('Undone');
+    setInvUndoAvail(canUndoInventory());
+    setInvRedoAvail(canRedoInventory());
+  };
+
+  const handleInventoryRedo = () => {
+    const restored = redoInventoryMutation(items);
+    if (!restored) {
+      toast.info('Nothing to redo');
+      return;
+    }
+    if (!applyInventoryState(restored, setItems)) {
+      toast.error('Could not save redo.', {
+        description: 'Browser storage may be full. Export a backup or free space, then try again.',
+      });
+      return;
+    }
+    toast.success('Redone');
+    setInvUndoAvail(canUndoInventory());
+    setInvRedoAvail(canRedoInventory());
   };
 
   // Handle filter changes
@@ -746,19 +961,20 @@ export default function InventoryPage() {
   };
 
   useEffect(() => {
-    // If we have a template from navigation, open the add dialog
-    if (template) {
-      setIsAddDialogOpen(true);
-      // Clear the template from location state to prevent reopening
-      navigate(location.pathname, { replace: true });
+    const navTemplate = location.state?.template as ItemTemplate | undefined;
+    if (!navTemplate) {
+      return;
     }
-  }, [template, navigate, location.pathname]);
+    setAddDialogTemplate(navTemplate);
+    setIsAddDialogOpen(true);
+    navigate(location.pathname, { replace: true });
+  }, [location.state, navigate, location.pathname]);
 
   const [isDetailedView, setIsDetailedView] = useState(false);
 
   // Define column sets for different views
-  const SIMPLE_COLUMNS = ['name', 'category', 'location', 'project', 'quantity', 'lastUpdated'];
-  const DETAILED_COLUMNS = ['assetId', 'name', 'category', 'expenseTypeCode', 'costCenterCode', 'quantity', 'unit', 'costPerUnit', 'totalValue', 'location', 'project', 'lastUpdated'];
+  const SIMPLE_COLUMNS = ['photoUrl', 'name', 'category', 'location', 'project', 'quantity', 'lastUpdated'];
+  const DETAILED_COLUMNS = ['photoUrl', 'recordId', 'assetId', 'name', 'category', 'expenseTypeCode', 'costCenterCode', 'quantity', 'unit', 'costPerUnit', 'totalValue', 'location', 'rackLocation', 'project', 'lastUpdated'];
 
   const activeColumns = isDetailedView ? DETAILED_COLUMNS : SIMPLE_COLUMNS;
 
@@ -827,22 +1043,21 @@ export default function InventoryPage() {
   }, [location.state?.forceRefresh, navigate]);
 
   return (
-    <div className="mx-auto w-[clamp(75vw,calc(100vw-2rem),2400px)] max-w-none px-4 py-6 space-y-4 min-h-screen">
-      <div className="sticky top-16 z-30 space-y-3 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-2">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold">Inventory</h1>
-          <div className="flex items-center space-x-2">
-            <Input
-              type="text"
-              placeholder="Search inventory..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="min-w-[240px]"
-            />
-            <div className="flex items-center space-x-2">
+    <div className="inventory-page w-full min-w-0 max-w-full space-y-4">
+      <div className="inventory-toolbar sticky top-16 z-30 space-y-4 bg-background/95 pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
+            <h1 className="shrink-0 text-2xl font-bold">Inventory</h1>
+            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+              <Input
+                type="text"
+                placeholder="Search inventory..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 min-w-[10rem] max-w-md shrink-0 flex-1 basis-[min(100%,18rem)]"
+              />
               <Select value={selectedCategory || 'all'} onValueChange={(value) => handleFilterChange('category', value)}>
-                <SelectTrigger className="min-w-[200px]">
+                <SelectTrigger className="h-9 w-[11.5rem] shrink-0">
                   <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
@@ -855,19 +1070,22 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
               <Select value={selectedLocation || "all"} onValueChange={(value) => handleFilterChange('location', value === "all" ? "" : value)}>
-                <SelectTrigger className="min-w-[200px]">
+                <SelectTrigger className="h-9 w-[11.5rem] shrink-0">
                   <SelectValue placeholder="All Locations" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
                   <SelectItem value="all">All Locations</SelectItem>
-                  {locations.map(location => (
-                    <React.Fragment key={location.id}>
-                      <SelectItem value={location.name}>
-                        {location.name}
+                  {locations.map((locRow) => (
+                    <React.Fragment key={locRow.id}>
+                      <SelectItem value={locRow.name}>
+                        {locRow.name}
                       </SelectItem>
-                      {location.subcategories?.map(subcategory => (
-                        <SelectItem key={`${location.name}/${subcategory}`} value={`${location.name}/${subcategory}`}>
-                          {location.name} - {subcategory}
+                      {locRow.children?.map((sub) => (
+                        <SelectItem
+                          key={`${locRow.id}/${sub.id}`}
+                          value={`${locRow.name}/${sub.name}`}
+                        >
+                          {locRow.name} - {sub.name}
                         </SelectItem>
                       ))}
                     </React.Fragment>
@@ -875,7 +1093,7 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
               <Select value={selectedProject || "all"} onValueChange={(value) => handleFilterChange('project', value === "all" ? "" : value)}>
-                <SelectTrigger className="min-w-[200px]">
+                <SelectTrigger className="h-9 w-[11.5rem] shrink-0">
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
@@ -913,26 +1131,62 @@ export default function InventoryPage() {
               </TooltipProvider>
             </div>
           </div>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 mr-4">
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex items-center gap-2 sm:mr-2">
             <Switch
               id="view-mode"
               checked={isDetailedView}
               onCheckedChange={setIsDetailedView}
             />
-            <Label htmlFor="view-mode" className="text-sm">
+            <Label htmlFor="view-mode" className="text-sm whitespace-nowrap">
               {isDetailedView ? 'Detailed View' : 'Simple View'}
             </Label>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
+          {inventoryUndoEnabled && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                disabled={!invUndoAvail}
+                onClick={handleInventoryUndo}
+              >
+                <Undo2 className="mr-2 h-4 w-4" />
+                Undo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                disabled={!invRedoAvail}
+                onClick={handleInventoryRedo}
+              >
+                <Redo2 className="mr-2 h-4 w-4" />
+                Redo
+              </Button>
+            </>
+          )}
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <Button className="w-full sm:w-auto" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
+            {mobileTabletUi && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-11 w-full touch-manipulation sm:w-auto"
+                onClick={() => setIsQuickAddOpen(true)}
+              >
+                <Zap className="mr-2 h-4 w-4" />
+                Quick add
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+        </div>
 
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-muted-foreground">
           {filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'} found
         </div>
@@ -970,8 +1224,14 @@ export default function InventoryPage() {
         </div>
       )}
 
-      <div className="bg-card text-card-foreground rounded-lg border shadow-sm">
-        <Table containerClassName="max-h-[calc(100vh-16rem)]">
+      <div className="min-w-0 w-full max-w-full bg-card text-card-foreground rounded-lg border shadow-sm">
+        <Table
+          containerClassName="max-h-[calc(100vh-16rem)] w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x"
+          className={cn(
+            'w-full table-fixed border-collapse align-top text-sm',
+            isDetailedView ? 'min-w-[1180px]' : 'min-w-[780px]'
+          )}
+        >
           <TableHeader>
             <TableRow>
               <TableHead className="w-[30px]">
@@ -986,10 +1246,29 @@ export default function InventoryPage() {
                   style={{ width: columnWidths[column] ? `${columnWidths[column]}px` : undefined }}
                   className="relative"
                 >
-                  <div className="flex items-center space-x-1 cursor-pointer pr-3" onClick={() => handleSort(column as keyof InventoryItem)}>
-                    <span>{column.charAt(0).toUpperCase() + column.slice(1).replace(/([A-Z])/g, ' $1')}</span>
-                    <ArrowUpDown className="h-4 w-4" />
-                  </div>
+                  {column === 'photoUrl' ? (
+                    <div
+                      className="flex cursor-pointer items-center space-x-1 pr-3"
+                      onClick={() => handleSort('photoUrl')}
+                    >
+                      <span>Photo</span>
+                      <ArrowUpDown className="h-4 w-4" />
+                    </div>
+                  ) : (
+                    <div
+                      className="flex cursor-pointer items-center space-x-1 pr-3"
+                      onClick={() => handleSort(column as keyof InventoryItem)}
+                    >
+                      <span>
+                        {column === 'recordId'
+                          ? 'Record ID'
+                          : column === 'assetId'
+                            ? 'Asset tag'
+                            : column.charAt(0).toUpperCase() + column.slice(1).replace(/([A-Z])/g, ' $1')}
+                      </span>
+                      <ArrowUpDown className="h-4 w-4" />
+                    </div>
+                  )}
                   <span
                     role="separator"
                     aria-label={`Resize ${column} column`}
@@ -1088,7 +1367,12 @@ export default function InventoryPage() {
       {/* Dialogs */}
       <AddItemDialog
         open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setIsAddDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setAddDialogTemplate(undefined);
+          }
+        }}
         onSubmit={handleAddItem}
         categories={categories}
         units={units}
@@ -1098,7 +1382,18 @@ export default function InventoryPage() {
         expenseTypes={expenseTypes}
         costCenters={costCenters}
         existingItems={items}
-        selectedTemplate={template}
+        selectedTemplate={addDialogTemplate}
+      />
+
+      <MobileQuickAddDialog
+        open={isQuickAddOpen}
+        onOpenChange={setIsQuickAddOpen}
+        categories={categories}
+        locations={locations}
+        units={units}
+        suppliers={suppliers}
+        projects={projects}
+        onSubmit={handleQuickAddSubmit}
       />
 
       {selectedItem && (

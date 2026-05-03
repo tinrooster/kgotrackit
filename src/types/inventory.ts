@@ -8,10 +8,25 @@ export enum OrderStatus {
 
 export interface InventoryItem {
   id: string;
+  /** Durable human-readable inventory row identifier (monotonic; never reused). */
+  recordId?: string;
   name: string;
   description?: string;
+  /** Physical asset tag for labels/QR — pattern `{prefix}_{YYMMDD}_{seq}` when auto-assigned. */
   assetId?: string;
-  assetStatus?: 'active' | 'hot_spare' | 'cold_spare' | 'in_service' | 'ready_decommission' | 'slated_removal' | 'ewaste' | 'other';
+  /** Optional company-issued asset tag (distinct from app record ID in `assetId`). */
+  companyAssetTag?: string;
+  assetStatus?: 'active' | 'hot_spare' | 'cold_spare' | 'in_service' | 'ready_decommission' | 'slated_removal' | 'cut_over_pending' | 'ewaste' | 'other';
+  /** Rack cell for server rooms (e.g. TE `TX-06`, Imagine `CA-3`, ITV `IB-4`). */
+  rackLocation?: string;
+  /** Planned end-of-life date (YYYY-MM-DD). */
+  decomEOLDate?: string;
+  /** Scheduled cut-over date (YYYY-MM-DD). */
+  decomCutoverDate?: string;
+  /** Last lifecycle / decommissioning audit timestamp (ISO). */
+  decomLastAuditAt?: string;
+  /** Notes for audit, EOL, or cut-over planning. */
+  decomNotes?: string;
   expenseCode?: string;
   expenseTypeCode?: string;
   expenseTypeDescription?: string;
@@ -31,6 +46,8 @@ export interface InventoryItem {
   supplierWebsite?: string;
   project?: string;
   notes?: string;
+  manufacturerNotes?: string;
+  additionalNotes?: string;
   qrCode?: string;
   orderStatus?: OrderStatus;
   deliveryPercentage?: number;
@@ -48,6 +65,8 @@ export interface InventoryItem {
   nextMaintenanceDate?: Date;
   maintenanceNotes?: string;
   customFields?: Record<string, string>;
+  /** Data URL or external https URL for an item photo (stored with the record). */
+  photoUrl?: string;
   lastUpdated: Date;
   lastModifiedBy?: string; // Username of the person who last modified the item
 }

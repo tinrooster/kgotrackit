@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { comparePasswords } from '../utils/passwordUtils';
 import { toast } from 'react-hot-toast';
 import { logger } from '../utils/logger';
 import { logger as durableLogger } from '../lib/logging';
+import { isSupabaseConfigured, getSupabase } from '@/lib/supabase/client';
+import { bootstrapCloudData, mapSupabaseUserToAppUser } from '@/lib/supabase/cloudData';
+import type { AuthBackend } from '@/lib/supabase/cloudData';
 
 export interface User {
   id: string;
@@ -15,12 +18,18 @@ export interface User {
   phoneExtension?: string;
 }
 
+export type UserWithPassword = User;
+
+export type LoginResult = { ok: true } | { ok: false; message?: string };
+
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
-  login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
+  authBackend: AuthBackend;
+  login: (username: string, password: string, rememberMe: boolean) => Promise<LoginResult>;
   logout: () => void;
   resetPassword: (username: string, securityAnswer: string, newPassword: string) => Promise<boolean>;
+  requestPasswordResetEmail: (email: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,7 +42,6 @@ export function useAuth() {
   return context;
 }
 
-// Helper to get the correct store object (for compatibility)
 function getStore() {
   if (window.electron && window.electron.store) return window.electron.store;
   if (window.electronStore) return {
@@ -41,7 +49,6 @@ function getStore() {
     set: async (key: string, value: any) => window.electronStore.setData(key, value),
     delete: async (key: string) => window.electronStore.deleteData(key),
   };
-  // Browser/dev fallback to keep auth functional when Electron preload store is unavailable.
   return {
     get: async (key: string) => {
       const rawValue = localStorage.getItem(`trackit:${key}`);
@@ -59,9 +66,71 @@ function getStore() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const bootstrappedUserIdRef = useRef<string | null>(null);
+
+  const authBackend: AuthBackend = useMemo(
+    () => (isSupabaseConfigured() ? 'supabase' : 'local'),
+    []
+  );
 
   useEffect(() => {
+    let cancelled = false;
+    let unsubscribeAuth: (() => void) | undefined;
+
     const initializeAuth = async () => {
+      if (isSupabaseConfigured()) {
+        const client = getSupabase();
+        if (!client) {
+          setLoading(false);
+          return;
+        }
+        try {
+          const { data: { session } } = await client.auth.getSession();
+          if (cancelled) return;
+          if (session?.user) {
+            const mapped = mapSupabaseUserToAppUser(session.user) as User;
+            setCurrentUser(mapped);
+            try {
+              await bootstrapCloudData(session.user.id);
+            } catch (error) {
+              logger.error('Supabase bootstrap failed: ' + String(error));
+              toast.error('Could not sync data from cloud. You can retry by refreshing.');
+            }
+            bootstrappedUserIdRef.current = session.user.id;
+          }
+
+          const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
+            if (cancelled) return;
+            if (event === 'SIGNED_OUT') {
+              bootstrappedUserIdRef.current = null;
+              setCurrentUser(null);
+              return;
+            }
+            if (!session?.user) {
+              return;
+            }
+            const mapped = mapSupabaseUserToAppUser(session.user) as User;
+            setCurrentUser(mapped);
+            if (event === 'SIGNED_IN' && bootstrappedUserIdRef.current !== session.user.id) {
+              bootstrappedUserIdRef.current = session.user.id;
+              try {
+                await bootstrapCloudData(session.user.id);
+              } catch (error) {
+                logger.error('Supabase bootstrap on sign-in failed: ' + String(error));
+                toast.error('Could not sync data from cloud.');
+              }
+            }
+          });
+          unsubscribeAuth = () => subscription.unsubscribe();
+        } catch (error) {
+          logger.error('Supabase auth init error: ' + String(error));
+          toast.error('Authentication service error');
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+        return;
+      }
+
       try {
         const store = getStore();
         let storedUsers = await store.get('users');
@@ -80,13 +149,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const adminIndex = storedUsers.findIndex(
-          (user) => user.username.toLowerCase() === 'admin'
+          (user: User) => user.username.toLowerCase() === 'admin'
         );
 
         if (adminIndex === -1) {
           storedUsers = [...storedUsers, defaultAdmin];
         } else {
-          // Keep admin deterministic in this dev branch so recovery is always possible.
           storedUsers[adminIndex] = {
             ...storedUsers[adminIndex],
             username: 'admin',
@@ -110,23 +178,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logger.error('Error initializing auth: ' + String(error));
         toast.error('Error initializing authentication');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    initializeAuth();
+    void initializeAuth();
+    return () => {
+      cancelled = true;
+      unsubscribeAuth?.();
+    };
   }, []);
 
-  const login = async (username: string, password: string, rememberMe: boolean): Promise<boolean> => {
+  const login = async (username: string, password: string, rememberMe: boolean): Promise<LoginResult> => {
     logger.info(`Login attempt for user: ${username}`);
     setLoading(true);
     try {
+      if (isSupabaseConfigured()) {
+        const client = getSupabase();
+        if (!client) {
+          return { ok: false, message: 'Auth is not configured' };
+        }
+        const email = username.trim();
+        const { data, error } = await client.auth.signInWithPassword({
+          email,
+          password: password.trim(),
+        });
+        if (error) {
+          const detail =
+            error.message ||
+            ('msg' in error && typeof (error as { msg?: string }).msg === 'string'
+              ? (error as { msg: string }).msg
+              : '') ||
+            'Invalid login credentials';
+          logger.warn('Supabase login failed: ' + detail);
+          durableLogger.warn('security', 'AUTH_LOGIN_FAILED', { username: email, error: detail }, 'AuthContext');
+          return { ok: false, message: detail };
+        }
+        if (data.user) {
+          const mapped = mapSupabaseUserToAppUser(data.user) as User;
+          setCurrentUser(mapped);
+          bootstrappedUserIdRef.current = data.user.id;
+          try {
+            await bootstrapCloudData(data.user.id);
+          } catch (e) {
+            logger.error('Bootstrap after login failed: ' + String(e));
+            toast.error('Logged in but cloud sync failed. Try refreshing.');
+          }
+          durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: email, rememberMe }, 'AuthContext');
+          toast.success('Login successful');
+          return { ok: true };
+        }
+        return { ok: false, message: 'Sign-in failed with no user returned.' };
+      }
+
       const store = getStore();
       const normalizedUsername = username.trim().toLowerCase();
       const normalizedPassword = password.trim();
 
       if (normalizedUsername === 'admin' && normalizedPassword === 'admin') {
-        const users = (await store.get('users') as User[] | undefined) ?? [];
+        const users = ((await store.get('users')) as User[] | undefined) ?? [];
         const adminUser: User = {
           id: users.find((user) => user.username.toLowerCase() === 'admin')?.id ?? crypto.randomUUID(),
           username: 'admin',
@@ -147,17 +257,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logger.info('Admin dev login override applied');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
         toast.success('Login successful');
-        return true;
+        return { ok: true };
       }
 
-      const users = (await store.get('users') as User[] | undefined) ?? [];
-      console.log('Retrieved users:', users);
+      const users = ((await store.get('users')) as User[] | undefined) ?? [];
 
       const userRecord = users.find(
         (u) => u.username.toLowerCase() === username.trim().toLowerCase()
       );
       if (!userRecord) {
-        // Dev recovery fallback: guarantee admin login path.
         if (normalizedUsername === 'admin' && normalizedPassword === 'admin') {
           const defaultAdmin: User = {
             id: crypto.randomUUID(),
@@ -174,12 +282,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           logger.info('Recovered missing admin account during login');
           durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
           toast.success('Login successful');
-          return true;
+          return { ok: true };
         }
         logger.warn('Login failed: User not found');
         durableLogger.warn('security', 'AUTH_LOGIN_FAILED_USER_NOT_FOUND', { username }, 'AuthContext');
-        toast.error('Invalid username or password');
-        return false;
+        return { ok: false, message: 'Invalid username or password' };
       }
 
       if (normalizedUsername === 'admin' && normalizedPassword === 'admin') {
@@ -201,11 +308,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logger.info('Recovered admin login with deterministic dev credentials');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
         toast.success('Login successful');
-        return true;
+        return { ok: true };
       }
 
       const passwordMatch = await comparePasswords(password, userRecord.password);
-      console.log('Password match result:', passwordMatch);
 
       if (passwordMatch) {
         setCurrentUser(userRecord);
@@ -214,18 +320,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logger.info('Login successful');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: userRecord.username, rememberMe }, 'AuthContext');
         toast.success('Login successful');
-        return true;
-      } else {
-        logger.warn('Login failed: Invalid password');
-        durableLogger.warn('security', 'AUTH_LOGIN_FAILED_INVALID_PASSWORD', { username }, 'AuthContext');
-        toast.error('Invalid username or password');
-        return false;
+        return { ok: true };
       }
+      logger.warn('Login failed: Invalid password');
+      durableLogger.warn('security', 'AUTH_LOGIN_FAILED_INVALID_PASSWORD', { username }, 'AuthContext');
+      return { ok: false, message: 'Invalid username or password' };
     } catch (error) {
-      logger.error('Login error: ' + String(error));
-      durableLogger.error('security', 'AUTH_LOGIN_ERROR', { username, error: String(error) }, 'AuthContext');
-      toast.error('An error occurred during login');
-      return false;
+      const hint = error instanceof Error ? error.message : String(error);
+      logger.error('Login error: ' + hint);
+      durableLogger.error('security', 'AUTH_LOGIN_ERROR', { username, error: hint }, 'AuthContext');
+      return {
+        ok: false,
+        message: `Sign-in error: ${hint}. If this mentions fetch or network, check browser extensions, VPN, and that your Supabase project is up.`,
+      };
     } finally {
       setLoading(false);
     }
@@ -235,20 +342,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const store = getStore();
     const username = currentUser?.username;
     setCurrentUser(null);
+    bootstrappedUserIdRef.current = null;
     await store.delete('rememberedUser');
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      await client?.auth.signOut();
+    }
     logger.info('User logged out');
     durableLogger.info('security', 'AUTH_LOGOUT', { username: username || 'Unknown' }, 'AuthContext');
     toast.success('Logged out successfully');
   };
 
   const resetPassword = async (username: string, securityAnswer: string, newPassword: string): Promise<boolean> => {
+    if (isSupabaseConfigured()) {
+      toast.error('Use the email reset link flow when using cloud sign-in.');
+      return false;
+    }
     try {
       const store = getStore();
-      const users = (await store.get('users') as User[] | undefined) ?? [];
+      const users = ((await store.get('users')) as User[] | undefined) ?? [];
       const userIndex = users.findIndex(
         (u) => u.username.toLowerCase() === username.trim().toLowerCase()
       );
-      
+
       if (userIndex === -1) {
         logger.warn('Password reset failed: User not found');
         durableLogger.warn('security', 'AUTH_PASSWORD_RESET_FAILED_USER_NOT_FOUND', { username }, 'AuthContext');
@@ -272,7 +388,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       users[userIndex].password = newPassword;
       await store.set('users', users);
-      
+
       logger.info('Password reset successful');
       durableLogger.info('security', 'AUTH_PASSWORD_RESET_SUCCESS', { username }, 'AuthContext');
       toast.success('Password reset successful');
@@ -285,17 +401,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const requestPasswordResetEmail = async (email: string): Promise<boolean> => {
+    if (!isSupabaseConfigured()) {
+      toast.error('Cloud password reset is not enabled.');
+      return false;
+    }
+    const client = getSupabase();
+    if (!client) {
+      return false;
+    }
+    try {
+      const redirectTo = `${window.location.origin}/login`;
+      const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+      toast.success('If an account exists for that email, a reset link was sent.');
+      durableLogger.info('security', 'AUTH_PASSWORD_RESET_EMAIL_REQUESTED', { email: email.trim() }, 'AuthContext');
+      return true;
+    } catch (error) {
+      logger.error('Password reset email error: ' + String(error));
+      toast.error('Could not send reset email');
+      return false;
+    }
+  };
+
   const value = {
     currentUser,
     loading,
+    authBackend,
     login,
     logout,
-    resetPassword
+    resetPassword,
+    requestPasswordResetEmail,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

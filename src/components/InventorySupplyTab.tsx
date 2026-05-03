@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { UseFormReturn } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ItemWithSubcategories } from "@/types/inventory";
@@ -82,9 +82,6 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription>
-                  {form.watch('unit')} sizes available
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -131,9 +128,6 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
                   }}
                 />
               </FormControl>
-              <FormDescription>
-                Leave empty or set to 0 for no minimum quantity alert
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

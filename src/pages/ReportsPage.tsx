@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Save, Trash2, FileSpreadsheet } from 'lucide-react';
+import { ChevronDown, Download, FileSpreadsheet, Save, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { InventoryItem } from '@/types/inventory';
@@ -16,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 type BuiltInReportId =
   | 'asset-availability'
   | 'lifecycle'
+  | 'decommissioning'
   | 'project-budget'
   | 'expense-allocation'
   | 'expendables-restock';
@@ -29,6 +31,7 @@ interface ReportDefinition {
 
 const CUSTOM_REPORTS_KEY = 'inventory-custom-report-definitions';
 const USER_REPORT_COLUMN_OPTIONS = [
+  'recordId',
   'assetId',
   'name',
   'assetStatus',
@@ -44,14 +47,37 @@ const USER_REPORT_COLUMN_OPTIONS = [
   'supplier',
   'cabinet',
   'assetTrackingMode',
+  'rackLocation',
+  'decomEOLDate',
+  'decomCutoverDate',
+  'decomLastAuditAt',
+  'decomNotes',
 ];
 
 const BUILT_IN_REPORTS: ReportDefinition[] = [
-  { id: 'asset-availability', name: 'Asset Availability', columns: ['assetId', 'name', 'assetStatus', 'location', 'project', 'quantity', 'expenseTypeCode', 'costCenterCode'], kind: 'built-in' },
+  { id: 'asset-availability', name: 'Asset Availability', columns: ['recordId', 'assetId', 'name', 'assetStatus', 'location', 'project', 'quantity', 'expenseTypeCode', 'costCenterCode'], kind: 'built-in' },
   { id: 'lifecycle', name: 'Lifecycle Status Summary', columns: ['assetStatus', 'quantity', 'project', 'location'], kind: 'built-in' },
+  {
+    id: 'decommissioning',
+    name: 'Decommissioning & cut-over',
+    columns: [
+      'recordId',
+      'assetId',
+      'name',
+      'assetStatus',
+      'location',
+      'rackLocation',
+      'decomEOLDate',
+      'decomCutoverDate',
+      'decomLastAuditAt',
+      'decomNotes',
+      'project',
+    ],
+    kind: 'built-in',
+  },
   { id: 'project-budget', name: 'Project Budget', columns: ['project', 'name', 'quantity', 'costPerUnit', 'totalValue', 'expenseTypeCode', 'costCenterCode'], kind: 'built-in' },
   { id: 'expense-allocation', name: 'Expense Allocation', columns: ['expenseTypeCode', 'costCenterCode', 'name', 'quantity', 'costPerUnit', 'totalValue', 'project'], kind: 'built-in' },
-  { id: 'expendables-restock', name: 'Expendables Restock', columns: ['assetId', 'name', 'quantity', 'minQuantity', 'restockRequired', 'recommendedTopUp', 'unit', 'location', 'expenseTypeCode'], kind: 'built-in' },
+  { id: 'expendables-restock', name: 'Expendables Restock', columns: ['recordId', 'assetId', 'name', 'quantity', 'minQuantity', 'restockRequired', 'recommendedTopUp', 'unit', 'location', 'expenseTypeCode'], kind: 'built-in' },
 ];
 
 export default function ReportsPage() {
@@ -67,7 +93,8 @@ export default function ReportsPage() {
   const [customReportsHydrated, setCustomReportsHydrated] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<string>(BUILT_IN_REPORTS[0].id);
   const [customName, setCustomName] = useState('Custom Production Report');
-  const [customColumns, setCustomColumns] = useState<string[]>(['assetId', 'name', 'project', 'location', 'expenseTypeCode', 'costCenterCode', 'quantity']);
+  const [customColumns, setCustomColumns] = useState<string[]>(['recordId', 'assetId', 'name', 'project', 'location', 'expenseTypeCode', 'costCenterCode', 'quantity']);
+  const [defineCustomReportOpen, setDefineCustomReportOpen] = useState(false);
 
   const allReports = useMemo(() => [...BUILT_IN_REPORTS, ...customReports], [customReports]);
   const selectedReport = useMemo(
@@ -136,7 +163,8 @@ export default function ReportsPage() {
 
         const values: Record<string, unknown> = {
           ...item,
-          assetId: item.assetId || item.id,
+          recordId: item.recordId ?? '',
+          assetId: item.assetId ?? '',
           totalValue,
           restockRequired,
           recommendedTopUp,
@@ -349,7 +377,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Production Reports</h1>
+        <h1 className="text-2xl font-bold">Reports</h1>
       </div>
 
       <Card>
@@ -390,6 +418,7 @@ export default function ReportsPage() {
                 <SelectItem value="in_service">In Service</SelectItem>
                 <SelectItem value="ready_decommission">Ready to Decommission</SelectItem>
                 <SelectItem value="slated_removal">Slated for Removal</SelectItem>
+                <SelectItem value="cut_over_pending">Cut-over pending</SelectItem>
                 <SelectItem value="ewaste">E-Waste</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
@@ -473,36 +502,61 @@ export default function ReportsPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Define Custom Report</CardTitle>
-          <CardDescription>Create and save reusable custom reports.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Custom Report Name</Label>
-            <Input value={customName} onChange={(event) => setCustomName(event.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Columns</Label>
-            <div className="flex flex-wrap gap-2">
-              {USER_REPORT_COLUMN_OPTIONS.map((column) => (
-                <Button
-                  key={column}
-                  type="button"
-                  size="sm"
-                  variant={customColumns.includes(column) ? 'default' : 'outline'}
-                  onClick={() => toggleCustomColumn(column)}
-                >
-                  {column}
-                </Button>
-              ))}
+        <CardHeader
+          className="cursor-pointer select-none rounded-t-lg hover:bg-muted/40"
+          role="button"
+          tabIndex={0}
+          aria-expanded={defineCustomReportOpen}
+          onClick={() => setDefineCustomReportOpen((open) => !open)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setDefineCustomReportOpen((open) => !open);
+            }
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1.5">
+              <CardTitle>Define Custom Report</CardTitle>
+              <CardDescription>Create and save reusable custom reports.</CardDescription>
             </div>
+            <ChevronDown
+              className={cn(
+                'mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition-transform',
+                defineCustomReportOpen && 'rotate-180'
+              )}
+              aria-hidden
+            />
           </div>
-          <Button size="sm" onClick={saveCustomReport}>
-            <Save className="mr-2 h-4 w-4" />
-            Save Custom Report
-          </Button>
-        </CardContent>
+        </CardHeader>
+        {defineCustomReportOpen ? (
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Custom Report Name</Label>
+              <Input value={customName} onChange={(event) => setCustomName(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Columns</Label>
+              <div className="flex flex-wrap gap-2">
+                {USER_REPORT_COLUMN_OPTIONS.map((column) => (
+                  <Button
+                    key={column}
+                    type="button"
+                    size="sm"
+                    variant={customColumns.includes(column) ? 'default' : 'outline'}
+                    onClick={() => toggleCustomColumn(column)}
+                  >
+                    {column}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <Button size="sm" onClick={saveCustomReport}>
+              <Save className="mr-2 h-4 w-4" />
+              Save Custom Report
+            </Button>
+          </CardContent>
+        ) : null}
       </Card>
     </div>
   );

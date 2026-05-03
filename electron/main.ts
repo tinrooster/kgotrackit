@@ -5,6 +5,24 @@ import * as fsPromises from 'fs/promises';
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
+// GPU process can fail on some Windows setups (VM, RDP, driver quirks) with
+// error_code=18 → FATAL. `disableHardwareAcceleration()` alone is not always enough;
+// Chromium still spawns a GPU child unless command-line switches are set first.
+// Must run before `ready` (and before squirrel). Opt in: ELECTRON_ENABLE_GPU=1
+const shouldMitigateGpu =
+  process.env.ELECTRON_ENABLE_GPU !== '1' &&
+  (process.platform === 'win32' || process.env.ELECTRON_DISABLE_GPU === '1');
+
+if (shouldMitigateGpu) {
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+  app.commandLine.appendSwitch('disable-gpu-compositing');
+  app.disableHardwareAcceleration();
+  console.log(
+    '[trackIT] GPU mitigation on (disable-gpu switches + disableHardwareAcceleration). Set ELECTRON_ENABLE_GPU=1 to use the GPU.'
+  );
+}
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();
@@ -14,7 +32,19 @@ let mainWindow: BrowserWindow | null = null;
 
 const isDev = process.env.NODE_ENV === 'development';
 
+/** Prefer ESM bundle (preload.mjs) when electron-vite emits `formats: ['es']`; fall back to .js for older/dev output. */
+function resolvePreloadPath(): string {
+  const fs = require('fs') as typeof import('fs');
+  const dir = path.join(__dirname, '../preload');
+  const mjs = path.join(dir, 'preload.mjs');
+  const js = path.join(dir, 'preload.js');
+  if (fs.existsSync(mjs)) return mjs;
+  if (fs.existsSync(js)) return js;
+  return mjs;
+}
+
 const createWindow = () => {
+  const preloadPath = resolvePreloadPath();
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 900,
@@ -25,7 +55,7 @@ const createWindow = () => {
       // Preload uses `electron-store`, which expects Node APIs. A sandboxed preload cannot load it
       // (fails with `module not found: node:process`). Keep the renderer isolated; only preload gets Node.
       sandbox: false,
-      preload: path.join(__dirname, '../preload/preload.js')
+      preload: preloadPath,
     }
   });
 
@@ -46,9 +76,8 @@ const createWindow = () => {
   });
 
   console.log('MAIN __dirname:', __dirname);
-  console.log('Preload path:', path.join(__dirname, '../preload/preload.js'));
-  const fs = require('fs');
-  console.log('Preload exists:', fs.existsSync(path.join(__dirname, '../preload/preload.js')));
+  console.log('Preload path:', preloadPath);
+  console.log('Preload exists:', require('fs').existsSync(preloadPath));
 };
 
 // This method will be called when Electron has finished

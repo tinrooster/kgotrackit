@@ -18,12 +18,13 @@ import { InventoryItem, OrderStatus, CategoryNode, ItemWithSubcategories } from 
 import { Cabinet } from "@/types/cabinets";
 import { Slider } from "@/components/ui/slider";
 import { BasicDetailsTab } from "./BasicDetailsTab";
+import { AdditionalInfoTab } from "@/components/AdditionalInfoTab";
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
 
 // Enhanced form schema with stricter validation
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  assetId: z.string().optional(),
+  companyAssetTag: z.string().optional(),
   description: z.string().optional(),
   category: z.string().min(1, "Category is required"),
   subcategory: z.string().optional(),
@@ -37,7 +38,8 @@ const formSchema = z.object({
     .transform((val) => val ? ensureUrlProtocol(val.trim()) : '')
     .optional(),
   project: z.string().optional(),
-  notes: z.string().optional(),
+  manufacturerNotes: z.string().optional(),
+  additionalNotes: z.string().optional(),
   orderStatus: z.nativeEnum(OrderStatus, {
     errorMap: () => ({ message: "Please select a valid order status" })
   }).default(OrderStatus.COMPLETED),
@@ -64,6 +66,12 @@ const formSchema = z.object({
   dateInService: z.string().optional(),
   maintenanceNotes: z.string().optional(),
   unitSubcategory: z.string().optional(),
+  photoUrl: z.string().optional(),
+  rackLocation: z.string().optional(),
+  decomEOLDate: z.string().optional(),
+  decomCutoverDate: z.string().optional(),
+  decomLastAuditAt: z.string().optional(),
+  decomNotes: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -351,133 +359,6 @@ const InventorySupplyTab = ({ form, units, suppliers }: {
   );
 };
 
-const AdditionalInfoTab = ({ form }: { form: any }) => {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <FormField
-          control={form.control}
-          name="barcode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Barcode</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter barcode" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="serialNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Serial Number</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter serial number" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="manufacturer"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Manufacturer</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter manufacturer" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="modelNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Model Number</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter model number" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="dateInService"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Date In Service</FormLabel>
-              <FormControl>
-                <Input 
-                  type="date"
-                  {...field}
-                  value={field.value || ''}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-
-      <FormField
-        control={form.control}
-        name="maintenanceNotes"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Maintenance Notes</FormLabel>
-            <FormControl>
-              <Input {...field} placeholder="Enter maintenance notes" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="assetId"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Asset ID</FormLabel>
-            <FormControl>
-              <Input {...field} value={field.value || ''} placeholder="Auto-assigned or custom asset ID" />
-            </FormControl>
-            <FormDescription>
-              Unique device identifier for tracking, audit, and sticker labels.
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="notes"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Additional Notes</FormLabel>
-            <FormControl>
-              <Input {...field} placeholder="Enter additional notes" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </div>
-  );
-};
-
 export function EditItemForm({
   item,
   onSubmit: handleSubmit,
@@ -562,7 +443,7 @@ export function EditItemForm({
           }
         : {}),
       name: item.name || '',
-      assetId: item.assetId || '',
+      companyAssetTag: item.companyAssetTag || '',
       description: item.description || '',
       category: item.category || '',
       subcategory: item.subcategory || '',
@@ -582,7 +463,8 @@ export function EditItemForm({
       assetTrackingMode: item.assetTrackingMode || 'line_item',
       assetTagEnd: item.assetTagEnd || '',
       project: item.project || '',
-      notes: item.notes || '',
+      manufacturerNotes: item.manufacturerNotes || '',
+      additionalNotes: item.additionalNotes ?? item.notes ?? '',
       orderStatus: item.orderStatus || OrderStatus.COMPLETED,
       deliveryPercentage: item.deliveryPercentage || 100,
       expectedDeliveryDate,
@@ -595,6 +477,12 @@ export function EditItemForm({
       dateInService,
       maintenanceNotes: item.maintenanceNotes || '',
       unitSubcategory: item.unitSubcategory || '',
+      photoUrl: item.photoUrl || '',
+      rackLocation: item.rackLocation || '',
+      decomEOLDate: item.decomEOLDate || '',
+      decomCutoverDate: item.decomCutoverDate || '',
+      decomLastAuditAt: item.decomLastAuditAt || '',
+      decomNotes: item.decomNotes || '',
     };
   }, [item, initialLocationValue]);
 
@@ -649,14 +537,14 @@ export function EditItemForm({
           </TabsList>
 
           <TabsContent value="details">
-            <BasicDetailsTab 
-              form={form} 
-              categories={categories} 
+            <BasicDetailsTab
+              form={form}
+              categories={categories}
               locations={locations}
               cabinets={cabinets}
               projects={projects}
-              expenseTypes={expenseTypes}
-              costCenters={costCenters}
+              inventoryRecordLine={item.recordId ?? undefined}
+              assetTagLine={item.assetId}
             />
           </TabsContent>
 
@@ -669,7 +557,7 @@ export function EditItemForm({
           </TabsContent>
 
           <TabsContent value="additional">
-            <AdditionalInfoTab form={form} />
+            <AdditionalInfoTab form={form} expenseTypes={expenseTypes} costCenters={costCenters} />
           </TabsContent>
         </Tabs>
 

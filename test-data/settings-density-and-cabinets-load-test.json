@@ -67,7 +67,8 @@
     "defaultMinQuantity": 0,
     "defaultReorderLevel": 5,
     "theme": "light",
-    "condensedView": true
+    "condensedView": true,
+    "mobileTabletUi": true
   },
   "cabinets": [
     { "id": "CAMA", "name": "Camera Bay A", "locationId": "Main Warehouse", "description": "Primary body storage", "isSecure": true, "allowedCategories": ["Cameras", "Lenses"], "qrCode": "cabinet-CAMA-171465200001", "notes": "Sign-out required" },

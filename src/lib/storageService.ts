@@ -1,9 +1,11 @@
 import { InventoryItem, CategoryNode, ItemWithSubcategories } from '@/types/inventory';
 import { ItemTemplate } from '@/types/templates';
+import { requestCloudSync } from '@/lib/cloudSyncEvents';
 
 declare global {
   interface Window {
-    electronStore: {
+    /** Present in Electron; absent in static web builds. */
+    electronStore?: {
       getData: (key: string) => any;
       setData: (key: string, value: any) => void;
       deleteData: (key: string) => void;
@@ -29,16 +31,18 @@ export const STORAGE_KEYS = {
 export const SETTINGS_UPDATED_EVENT = 'trackit:settings-updated';
 
 // Helper function to parse dates in items
-const parseItemDates = (item: any): InventoryItem => ({
-  ...item,
-  lastUpdated: item.lastUpdated ? new Date(item.lastUpdated) : new Date(),
-  expectedDeliveryDate: item.expectedDeliveryDate ? new Date(item.expectedDeliveryDate) : undefined
-});
+export function parseItemDates(item: any): InventoryItem {
+  return {
+    ...item,
+    lastUpdated: item.lastUpdated ? new Date(item.lastUpdated) : new Date(),
+    expectedDeliveryDate: item.expectedDeliveryDate ? new Date(item.expectedDeliveryDate) : undefined,
+  };
+}
 
 // Get items from store
 export const getItems = (): InventoryItem[] => {
   try {
-    const electronItems = window.electronStore.getData(STORAGE_KEYS.ITEMS) as InventoryItem[] | undefined;
+    const electronItems = window.electronStore?.getData?.(STORAGE_KEYS.ITEMS) as InventoryItem[] | undefined;
 
     if (electronItems && electronItems.length > 0) {
       const parsedElectronItems = electronItems.map(parseItemDates);
@@ -63,27 +67,28 @@ export const getItems = (): InventoryItem[] => {
   }
 };
 
-// Save items to store
-export const saveItems = (items: InventoryItem[]): void => {
+/** Persist inventory items. Returns false if nothing could be written (e.g. storage quota). */
+export const saveItems = (items: InventoryItem[]): boolean => {
+  const itemsToSave = items.map((item) => ({
+    ...item,
+    lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : new Date().toISOString(),
+    expectedDeliveryDate:
+      item.expectedDeliveryDate instanceof Date ? item.expectedDeliveryDate.toISOString() : undefined,
+  }));
   try {
-    const itemsToSave = items.map(item => ({
-      ...item,
-      lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : new Date().toISOString(),
-      expectedDeliveryDate: item.expectedDeliveryDate instanceof Date ? item.expectedDeliveryDate.toISOString() : undefined,
-    }));
-    window.electronStore.setData(STORAGE_KEYS.ITEMS, itemsToSave);
+    window.electronStore?.setData?.(STORAGE_KEYS.ITEMS, itemsToSave);
     localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(itemsToSave));
+    requestCloudSync();
+    return true;
   } catch (error) {
     console.error('Error saving items to store:', error);
     try {
-      const itemsToSave = items.map(item => ({
-        ...item,
-        lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : new Date().toISOString(),
-        expectedDeliveryDate: item.expectedDeliveryDate instanceof Date ? item.expectedDeliveryDate.toISOString() : undefined,
-      }));
       localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(itemsToSave));
-    } catch {
-      // no-op fallback
+      requestCloudSync();
+      return true;
+    } catch (secondError) {
+      console.error('Retry saving items to localStorage failed:', secondError);
+      return false;
     }
   }
 };
@@ -129,7 +134,7 @@ export const getSettings = (): Settings => {
                 }));
                 settings[key.toLowerCase() as keyof Settings] = newFormat;
                 // Save in new format
-                window.electronStore.setData(storageKey, newFormat);
+                window.electronStore?.setData?.(storageKey, newFormat);
                 localStorage.setItem(storageKey, JSON.stringify(newFormat));
               } else {
                 // Already in new format
@@ -163,7 +168,7 @@ export const saveSettings = (settings: Settings): void => {
       const storageKey = STORAGE_KEYS[key.toUpperCase() as keyof typeof STORAGE_KEYS];
       if (storageKey) {
         try {
-          window.electronStore.setData(storageKey, values);
+          window.electronStore?.setData?.(storageKey, values);
         } catch {
           // Use localStorage fallback when electron store bridge is unavailable.
         }
@@ -173,64 +178,104 @@ export const saveSettings = (settings: Settings): void => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT, { detail: settings }));
     }
+    requestCloudSync();
   } catch (error) {
     console.error('Error saving settings to store:', error);
   }
 };
 
-// Save templates to store
+// Save templates to store (Electron + localStorage, same pattern as saveItems)
 export const saveTemplates = (templates: ItemTemplate[]): void => {
   try {
-    console.log('Saving templates:', templates);
     if (!Array.isArray(templates)) {
       console.error('Templates must be an array');
       return;
     }
-    
-    // Ensure we're saving valid template data
-    const validTemplates = templates.filter(template => 
-      template && 
-      typeof template === 'object' && 
-      template.templateId && 
-      template.templateName
+
+    const validTemplates = templates.filter(
+      (template) =>
+        template &&
+        typeof template === 'object' &&
+        template.templateId &&
+        template.templateName
     );
-    
-    window.electronStore.setData(STORAGE_KEYS.TEMPLATES, validTemplates);
-    console.log('Templates saved successfully');
+
+    try {
+      window.electronStore?.setData?.(STORAGE_KEYS.TEMPLATES, validTemplates);
+    } catch (e) {
+      console.warn('electronStore template save failed, using localStorage:', e);
+    }
+    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(validTemplates));
+    requestCloudSync();
   } catch (error) {
     console.error('Error saving templates to store:', error);
-    throw error;
+    try {
+      const validTemplates = templates.filter(
+        (template) =>
+          template &&
+          typeof template === 'object' &&
+          template.templateId &&
+          template.templateName
+      );
+      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(validTemplates));
+      requestCloudSync();
+    } catch {
+      throw error;
+    }
   }
 };
 
-// Get templates from store
+// Get templates from store (Electron or localStorage fallback)
 export const getTemplates = (): ItemTemplate[] => {
   try {
-    const templates = window.electronStore.getData(STORAGE_KEYS.TEMPLATES) as ItemTemplate[];
-    console.log('Templates loaded from store:', templates);
-    
-    if (!templates) {
-      console.log('No templates found in storage');
+    let templates: ItemTemplate[] | undefined;
+
+    try {
+      templates = window.electronStore?.getData?.(STORAGE_KEYS.TEMPLATES) as ItemTemplate[] | undefined;
+    } catch {
+      templates = undefined;
+    }
+
+    if (templates && Array.isArray(templates) && templates.length > 0) {
+      const valid = templates.filter(
+        (template) =>
+          template &&
+          typeof template === 'object' &&
+          template.templateId &&
+          template.templateName
+      );
+      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(valid));
+      return valid;
+    }
+
+    const localRaw = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    if (!localRaw) {
       return [];
     }
-    
-    if (!Array.isArray(templates)) {
-      console.error('Stored templates is not an array');
+
+    const parsed = JSON.parse(localRaw) as ItemTemplate[];
+    if (!Array.isArray(parsed)) {
       return [];
     }
-    
-    // Validate template structure
-    const validTemplates = templates.filter(template => 
-      template && 
-      typeof template === 'object' && 
-      template.templateId && 
-      template.templateName
+
+    return parsed.filter(
+      (template) =>
+        template &&
+        typeof template === 'object' &&
+        template.templateId &&
+        template.templateName
     );
-    
-    console.log('Valid templates loaded:', validTemplates);
-    return validTemplates;
   } catch (error) {
     console.error('Error getting templates from store:', error);
-    return [];
+    try {
+      const localRaw = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+      if (!localRaw) {
+        return [];
+      }
+      const parsed = JSON.parse(localRaw) as ItemTemplate[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   }
 };
