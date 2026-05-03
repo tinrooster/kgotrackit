@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import CabinetManagement from '@/pages/CabinetManagement';
 import { FinancialCodesTab } from '@/components/settings/FinancialCodesTab';
-import { TemplatesPage } from '@/pages/TemplatesPage';
 import { ItemWithSubcategories } from '@/types/inventory';
 import { FinancialCodeEntry, saveFinancialSettings } from '@/lib/financialSettingsService';
 import { logger } from '@/lib/logging';
@@ -13,12 +12,10 @@ import { getItems } from '@/lib/storageService';
 export type UserDefinedPanel =
   | 'overview'
   | 'categories'
-  | 'suppliers'
   | 'units'
   | 'locations'
   | 'projects'
   | 'financial'
-  | 'templates'
   | 'cabinets';
 
 interface SettingsListsState {
@@ -34,12 +31,10 @@ type SettingsKey = keyof SettingsListsState;
 
 const LIST_NAV: { id: Exclude<UserDefinedPanel, 'overview'>; label: string }[] = [
   { id: 'categories', label: 'Categories' },
-  { id: 'suppliers', label: 'Suppliers' },
   { id: 'units', label: 'Units' },
   { id: 'locations', label: 'Locations' },
   { id: 'projects', label: 'Projects' },
   { id: 'cabinets', label: 'Cab/Storage' },
-  { id: 'templates', label: 'Templates' },
   { id: 'financial', label: 'Expense Codes' },
 ];
 
@@ -119,32 +114,6 @@ export function UserDefinedListsSection({
             </Card>
           )}
 
-          {panel === 'suppliers' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Suppliers</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <EditableItemWithSubcategoriesList
-                  hideListTitle
-                  items={settings.suppliers}
-                  setItems={(newItems) => updateSettingsList('suppliers', newItems)}
-                  title="Suppliers"
-                  enableSubcategories={false}
-                  onCheckBeforeDelete={(value, onSafeToDelete) => {
-                    const items = getItems();
-                    const affectedItems = items.filter((item) => item.supplier === value);
-                    if (affectedItems.length > 0) {
-                      requestReconcile('Suppliers', value, affectedItems.length);
-                    } else {
-                      onSafeToDelete();
-                    }
-                  }}
-                />
-              </CardContent>
-            </Card>
-          )}
-
           {panel === 'units' && (
             <Card>
               <CardHeader>
@@ -183,6 +152,7 @@ export function UserDefinedListsSection({
                   title="Locations"
                   showColorPicker
                   colorPickerLabel="Location color"
+                  locationRackExtension
                   onCheckBeforeDelete={(value, onSafeToDelete) => {
                     const items = getItems();
                     const affectedItems = items.filter((item) => item.location === value);
@@ -268,8 +238,6 @@ export function UserDefinedListsSection({
               }}
             />
           )}
-
-          {panel === 'templates' && <TemplatesPage />}
 
           {panel === 'cabinets' && (
             <Card>

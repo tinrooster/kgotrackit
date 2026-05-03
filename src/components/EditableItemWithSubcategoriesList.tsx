@@ -12,7 +12,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Pencil, Trash2, GripVertical, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  Pencil,
+  Trash2,
+  GripVertical,
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+} from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -53,6 +61,104 @@ function singularFormForListTitle(title: string): string {
   return lower;
 }
 
+function RackSlotsBlock({
+  rackLocationEnabled,
+  rackSlots,
+  onEnabledChange,
+  onSlotsChange,
+  className = '',
+}: {
+  rackLocationEnabled?: boolean;
+  rackSlots?: string[];
+  onEnabledChange: (value: boolean) => void;
+  onSlotsChange: (slots: string[]) => void;
+  className?: string;
+}) {
+  const slots = rackSlots ?? [];
+  const addSlot = () => onSlotsChange([...slots, '']);
+  const updateSlot = (index: number, value: string) => {
+    const next = [...slots];
+    next[index] = value;
+    onSlotsChange(next);
+  };
+  const removeSlot = (index: number) => {
+    onSlotsChange(slots.filter((_, i) => i !== index));
+  };
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= slots.length) {
+      return;
+    }
+    onSlotsChange(arrayMove(slots, from, to));
+  };
+
+  return (
+    <div className={`space-y-2 rounded-md border border-border/40 bg-muted/10 p-2 ${className}`}>
+      <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
+        <input
+          type="checkbox"
+          className="rounded border-border"
+          checked={rackLocationEnabled === true}
+          onChange={(e) => onEnabledChange(e.target.checked)}
+        />
+        This location has rack positions
+      </label>
+      {rackLocationEnabled && (
+        <div className="space-y-1">
+          <p className="text-[11px] text-muted-foreground">
+            Name each rack cell (used when picking rack in inventory). Reorder with arrows.
+          </p>
+          {slots.map((slot, i) => (
+            <div key={`rack-slot-${i}`} className="flex flex-wrap items-center gap-1">
+              <Input
+                className="h-8 min-w-0 flex-1 text-xs"
+                value={slot}
+                onChange={(e) => updateSlot(i, e.target.value)}
+                placeholder="e.g. TD-05"
+                aria-label={`Rack position ${i + 1}`}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                disabled={i === 0}
+                title="Move up"
+                onClick={() => move(i, i - 1)}
+              >
+                <ChevronUp className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                disabled={i === slots.length - 1}
+                title="Move down"
+                onClick={() => move(i, i + 1)}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                title="Remove position"
+                onClick={() => removeSlot(i)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={addSlot}>
+            Add position
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface SortableItemProps {
   item: ItemWithSubcategories;
   onEdit: (id: string, newValue: string) => void;
@@ -61,6 +167,10 @@ interface SortableItemProps {
   onAddSubcategory: (id: string, subcategory: string) => void;
   onEditSubcategory: (id: string, oldValue: string, newValue: string) => void;
   onRequestDeleteSubcategory: (id: string, subcategory: string) => void;
+  onPatchItem?: (id: string, patch: Partial<ItemWithSubcategories>) => void;
+  onPatchChild?: (parentId: string, childKey: string, patch: Partial<ItemWithSubcategories>) => void;
+  perItemWebsiteField?: boolean;
+  locationRackExtension?: boolean;
 }
 
 const DEFAULT_CATEGORY_COLORS = [
@@ -82,6 +192,10 @@ function SortableItem({
   onAddSubcategory,
   onEditSubcategory,
   onRequestDeleteSubcategory,
+  onPatchItem,
+  onPatchChild,
+  perItemWebsiteField = false,
+  locationRackExtension = false,
   showColorPicker = false,
   enableSubcategories = true,
   colorPickerLabel = 'Category color',
@@ -252,11 +366,42 @@ function SortableItem({
         </div>
       </div>
 
+      {perItemWebsiteField && onPatchItem && (
+        <div className="ml-9 flex max-w-md flex-col gap-1 sm:ml-10">
+          <span className="text-xs font-medium text-muted-foreground">Supplier website</span>
+          <Input
+            type="url"
+            className="h-8 text-sm"
+            placeholder="https://…"
+            value={item.website ?? ''}
+            onChange={(e) =>
+              onPatchItem(item.id, {
+                website: e.target.value.trim() || undefined,
+              })
+            }
+          />
+        </div>
+      )}
+
+      {locationRackExtension &&
+        onPatchItem &&
+        (!(item.children && item.children.length > 0)) && (
+          <RackSlotsBlock
+            className="ml-9 sm:ml-10"
+            rackLocationEnabled={item.rackLocationEnabled}
+            rackSlots={item.rackSlots}
+            onEnabledChange={(v) => onPatchItem(item.id, { rackLocationEnabled: v })}
+            onSlotsChange={(sl) => onPatchItem(item.id, { rackSlots: sl })}
+          />
+        )}
+
       {enableSubcategories && subsExpanded && (item.children?.length ?? 0) > 0 && (
         <div className="ml-1 space-y-1 border-l-2 border-primary/30 pl-3 sm:ml-2 sm:pl-4">
-          {item.children?.map((child) => (
+          {item.children?.map((child) => {
+            const childKey = child.id ?? child.name;
+            return (
+              <div key={childKey} className="space-y-1">
             <div
-              key={child.name}
               className="flex min-w-0 items-center justify-between gap-2 rounded-r-md border border-border/60 border-l-transparent bg-muted/15 py-1.5 pl-2 pr-2 text-sm text-muted-foreground"
             >
               {editingSubcategory === child.name ? (
@@ -309,7 +454,18 @@ function SortableItem({
                 </>
               )}
             </div>
-          ))}
+            {locationRackExtension && onPatchChild && (
+              <RackSlotsBlock
+                className="ml-1 sm:ml-2"
+                rackLocationEnabled={child.rackLocationEnabled}
+                rackSlots={child.rackSlots}
+                onEnabledChange={(v) => onPatchChild(item.id, childKey, { rackLocationEnabled: v })}
+                onSlotsChange={(sl) => onPatchChild(item.id, childKey, { rackSlots: sl })}
+              />
+            )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -328,6 +484,10 @@ interface EditableItemWithSubcategoriesListProps {
   /** Accessible label for the color input when `showColorPicker` is on. */
   colorPickerLabel?: string;
   onCheckBeforeDelete?: (value: string, onSafeToDelete: () => void) => void;
+  /** Per-row website URL (e.g. supplier portal under Settings → Libraries → Suppliers). */
+  perItemWebsiteField?: boolean;
+  /** Location list: rack checkbox and named rack positions per parent or sub-location row. */
+  locationRackExtension?: boolean;
 }
 
 type DeleteTarget =
@@ -345,6 +505,8 @@ export function EditableItemWithSubcategoriesList({
   showColorPicker = false,
   colorPickerLabel = 'Category color',
   onCheckBeforeDelete,
+  perItemWebsiteField = false,
+  locationRackExtension = false,
 }: EditableItemWithSubcategoriesListProps) {
   const addInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
@@ -388,6 +550,27 @@ export function EditableItemWithSubcategoriesList({
       item.id === id ? { ...item, name: newValue } : item
     );
     setItems(newItems);
+  };
+
+  const handlePatchItem = (id: string, patch: Partial<ItemWithSubcategories>) => {
+    setItems(items.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  };
+
+  const handlePatchChild = (parentId: string, childKey: string, patch: Partial<ItemWithSubcategories>) => {
+    setItems(
+      items.map((parent) => {
+        if (parent.id !== parentId) {
+          return parent;
+        }
+        return {
+          ...parent,
+          children: (parent.children ?? []).map((child) => {
+            const key = child.id ?? child.name;
+            return key === childKey ? { ...child, ...patch } : child;
+          }),
+        };
+      }),
+    );
   };
 
   const runParentDelete = (id: string) => {
@@ -526,6 +709,12 @@ export function EditableItemWithSubcategoriesList({
                 onRequestDeleteSubcategory={(parentId, subName) =>
                   setDeleteTarget({ kind: 'sub', parentId, subName })
                 }
+                onPatchItem={
+                  perItemWebsiteField || locationRackExtension ? handlePatchItem : undefined
+                }
+                onPatchChild={locationRackExtension ? handlePatchChild : undefined}
+                perItemWebsiteField={perItemWebsiteField}
+                locationRackExtension={locationRackExtension}
                 enableSubcategories={enableSubcategories}
                 showColorPicker={showColorPicker}
                 colorPickerLabel={colorPickerLabel}

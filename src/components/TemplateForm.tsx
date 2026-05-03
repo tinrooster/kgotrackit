@@ -290,8 +290,9 @@ export function TemplateForm({
               <span className="hidden sm:inline">Additional Info</span>
               <span className="sm:hidden">More</span>
             </TabsTrigger>
-            <TabsTrigger value="decommissioning" className="px-1.5 text-xs sm:px-3 sm:text-sm">
-              <span className="hidden sm:inline">Decommissioning</span>
+            <TabsTrigger value="decommissioning" className="px-1.5 text-xs sm:px-3 sm:text-sm" title="EOL / decommissioning">
+              <span className="sm:hidden">EOL</span>
+              <span className="hidden sm:inline">EOL · Decommissioning</span>
               <span className="sm:hidden">EOL</span>
             </TabsTrigger>
           </TabsList>

@@ -4,6 +4,15 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ItemWithSubcategories } from "@/types/inventory";
+import { SupplierWebsiteStatusBlock } from "@/components/SupplierWebsiteStatusBlock";
+
+function ReqAsterisk() {
+  return (
+    <span className="ml-0.5 text-destructive" title="Required" aria-hidden>
+      *
+    </span>
+  );
+}
 
 interface InventorySupplyTabProps {
   form: UseFormReturn<any>;
@@ -28,7 +37,10 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
           name="unit"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Unit*</FormLabel>
+              <FormLabel>
+                Unit
+                <ReqAsterisk />
+              </FormLabel>
               <Select
                 onValueChange={(value) => {
                   if (value !== field.value) {
@@ -94,7 +106,10 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
           name="quantity"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Quantity*</FormLabel>
+              <FormLabel>
+                Quantity
+                <ReqAsterisk />
+              </FormLabel>
               <FormControl>
                 <Input 
                   type="number" 
@@ -162,23 +177,7 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="supplierWebsite"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Supplier Website</FormLabel>
-              <FormControl>
-                <Input 
-                  type="url" 
-                  {...field} 
-                  placeholder="https://supplier.com"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <SupplierWebsiteStatusBlock form={form} suppliers={suppliers} />
       </div>
     </div>
   );

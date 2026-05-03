@@ -60,7 +60,7 @@ export function AdditionalInfoTab({
 
   return (
     <div className="mx-auto w-full max-w-[56rem] space-y-4">
-      <OptionalFormCollapsible title="Expense & allocation (optional)">
+      <OptionalFormCollapsible title="Expense & allocation">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -131,7 +131,7 @@ export function AdditionalInfoTab({
       </OptionalFormCollapsible>
 
       {deviceLibraryOptions.length > 0 ? (
-        <OptionalFormCollapsible title="Device library (optional)">
+        <OptionalFormCollapsible title="Device library">
           <Combobox
             key={deviceLibraryPickerKey}
             options={deviceLibraryOptions}
@@ -149,76 +149,82 @@ export function AdditionalInfoTab({
         </OptionalFormCollapsible>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="barcode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Barcode</FormLabel>
-              <div className="flex gap-2">
+      <OptionalFormCollapsible title="Identifiers">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="barcode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Barcode</FormLabel>
+                <div className="flex gap-2">
+                  <FormControl>
+                    <Input {...field} placeholder="Enter barcode" />
+                  </FormControl>
+                  {onScanBarcode && (
+                    <Button type="button" variant="outline" size="icon" onClick={onScanBarcode}>
+                      <ScanLine className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="serialNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Serial number</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Enter barcode" />
+                  <Input {...field} placeholder="Enter serial number" />
                 </FormControl>
-                {onScanBarcode && (
-                  <Button type="button" variant="outline" size="icon" onClick={onScanBarcode}>
-                    <ScanLine className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </OptionalFormCollapsible>
 
-        <FormField
-          control={form.control}
-          name="serialNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Serial Number</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter serial number" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <OptionalFormCollapsible title="Manufacturer & model">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="manufacturer"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Manufacturer</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Enter manufacturer" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="manufacturer"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Manufacturer</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter manufacturer" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <FormField
+            control={form.control}
+            name="modelNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Model number</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Enter model number" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </OptionalFormCollapsible>
 
-        <FormField
-          control={form.control}
-          name="modelNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Model Number</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter model number" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-
-      <OptionalFormCollapsible title="Bulk Cable & Fiber (optional)">
+      <OptionalFormCollapsible title="Bulk cable & fiber">
         <BulkCableFiberSection form={form} />
       </OptionalFormCollapsible>
 
-      <OptionalFormCollapsible title="Service record & photo (optional)">
+      <OptionalFormCollapsible title="Service record & photo">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -241,7 +247,7 @@ export function AdditionalInfoTab({
               <FormItem>
                 <FormLabel>Company asset tag</FormLabel>
                 <FormControl>
-                  <Input {...field} value={field.value || ''} placeholder="External asset number (optional)" />
+                  <Input {...field} value={field.value || ''} placeholder="External asset number" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -252,7 +258,7 @@ export function AdditionalInfoTab({
         </div>
       </OptionalFormCollapsible>
 
-      <OptionalFormCollapsible title="Notes (optional)">
+      <OptionalFormCollapsible title="Notes">
         <div className="space-y-4">
           <FormField
             control={form.control}

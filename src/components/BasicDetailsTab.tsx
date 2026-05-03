@@ -14,6 +14,15 @@ import {
   getRackOptionsForFlatLocationLabel,
   RACK_LOCATIONS_UPDATED_EVENT,
 } from "@/lib/rackLocationsConfig";
+import { findLocationByFlatId } from "@/lib/locationOptions";
+
+function ReqAsterisk() {
+  return (
+    <span className="ml-0.5 text-destructive" title="Required" aria-hidden>
+      *
+    </span>
+  );
+}
 
 interface BasicDetailsTabProps {
   form: UseFormReturn<any>;
@@ -101,10 +110,28 @@ export function BasicDetailsTab({
     return () => window.removeEventListener(RACK_LOCATIONS_UPDATED_EVENT, onUpdate);
   }, []);
 
-  const rackOptions = React.useMemo(
-    () => getRackOptionsForFlatLocationLabel(flatLocationLabel),
-    [flatLocationLabel, rackConfigEpoch]
+  const selectedLocationRow = React.useMemo(
+    () => findLocationByFlatId(locations, watchedLocationId),
+    [locations, watchedLocationId],
   );
+  const presetRackOptions = React.useMemo(
+    () => getRackOptionsForFlatLocationLabel(flatLocationLabel),
+    [flatLocationLabel, rackConfigEpoch],
+  );
+  const useCustomRacks = selectedLocationRow?.rackLocationEnabled === true;
+  const customRackSlots = React.useMemo(() => {
+    if (!useCustomRacks || !Array.isArray(selectedLocationRow?.rackSlots)) {
+      return null as string[] | null;
+    }
+    return selectedLocationRow!.rackSlots!.map((s) => String(s).trim()).filter(Boolean);
+  }, [useCustomRacks, selectedLocationRow]);
+  const rackOptions = React.useMemo(() => {
+    if (useCustomRacks) {
+      return customRackSlots ?? [];
+    }
+    return presetRackOptions;
+  }, [useCustomRacks, customRackSlots, presetRackOptions]);
+  const showRackField = useCustomRacks || presetRackOptions.length > 0;
 
   const locationComboboxOptions = React.useMemo(
     () =>
@@ -120,6 +147,10 @@ export function BasicDetailsTab({
     [rackOptions]
   );
   const flattenedProjectOptions = React.useMemo(() => flattenProjectOptions(projects), [projects]);
+  const projectComboboxOptions = React.useMemo(
+    () => flattenedProjectOptions.map((o) => ({ label: o.name, value: o.id })),
+    [flattenedProjectOptions],
+  );
 
   return (
     <div className="mx-auto w-full max-w-[56rem] space-y-4">
@@ -144,7 +175,10 @@ export function BasicDetailsTab({
         name="name"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>{itemNameOptional ? "Item name (optional)" : "Name*"}</FormLabel>
+            <FormLabel>
+              {itemNameOptional ? "Item name" : "Name"}
+              {!itemNameOptional ? <ReqAsterisk /> : null}
+            </FormLabel>
             <FormControl>
               <Input {...field} placeholder="Enter item name" />
             </FormControl>
@@ -180,7 +214,10 @@ export function BasicDetailsTab({
             name="category"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Category*</FormLabel>
+                <FormLabel>
+                  Category
+                  <ReqAsterisk />
+                </FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   value={field.value}
@@ -209,24 +246,13 @@ export function BasicDetailsTab({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Project</FormLabel>
-                <Select
-                  onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
-                  value={field.value || undefined}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {flattenedProjectOptions.map((projectOption) => (
-                      <SelectItem key={projectOption.id} value={projectOption.id}>
-                        {projectOption.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={[{ label: "None", value: "__none__" }, ...projectComboboxOptions]}
+                  value={field.value ? field.value : "__none__"}
+                  onChange={(value) => field.onChange(value === "__none__" ? "" : value)}
+                  placeholder="Search project (type to filter)…"
+                  emptyText="No project matches."
+                />
                 <FormMessage />
               </FormItem>
             )}
@@ -312,7 +338,10 @@ export function BasicDetailsTab({
             name="location"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Location*</FormLabel>
+                <FormLabel>
+                  Location
+                  <ReqAsterisk />
+                </FormLabel>
                 <Combobox
                   options={locationComboboxOptions}
                   value={field.value}
@@ -360,7 +389,7 @@ export function BasicDetailsTab({
             />
           )}
 
-          {rackOptions.length > 0 && (
+          {showRackField && (
             <FormField
               control={form.control}
               name="rackLocation"

@@ -18,6 +18,7 @@ import { InventoryItem, OrderStatus, CategoryNode, ItemWithSubcategories } from 
 import { Cabinet } from "@/types/cabinets";
 import { Slider } from "@/components/ui/slider";
 import { BasicDetailsTab } from "./BasicDetailsTab";
+import { SupplierWebsiteStatusBlock } from "@/components/SupplierWebsiteStatusBlock";
 import { AdditionalInfoTab } from "@/components/AdditionalInfoTab";
 import { DecommissioningTab } from "@/components/DecommissioningTab";
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
@@ -343,23 +344,7 @@ const InventorySupplyTab = ({ form, units, suppliers }: {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="supplierWebsite"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Supplier Website</FormLabel>
-              <FormControl>
-                <Input 
-                  type="url" 
-                  {...field} 
-                  placeholder="https://supplier.com"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <SupplierWebsiteStatusBlock form={form} suppliers={suppliers} />
       </div>
     </div>
   );
@@ -559,8 +544,9 @@ export function EditItemForm({
               <span className="hidden sm:inline">Additional Info</span>
               <span className="sm:hidden">More</span>
             </TabsTrigger>
-            <TabsTrigger value="decommissioning" className="px-1.5 text-xs sm:px-3 sm:text-sm">
-              <span className="hidden sm:inline">Decommissioning</span>
+            <TabsTrigger value="decommissioning" className="px-1.5 text-xs sm:px-3 sm:text-sm" title="EOL / decommissioning">
+              <span className="sm:hidden">EOL</span>
+              <span className="hidden sm:inline">EOL · Decommissioning</span>
               <span className="sm:hidden">EOL</span>
             </TabsTrigger>
           </TabsList>

@@ -110,6 +110,12 @@ export interface ItemWithSubcategories {
   id: string;
   name: string;
   description?: string;
+  /** Supplier portal URL when this row is used under Suppliers (Settings → Libraries). */
+  website?: string;
   color?: string;
   children?: ItemWithSubcategories[];
+  /** When this row is a location (or sub-location), enables rack cell UI for inventory at that place. */
+  rackLocationEnabled?: boolean;
+  /** Named rack positions for this location row (e.g. TD-05); used when rackLocationEnabled is true. */
+  rackSlots?: string[];
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Cpu } from 'lucide-react'
+import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Library } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -33,12 +33,12 @@ import { Label } from "@/components/ui/label"
 import { getPasswordError } from '@/utils/passwordUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { DataBackupTab } from "@/components/settings/DataBackupTab"
-import { DeviceLibraryTab } from '@/components/settings/DeviceLibraryTab'
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
 import {
   UserDefinedListsSection,
   type UserDefinedPanel,
 } from '@/components/settings/UserDefinedListsSection'
+import { LibrariesSection, type LibrariesPanel } from '@/components/settings/LibrariesSection'
 import { CameraSettingsDialog } from '@/components/CameraSettingsDialog'
 import { SettingsService, type DefaultSettings, defaultSettingsSchema } from '@/lib/settingsService'
 import { FinancialCodeEntry, getFinancialSettings, saveFinancialSettings } from '@/lib/financialSettingsService'
@@ -320,6 +320,7 @@ export default function SettingsPage() {
   const [financialSettings, setFinancialSettings] = useState<{ expenseTypes: FinancialCodeEntry[]; costCenters: FinancialCodeEntry[] }>(() => getFinancialSettings());
   const [settingsTab, setSettingsTab] = useState('general');
   const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>('categories');
+  const [librariesPanel, setLibrariesPanel] = useState<LibrariesPanel>('suppliers');
 
   const listUndoStackRef = useRef<ListUndoSnapshot[]>([]);
   const listRedoStackRef = useRef<ListUndoSnapshot[]>([]);
@@ -1595,6 +1596,10 @@ export default function SettingsPage() {
   };
 
   const handleFixUnreconciledLookup = () => {
+    if (settingsTab === 'libraries' && librariesPanel === 'suppliers') {
+      fixUnreconciledForLookupPanel('suppliers', settings);
+      return;
+    }
     if (!panelSupportsListReconcile(userDefinedPanel)) {
       return;
     }
@@ -1628,7 +1633,8 @@ export default function SettingsPage() {
             <Redo2 className="mr-2 h-4 w-4" />
             Redo
           </Button>
-          {settingsTab === 'userDefined' && panelSupportsListReconcile(userDefinedPanel) && (
+          {((settingsTab === 'userDefined' && panelSupportsListReconcile(userDefinedPanel)) ||
+            (settingsTab === 'libraries' && librariesPanel === 'suppliers')) && (
             <Button
               type="button"
               variant="outline"
@@ -1659,10 +1665,10 @@ export default function SettingsPage() {
             <span data-settings-tab-long>Lookup Lists</span>
             <span data-settings-tab-short>Lookup Lists</span>
           </TabsTrigger>
-          <TabsTrigger value="devices" title="Device library" className="inline-flex items-center gap-1.5">
-            <Cpu className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-            <span data-settings-tab-long>Device Library</span>
-            <span data-settings-tab-short>Devices</span>
+          <TabsTrigger value="libraries" title="Libraries" className="inline-flex items-center gap-1.5">
+            <Library className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span data-settings-tab-long>Libraries</span>
+            <span data-settings-tab-short>Libraries</span>
           </TabsTrigger>
           <TabsTrigger value="users" title="Users" className="inline-flex items-center gap-1.5">
             <Users className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
@@ -1703,8 +1709,14 @@ export default function SettingsPage() {
           />
         </TabsContent>
 
-        <TabsContent value="devices">
-          <DeviceLibraryTab />
+        <TabsContent value="libraries">
+          <LibrariesSection
+            panel={librariesPanel}
+            onPanelChange={setLibrariesPanel}
+            settings={settings}
+            updateSettingsList={updateSettingsList}
+            onRequestDeleteReconcile={requestListDeleteReconcile}
+          />
         </TabsContent>
 
         <TabsContent value="users">

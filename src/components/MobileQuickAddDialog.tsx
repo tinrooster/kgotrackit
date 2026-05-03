@@ -788,26 +788,26 @@ export function MobileQuickAddDialog({
         <DialogContent
           nonModalBackdrop
           className={cn(
-            "flex max-h-[min(96dvh,800px)] min-h-0 w-[min(100vw-1rem,440px)] flex-col gap-0 overflow-x-hidden overflow-y-visible p-0",
+            "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-3xl md:max-w-4xl lg:max-w-5xl",
             "sm:rounded-xl",
             "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
             "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <DialogHeader className="shrink-0 border-b px-3 py-2 text-left">
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+          <DialogHeader className="shrink-0 border-b px-4 py-3 text-left sm:px-6 sm:py-4">
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold sm:text-lg">
               <Zap className="h-5 w-5" aria-hidden />
               Quick add
             </DialogTitle>
           </DialogHeader>
 
           <div
-            className="shrink-0 border-b border-border/50 bg-muted/35 px-3 py-2 backdrop-blur-sm"
+            className="shrink-0 border-b border-border/50 bg-muted/35 px-4 py-2.5 backdrop-blur-sm sm:px-6"
             aria-label="Current selection and quick navigation"
           >
             <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Current</p>
-            <div className="mt-1 grid grid-cols-2 gap-1.5 text-[11px] sm:grid-cols-4">
+            <div className="mt-1 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4 md:gap-2.5">
               <button
                 type="button"
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
@@ -924,8 +924,8 @@ export function MobileQuickAddDialog({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 [-webkit-overflow-scrolling:touch]">
-            <div className="space-y-3 py-2 pr-1 pb-4">
+          <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 [-webkit-overflow-scrolling:touch] sm:px-6">
+            <div className="space-y-3 py-3 pr-0 pb-6 sm:space-y-4 sm:py-4">
               <div
                 ref={sectionNameRef}
                 className="rounded-lg border-2 border-primary/40 bg-primary/[0.07] p-3 shadow-sm ring-1 ring-primary/15"

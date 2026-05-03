@@ -172,9 +172,16 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                   <span className="font-mono text-sm">{item.rackLocation}</span>
                 </div>
               ) : null}
-              {(item.decomEOLDate || item.decomCutoverDate || item.decomLastAuditAt || item.decomNotes) ? (
+              {(item.decomEOLDate ||
+                item.decomCutoverDate ||
+                item.decomLastAuditAt ||
+                item.decomNotes ||
+                item.assetStatus === "ready_decommission" ||
+                item.assetStatus === "slated_removal" ||
+                item.assetStatus === "cut_over_pending" ||
+                item.assetStatus === "ewaste") ? (
                 <div className="rounded-md border border-border/60 bg-muted/15 p-3 text-sm">
-                  <p className="mb-2 font-medium text-foreground">Decommissioning</p>
+                  <p className="mb-2 font-medium text-foreground">EOL (decommissioning)</p>
                   {item.decomEOLDate ? (
                     <p className="text-muted-foreground">
                       <span className="font-medium text-foreground">EOL target:</span> {item.decomEOLDate}
