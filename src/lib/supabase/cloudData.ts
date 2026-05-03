@@ -16,6 +16,7 @@ import {
   saveTemplates,
   STORAGE_KEYS,
   parseItemDates,
+  CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT,
 } from '@/lib/storageService';
 import { getFinancialSettings, saveFinancialSettings } from '@/lib/financialSettingsService';
 
@@ -31,6 +32,8 @@ export interface UserAppDataRow {
   financial: FinancialSettings;
   ui_defaults: DefaultSettings | null;
   general_settings: unknown | null;
+  /** JSON array of saved custom report definitions (optional on legacy DB rows before migration). */
+  custom_report_definitions?: unknown;
   updated_at?: string;
 }
 
@@ -154,6 +157,10 @@ export function snapshotHasMeaningfulRemoteData(row: UserAppDataRow): boolean {
   if (row.general_settings !== null && row.general_settings !== undefined) {
     return true;
   }
+  const customDefs = row.custom_report_definitions;
+  if (Array.isArray(customDefs) && customDefs.length > 0) {
+    return true;
+  }
   return false;
 }
 
@@ -176,6 +183,15 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
   const uiDefaults = SettingsService.loadDefaultSettings();
   const generalSettings = readGeneralSettingsRaw();
 
+  let customReportDefinitions: unknown[] = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_REPORT_DEFINITIONS);
+    const parsed = raw ? JSON.parse(raw) : [];
+    customReportDefinitions = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    customReportDefinitions = [];
+  }
+
   return {
     items,
     settings,
@@ -185,6 +201,7 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
     financial,
     ui_defaults: uiDefaults,
     general_settings: generalSettings,
+    custom_report_definitions: customReportDefinitions,
   };
 }
 
@@ -220,6 +237,16 @@ export async function applySnapshotToLocal(row: UserAppDataRow): Promise<void> {
 
   if (row.general_settings !== undefined) {
     writeGeneralSettingsRaw(row.general_settings);
+  }
+
+  if ('custom_report_definitions' in row && row.custom_report_definitions !== undefined) {
+    const defs = Array.isArray(row.custom_report_definitions) ? row.custom_report_definitions : [];
+    try {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_REPORT_DEFINITIONS, JSON.stringify(defs));
+    } catch {
+      // quota or private mode — still notify listeners with in-memory intent
+    }
+    window.dispatchEvent(new CustomEvent(CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT, { detail: defs }));
   }
 }
 

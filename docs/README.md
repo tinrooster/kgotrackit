@@ -28,7 +28,10 @@ This docs index is the single entry point for setup, operations, architecture, a
 7. [Development Status](development-status.md)  
    Current feature maturity and project status notes.
 
-8. [Changes / changelog](changes.md)  
+8. [Production roadmap](production-roadmap.md)  
+   In-repo production plan: P0–P3 priorities, data-model notes, and todo status.
+
+9. [Changes / changelog](changes.md)  
    Notable feature and documentation updates by period.
 
 ## Supplemental Guides

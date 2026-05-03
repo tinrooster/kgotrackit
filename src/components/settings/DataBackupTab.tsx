@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, Save, RefreshCw, FileJson, Database, GitMerge, Upload } from 'lucide-react';
+import { Download, Save, RefreshCw, FileJson, Database, GitMerge, Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import type { GroupReconcileResult } from '@/lib/groupInventoryReconciliation';
 import { Label } from '@/components/ui/label';
@@ -17,13 +17,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { validateFullBackupJsonText, validateSettingsSnapshotJsonText } from '@/lib/backupValidation';
 
 interface DataBackupTabProps {
   onExportData: () => void;
   onExportExcel: () => void;
   onImportData: (file: File) => Promise<void>;
   onImportExcel: (file: File) => Promise<void>;
-  onBackupData: () => void;
+  onBackupData: () => void | Promise<void>;
   onRestoreData: (file: File) => Promise<void>;
   onExportSettingsSnapshot: () => void;
   onRestoreSettingsSnapshot: (file: File) => Promise<void>;
@@ -81,6 +82,7 @@ export function DataBackupTab({
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('import-export');
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isRestoringSettingsSnapshot, setIsRestoringSettingsSnapshot] = useState(false);
   const [reconcileReport, setReconcileReport] = useState<string | null>(null);
@@ -88,22 +90,38 @@ export function DataBackupTab({
   const [pendingFullRestoreFile, setPendingFullRestoreFile] = useState<File | null>(null);
   const [settingsRestoreDialogOpen, setSettingsRestoreDialogOpen] = useState(false);
   const [pendingSettingsRestoreFile, setPendingSettingsRestoreFile] = useState<File | null>(null);
+  const [jsonImportConfirmOpen, setJsonImportConfirmOpen] = useState(false);
+  const [pendingJsonImportFile, setPendingJsonImportFile] = useState<File | null>(null);
+  const [excelImportConfirmOpen, setExcelImportConfirmOpen] = useState(false);
+  const [pendingExcelImportFile, setPendingExcelImportFile] = useState<File | null>(null);
+  const [fullRestoreSummary, setFullRestoreSummary] = useState<{ lines: string[]; warnings: string[] } | null>(null);
+  const [settingsRestoreSummary, setSettingsRestoreSummary] = useState<{ lines: string[]; warnings: string[] } | null>(
+    null
+  );
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isValidatingFullRestore, setIsValidatingFullRestore] = useState(false);
+  const [isValidatingSettingsRestore, setIsValidatingSettingsRestore] = useState(false);
   const jsonImportRef = React.useRef<HTMLInputElement>(null);
   const excelImportRef = React.useRef<HTMLInputElement>(null);
   const restoreRef = React.useRef<HTMLInputElement>(null);
   const settingsSnapshotRestoreRef = React.useRef<HTMLInputElement>(null);
 
-  const handleJsonFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (jsonImportRef.current) {
+      jsonImportRef.current.value = '';
+    }
     if (!file) return;
+    setPendingJsonImportFile(file);
+    setJsonImportConfirmOpen(true);
+  };
 
+  const executeJsonImport = async () => {
+    const file = pendingJsonImportFile;
+    if (!file) return;
     try {
       setIsImporting(true);
       await onImportData(file);
-      toast({
-        title: 'Import successful',
-        description: 'Your data has been imported successfully.',
-      });
     } catch (error) {
       toast({
         title: 'Import failed',
@@ -112,17 +130,26 @@ export function DataBackupTab({
       });
     } finally {
       setIsImporting(false);
-      if (jsonImportRef.current) {
-        jsonImportRef.current.value = '';
-      }
+      setPendingJsonImportFile(null);
+      setJsonImportConfirmOpen(false);
     }
   };
 
-  const handleExcelFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (excelImportRef.current) {
+      excelImportRef.current.value = '';
+    }
     if (!file) return;
+    setPendingExcelImportFile(file);
+    setExcelImportConfirmOpen(true);
+  };
 
+  const executeExcelImport = async () => {
+    const file = pendingExcelImportFile;
+    if (!file) return;
     try {
+      setIsImportingExcel(true);
       await onImportExcel(file);
     } catch (error) {
       toast({
@@ -131,31 +158,56 @@ export function DataBackupTab({
         variant: 'destructive',
       });
     } finally {
-      if (excelImportRef.current) {
-        excelImportRef.current.value = '';
-      }
+      setIsImportingExcel(false);
+      setPendingExcelImportFile(null);
+      setExcelImportConfirmOpen(false);
     }
   };
 
-  const handleRestoreFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRestoreFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (restoreRef.current) {
       restoreRef.current.value = '';
     }
     if (!file) return;
-    setPendingFullRestoreFile(file);
-    setFullRestoreDialogOpen(true);
+    setIsValidatingFullRestore(true);
+    try {
+      const text = await file.text();
+      const v = validateFullBackupJsonText(text);
+      if (!v.ok) {
+        toast({
+          title: 'Invalid backup file',
+          description: v.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+      setPendingFullRestoreFile(file);
+      setFullRestoreSummary({ lines: v.summaryLines, warnings: v.warnings });
+      setFullRestoreDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: 'Could not read file',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsValidatingFullRestore(false);
+    }
   };
 
   const executeFullRestore = async () => {
     const file = pendingFullRestoreFile;
+    const summary = fullRestoreSummary;
     if (!file) return;
     try {
       setIsRestoring(true);
       await onRestoreData(file);
       toast({
         title: 'Restore successful',
-        description: 'Your backup has been restored successfully.',
+        description: summary
+          ? summary.lines.slice(0, 4).join(' · ')
+          : 'Your backup has been applied to local storage.',
       });
     } catch (error) {
       toast({
@@ -166,29 +218,55 @@ export function DataBackupTab({
     } finally {
       setIsRestoring(false);
       setPendingFullRestoreFile(null);
+      setFullRestoreSummary(null);
       setFullRestoreDialogOpen(false);
     }
   };
 
-  const handleSettingsSnapshotFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSettingsSnapshotFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (settingsSnapshotRestoreRef.current) {
       settingsSnapshotRestoreRef.current.value = '';
     }
     if (!file) return;
-    setPendingSettingsRestoreFile(file);
-    setSettingsRestoreDialogOpen(true);
+    setIsValidatingSettingsRestore(true);
+    try {
+      const text = await file.text();
+      const v = validateSettingsSnapshotJsonText(text);
+      if (!v.ok) {
+        toast({
+          title: 'Invalid settings snapshot',
+          description: v.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+      setPendingSettingsRestoreFile(file);
+      setSettingsRestoreSummary({ lines: v.summaryLines, warnings: v.warnings });
+      setSettingsRestoreDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: 'Could not read file',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsValidatingSettingsRestore(false);
+    }
   };
 
   const executeSettingsSnapshotRestore = async () => {
     const file = pendingSettingsRestoreFile;
+    const summary = settingsRestoreSummary;
     if (!file) return;
     try {
       setIsRestoringSettingsSnapshot(true);
       await onRestoreSettingsSnapshot(file);
       toast({
         title: 'Settings snapshot restored',
-        description: 'Lists, financial codes, cabinets, and general preferences were replaced from the file.',
+        description: summary
+          ? summary.lines.slice(0, 3).join(' · ')
+          : 'Lists, financial codes, cabinets, and general preferences were replaced from the file.',
       });
     } catch (error) {
       toast({
@@ -199,7 +277,23 @@ export function DataBackupTab({
     } finally {
       setIsRestoringSettingsSnapshot(false);
       setPendingSettingsRestoreFile(null);
+      setSettingsRestoreSummary(null);
       setSettingsRestoreDialogOpen(false);
+    }
+  };
+
+  const handleCreateBackupClick = async () => {
+    try {
+      setIsBackingUp(true);
+      await Promise.resolve(onBackupData());
+    } catch (error) {
+      toast({
+        title: 'Backup failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBackingUp(false);
     }
   };
 
@@ -341,12 +435,20 @@ export function DataBackupTab({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={onBackupData}
+                    onClick={() => void handleCreateBackupClick()}
+                    disabled={isBackingUp}
                     className="mt-auto inline-flex w-fit items-center justify-center gap-2 active:bg-accent"
                   >
-                    <Save className="h-4 w-4 shrink-0" />
-                    Create Backup
+                    {isBackingUp ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                    ) : (
+                      <Save className="h-4 w-4 shrink-0" aria-hidden />
+                    )}
+                    {isBackingUp ? 'Preparing backup…' : 'Create Backup'}
                   </Button>
+                  {isBackingUp ? (
+                    <p className="text-xs text-muted-foreground">Gathering inventory, lists, and related data for download…</p>
+                  ) : null}
                   <div className="mt-3 flex flex-col gap-2 rounded-md border border-border/60 bg-muted/20 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <Label htmlFor="daily-offline-backup" className="text-sm font-medium leading-snug">
@@ -384,11 +486,15 @@ export function DataBackupTab({
                     variant="outline"
                     size="sm"
                     onClick={() => restoreRef.current?.click()}
-                    disabled={isRestoring}
+                    disabled={isRestoring || isValidatingFullRestore}
                     className="mt-auto inline-flex w-fit items-center justify-center gap-2 active:bg-accent"
                   >
-                    <Upload className="h-4 w-4 shrink-0" />
-                    Restore from Backup
+                    {isValidatingFullRestore ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                    ) : (
+                      <Upload className="h-4 w-4 shrink-0" aria-hidden />
+                    )}
+                    {isValidatingFullRestore ? 'Reading file…' : 'Restore from Backup'}
                   </Button>
                   <input
                     type="file"
@@ -426,11 +532,15 @@ export function DataBackupTab({
                     variant="outline"
                     size="sm"
                     className="active:bg-accent"
-                    disabled={isRestoringSettingsSnapshot}
+                    disabled={isRestoringSettingsSnapshot || isValidatingSettingsRestore}
                     onClick={() => settingsSnapshotRestoreRef.current?.click()}
                   >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Restore settings snapshot
+                    {isValidatingSettingsRestore ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Upload className="mr-2 h-4 w-4" aria-hidden />
+                    )}
+                    {isValidatingSettingsRestore ? 'Reading file…' : 'Restore settings snapshot'}
                   </Button>
                   <input
                     type="file"
@@ -505,7 +615,10 @@ export function DataBackupTab({
         onOpenChange={(open) => {
           if (!open && isRestoring) return;
           setFullRestoreDialogOpen(open);
-          if (!open) setPendingFullRestoreFile(null);
+          if (!open) {
+            setPendingFullRestoreFile(null);
+            setFullRestoreSummary(null);
+          }
         }}
       >
         <AlertDialogContent>
@@ -513,11 +626,32 @@ export function DataBackupTab({
             <AlertDialogTitle>Replace all local data?</AlertDialogTitle>
             <AlertDialogDescription>
               Restoring from{' '}
-              <span className="font-mono text-foreground">{pendingFullRestoreFile?.name ?? 'this file'}</span>{' '}
-              overwrites inventory, settings, lists, templates, and other data stored in this browser profile with the
-              backup contents. This cannot be undone from the app.
+              <span className="font-mono text-foreground">{pendingFullRestoreFile?.name ?? 'this file'}</span> overwrites
+              inventory, settings, lists, templates, and related data in this browser profile with the backup contents.
+              This cannot be undone from the app.
             </AlertDialogDescription>
+            {fullRestoreSummary ? (
+              <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-foreground">
+                <p className="mb-1.5 font-medium text-foreground">File contents (read-only check)</p>
+                <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+                  {fullRestoreSummary.lines.map((line, i) => (
+                    <li key={i} className="text-foreground">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+                {fullRestoreSummary.warnings.length > 0 ? (
+                  <p className="mt-2 text-amber-800 dark:text-amber-200/90">{fullRestoreSummary.warnings.join(' ')}</p>
+                ) : null}
+              </div>
+            ) : null}
           </AlertDialogHeader>
+          {isRestoring ? (
+            <div className="flex items-center gap-2 px-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+              <span>Applying backup to local storage…</span>
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
             <Button type="button" disabled={isRestoring} onClick={() => void executeFullRestore()}>
@@ -532,7 +666,10 @@ export function DataBackupTab({
         onOpenChange={(open) => {
           if (!open && isRestoringSettingsSnapshot) return;
           setSettingsRestoreDialogOpen(open);
-          if (!open) setPendingSettingsRestoreFile(null);
+          if (!open) {
+            setPendingSettingsRestoreFile(null);
+            setSettingsRestoreSummary(null);
+          }
         }}
       >
         <AlertDialogContent>
@@ -541,10 +678,33 @@ export function DataBackupTab({
             <AlertDialogDescription>
               Restoring{' '}
               <span className="font-mono text-foreground">{pendingSettingsRestoreFile?.name ?? 'this file'}</span>{' '}
-              replaces lookup lists, financial codes, cabinets, and general preferences. Inventory rows are not
-              changed by this action.
+              replaces lookup lists, financial codes, cabinets, and general preferences. Inventory rows are not changed
+              by this action.
             </AlertDialogDescription>
+            {settingsRestoreSummary ? (
+              <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-foreground">
+                <p className="mb-1.5 font-medium text-foreground">Snapshot summary</p>
+                <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+                  {settingsRestoreSummary.lines.map((line, i) => (
+                    <li key={i} className="text-foreground">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+                {settingsRestoreSummary.warnings.length > 0 ? (
+                  <p className="mt-2 text-amber-800 dark:text-amber-200/90">
+                    {settingsRestoreSummary.warnings.join(' ')}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </AlertDialogHeader>
+          {isRestoringSettingsSnapshot ? (
+            <div className="flex items-center gap-2 px-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+              <span>Applying settings snapshot…</span>
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
             <Button
@@ -553,6 +713,60 @@ export function DataBackupTab({
               onClick={() => void executeSettingsSnapshotRestore()}
             >
               {isRestoringSettingsSnapshot ? 'Restoring…' : 'Restore settings'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={jsonImportConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open && isImporting) return;
+          setJsonImportConfirmOpen(open);
+          if (!open) setPendingJsonImportFile(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import JSON data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              File{' '}
+              <span className="font-mono text-foreground">{pendingJsonImportFile?.name ?? 'selected'}</span> will be
+              merged with your current inventory and lists. Overlapping rows may open a resolution step
+              (replace, merge, or skip). Create a backup first if you might need to undo this.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button type="button" disabled={isImporting} onClick={() => void executeJsonImport()}>
+              {isImporting ? 'Importing…' : 'Import JSON'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={excelImportConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open && isImportingExcel) return;
+          setExcelImportConfirmOpen(open);
+          if (!open) setPendingExcelImportFile(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import Excel workbook?</AlertDialogTitle>
+            <AlertDialogDescription>
+              File{' '}
+              <span className="font-mono text-foreground">{pendingExcelImportFile?.name ?? 'selected'}</span> will be
+              merged in the same way as a JSON import. Conflicts may require your choice before data is written. Export a
+              backup if you are unsure.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button type="button" disabled={isImportingExcel} onClick={() => void executeExcelImport()}>
+              {isImportingExcel ? 'Importing…' : 'Import Excel'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

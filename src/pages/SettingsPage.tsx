@@ -8,10 +8,14 @@ import {
   saveItems,
   getSettings,
   saveSettings,
+  saveTemplates,
+  parseItemDates,
   STORAGE_KEYS,
   SETTINGS_UPDATED_EVENT,
   type Settings,
 } from '@/lib/storageService'
+import { buildFullOfflineBackupPayload } from '@/lib/trackItDailyBackup'
+import { validateFullBackupJsonText } from '@/lib/backupValidation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -20,6 +24,7 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
 import { InventoryItem, CategoryNode, ItemWithSubcategories } from '@/types/inventory'
+import type { ItemTemplate } from '@/types/templates'
 import type { Cabinet } from '@/types/cabinets'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -1402,22 +1407,9 @@ export default function SettingsPage() {
     }
   };
 
-  const handleBackupData = () => {
+  const handleBackupData = async (): Promise<void> => {
     try {
-      const backupData = {
-        version: "1.0",
-        timestamp: new Date().toISOString(),
-        data: {
-          locations: settings.locations,
-          categories: settings.categories,
-          units: settings.units,
-          suppliers: settings.suppliers,
-          projects: settings.projects,
-          // Add other data you want to backup
-          settings: {} // Add your settings here
-        }
-      };
-      
+      const backupData = await buildFullOfflineBackupPayload();
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1427,44 +1419,71 @@ export default function SettingsPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("Backup created successfully");
+      const items = getItems();
+      toast.success('Backup created successfully', {
+        description: `Format v${backupData.version} · ${items.length} inventory rows · lists, financials, templates, cabinets included.`,
+      });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "An unknown error occurred");
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
     }
   };
 
   const handleRestoreData = async (file: File): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const backupData = JSON.parse(e.target?.result as string);
-          
-          // Validate backup structure
-          if (!backupData || !backupData.version || !backupData.data) {
-            throw new Error('Invalid backup format');
-          }
-          
-          // Replace all data with backup data
-          const { data } = backupData;
-          
-          setSettings({
-            locations: data.locations || [],
-            categories: data.categories || [],
-            units: data.units || [],
-            suppliers: data.suppliers || [],
-            projects: data.projects || [],
-          });
-          
-          toast.success("Backup restored successfully");
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsText(file);
-    });
+    const text = await file.text();
+    const checked = validateFullBackupJsonText(text);
+    if (!checked.ok) {
+      throw new Error(checked.error);
+    }
+
+    const backupData = JSON.parse(text) as { version: string; data: Record<string, unknown> };
+    const { data } = backupData;
+
+    const nextLists: Settings = {
+      categories: Array.isArray(data.categories) ? (data.categories as Settings['categories']) : [],
+      units: Array.isArray(data.units) ? (data.units as Settings['units']) : [],
+      locations: Array.isArray(data.locations) ? (data.locations as Settings['locations']) : [],
+      suppliers: Array.isArray(data.suppliers) ? (data.suppliers as Settings['suppliers']) : [],
+      projects: Array.isArray(data.projects) ? (data.projects as Settings['projects']) : [],
+      expenseCodes: Array.isArray(data.expenseCodes) ? (data.expenseCodes as Settings['expenseCodes']) : [],
+    };
+
+    setSettings(nextLists as SettingsState);
+    saveSettings(nextLists);
+
+    if (Array.isArray(data.items)) {
+      saveItems((data.items as InventoryItem[]).map(parseItemDates));
+    } else {
+      saveItems([]);
+    }
+
+    if (data.financial && typeof data.financial === 'object') {
+      const f = data.financial as { expenseTypes?: unknown; costCenters?: unknown };
+      saveFinancialSettings({
+        expenseTypes: Array.isArray(f.expenseTypes) ? (f.expenseTypes as FinancialCodeEntry[]) : [],
+        costCenters: Array.isArray(f.costCenters) ? (f.costCenters as FinancialCodeEntry[]) : [],
+      });
+      setFinancialSettings(getFinancialSettings());
+    }
+
+    if (data.defaultSettings && typeof data.defaultSettings === 'object') {
+      const merged = defaultSettingsSchema.parse({
+        ...SettingsService.loadDefaultSettings(),
+        ...(data.defaultSettings as object),
+      });
+      SettingsService.saveDefaultSettings(merged);
+      setDefaultSettings(merged);
+      applyUiPreferences(merged);
+    }
+
+    if (Array.isArray(data.cabinets)) {
+      await SettingsService.replaceAllCabinets(data.cabinets as Cabinet[]);
+    }
+
+    if (Array.isArray(data.templates)) {
+      saveTemplates(data.templates as ItemTemplate[]);
+    }
+
+    window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT, { detail: getSettings() }));
   };
 
   // Add Excel export function to handle Excel export

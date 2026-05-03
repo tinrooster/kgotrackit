@@ -6,9 +6,9 @@ All notable changes to this project are documented here. The format is loosely i
 
 ### Added
 
-- **Supabase profile sync: custom reports and system logs** — `public.user_app_data` gains `custom_report_definitions` and `system_logs` (JSON arrays, capped in app). `src/lib/supabase/cloudData.ts` includes them in snapshot upserts and applies them on pull (localStorage + Electron store for logs; `trackit:custom-reports-updated` / `trackit:logs-updated` events). Migration: `supabase/migrations/20260505120000_user_app_data_reports_system_logs.sql`.
-- **Debounced cloud push for system logs** — `src/lib/logging.ts` schedules a 10s debounced sync after durable audit and in-memory log persistence so logging does not spam the network.
-- **Reports page cloud UX** — `CUSTOM_REPORTS_STORAGE_KEY` from `cloudData`, `requestCloudSync` after custom report changes, listener for `trackit:custom-reports-updated`, persisted “define custom report” section open state, and **Define / save custom…** in the report runner toolbar (`ReportsPage.tsx`).
+- **Production roadmap in repo** — [`docs/production-roadmap.md`](production-roadmap.md): versioned copy of the Cursor production plan (YAML todos + narrative); indexed from [`docs/README.md`](README.md).
+- **Supabase: `custom_report_definitions` column** — `public.user_app_data.custom_report_definitions` (JSONB array, default `[]`). `collectLocalSnapshot` / `applySnapshotToLocal` in [`src/lib/supabase/cloudData.ts`](../src/lib/supabase/cloudData.ts) sync with localStorage key `inventory-custom-report-definitions`; [`src/lib/storageService.ts`](../src/lib/storageService.ts) defines `STORAGE_KEYS.CUSTOM_REPORT_DEFINITIONS` and `CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT`. Migration: [`supabase/migrations/20260505120000_user_app_data_custom_report_definitions.sql`](../supabase/migrations/20260505120000_user_app_data_custom_report_definitions.sql).
+- **Reports page: discoverable custom save + cloud push** — **Define / save custom…** in the Report Runner row (scrolls to the define card); `requestCloudSync` when custom definitions change; cross-tab / post-pull refresh via `CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT` (`ReportsPage.tsx`).
 - **Supabase CLI project root** — `supabase/config.toml` (for `npx supabase link` / `db push`); `.gitignore` includes `supabase/.temp/` so link state stays local.
 - **Inventory: Quick add dialog** — Fast mobile-oriented flow (toolbar lightning / Quick add) with:
   - Sticky **Current** strip (location, category, unit, project) and **Go to** jumps (Name, Shortcuts, Details, Unit, Project).

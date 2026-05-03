@@ -26,9 +26,13 @@ export const STORAGE_KEYS = {
   TEMPLATES: 'inventory-templates',
   GENERAL_SETTINGS: 'inventory-general-settings',
   USERS: 'users',
+  CUSTOM_REPORT_DEFINITIONS: 'inventory-custom-report-definitions',
 };
 
 export const SETTINGS_UPDATED_EVENT = 'trackit:settings-updated';
+
+/** Fired after `custom_report_definitions` are written from cloud pull or local edits (cross-tab / Reports UI). */
+export const CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT = 'trackit:custom-reports-updated';
 
 // Helper function to parse dates in items
 export function parseItemDates(item: any): InventoryItem {

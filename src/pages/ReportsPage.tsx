@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,13 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { InventoryItem } from '@/types/inventory';
-import { getSettings, SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
+import {
+  getSettings,
+  SETTINGS_UPDATED_EVENT,
+  STORAGE_KEYS,
+  CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT,
+} from '@/lib/storageService';
+import { requestCloudSync } from '@/lib/cloudSyncEvents';
 import * as XLSX from 'xlsx';
 import { logger } from '@/lib/logging';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,7 +35,6 @@ interface ReportDefinition {
   kind: 'built-in' | 'custom';
 }
 
-const CUSTOM_REPORTS_KEY = 'inventory-custom-report-definitions';
 const USER_REPORT_COLUMN_OPTIONS = [
   'recordId',
   'assetId',
@@ -95,6 +100,7 @@ export default function ReportsPage() {
   const [customName, setCustomName] = useState('Custom Production Report');
   const [customColumns, setCustomColumns] = useState<string[]>(['recordId', 'assetId', 'name', 'project', 'location', 'expenseTypeCode', 'costCenterCode', 'quantity']);
   const [defineCustomReportOpen, setDefineCustomReportOpen] = useState(false);
+  const defineCustomReportCardRef = useRef<HTMLDivElement>(null);
 
   const allReports = useMemo(() => [...BUILT_IN_REPORTS, ...customReports], [customReports]);
   const selectedReport = useMemo(
@@ -103,20 +109,44 @@ export default function ReportsPage() {
   );
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CUSTOM_REPORTS_KEY);
-      const parsed = raw ? (JSON.parse(raw) as ReportDefinition[]) : [];
-      setCustomReports(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setCustomReports([]);
-    } finally {
-      setCustomReportsHydrated(true);
-    }
+    const loadCustomReportsFromStorage = () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_REPORT_DEFINITIONS);
+        const parsed = raw ? (JSON.parse(raw) as ReportDefinition[]) : [];
+        setCustomReports(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setCustomReports([]);
+      }
+    };
+
+    loadCustomReportsFromStorage();
+    setCustomReportsHydrated(true);
+
+    const onCustomDefinitionsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<ReportDefinition[]>).detail;
+      if (Array.isArray(detail)) {
+        setCustomReports(detail);
+      } else {
+        loadCustomReportsFromStorage();
+      }
+    };
+
+    window.addEventListener(CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT, onCustomDefinitionsUpdated);
+    window.addEventListener('focus', loadCustomReportsFromStorage);
+    return () => {
+      window.removeEventListener(CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT, onCustomDefinitionsUpdated);
+      window.removeEventListener('focus', loadCustomReportsFromStorage);
+    };
   }, []);
 
   useEffect(() => {
     if (!customReportsHydrated) return;
-    localStorage.setItem(CUSTOM_REPORTS_KEY, JSON.stringify(customReports));
+    try {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_REPORT_DEFINITIONS, JSON.stringify(customReports));
+    } catch {
+      // quota / private mode
+    }
+    requestCloudSync();
   }, [customReports, customReportsHydrated]);
 
   useEffect(() => {
@@ -457,7 +487,7 @@ export default function ReportsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={runSelectedReport}>
                 <Download className="mr-2 h-4 w-4" />
                 Export CSV
@@ -465,6 +495,20 @@ export default function ReportsPage() {
               <Button size="sm" variant="outline" onClick={exportSelectedReportExcel}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Export Excel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setDefineCustomReportOpen(true);
+                  requestAnimationFrame(() => {
+                    defineCustomReportCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  });
+                }}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Define / save custom…
               </Button>
               {selectedReport.kind === 'custom' && (
                 <Button size="sm" variant="outline" onClick={deleteSelectedCustomReport}>
@@ -501,7 +545,7 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card ref={defineCustomReportCardRef}>
         <CardHeader
           className="cursor-pointer select-none rounded-t-lg hover:bg-muted/40"
           role="button"
@@ -518,7 +562,10 @@ export default function ReportsPage() {
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1.5">
               <CardTitle>Define Custom Report</CardTitle>
-              <CardDescription>Create and save reusable custom reports.</CardDescription>
+              <CardDescription>
+                Name, pick columns, then save — or use <strong className="text-foreground">Define / save custom…</strong>{' '}
+                in Report Runner above. Saved reports sync to the cloud when you are signed in.
+              </CardDescription>
             </div>
             <ChevronDown
               className={cn(
