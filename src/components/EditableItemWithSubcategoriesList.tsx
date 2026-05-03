@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Warehouse,
 } from 'lucide-react';
 import {
   DndContext,
@@ -39,6 +40,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ItemWithSubcategories } from '@/types/inventory';
+import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+import { getRackOptionsForFlatLocationLabel, getRackOptionsForSubLocationKey } from '@/lib/rackLocationsConfig';
 
 function singularFormForListTitle(title: string): string {
   const lower = title.trim().toLowerCase();
@@ -61,18 +65,12 @@ function singularFormForListTitle(title: string): string {
   return lower;
 }
 
-function RackSlotsBlock({
-  rackLocationEnabled,
+function RackSlotsEditor({
   rackSlots,
-  onEnabledChange,
   onSlotsChange,
-  className = '',
 }: {
-  rackLocationEnabled?: boolean;
   rackSlots?: string[];
-  onEnabledChange: (value: boolean) => void;
   onSlotsChange: (slots: string[]) => void;
-  className?: string;
 }) {
   const slots = rackSlots ?? [];
   const addSlot = () => onSlotsChange([...slots, '']);
@@ -92,70 +90,132 @@ function RackSlotsBlock({
   };
 
   return (
-    <div className={`space-y-2 rounded-md border border-border/40 bg-muted/10 p-2 ${className}`}>
-      <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
-        <input
-          type="checkbox"
-          className="rounded border-border"
-          checked={rackLocationEnabled === true}
-          onChange={(e) => onEnabledChange(e.target.checked)}
-        />
-        This location has rack positions
-      </label>
-      {rackLocationEnabled && (
-        <div className="space-y-1">
-          <p className="text-[11px] text-muted-foreground">
-            Name each rack cell (used when picking rack in inventory). Reorder with arrows.
-          </p>
-          {slots.map((slot, i) => (
-            <div key={`rack-slot-${i}`} className="flex flex-wrap items-center gap-1">
-              <Input
-                className="h-8 min-w-0 flex-1 text-xs"
-                value={slot}
-                onChange={(e) => updateSlot(i, e.target.value)}
-                placeholder="e.g. TD-05"
-                aria-label={`Rack position ${i + 1}`}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                disabled={i === 0}
-                title="Move up"
-                onClick={() => move(i, i - 1)}
-              >
-                <ChevronUp className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                disabled={i === slots.length - 1}
-                title="Move down"
-                onClick={() => move(i, i + 1)}
-              >
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                title="Remove position"
-                onClick={() => removeSlot(i)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-          <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={addSlot}>
-            Add position
+    <div className="space-y-1 rounded-md border border-border/40 bg-muted/10 p-2">
+      <p className="text-[11px] text-muted-foreground">
+        Name each rack cell (inventory rack picker). Reorder with arrows.
+      </p>
+      {slots.map((slot, i) => (
+        <div key={`rack-slot-${i}`} className="flex flex-wrap items-center gap-1">
+          <Input
+            className="h-8 min-w-0 flex-1 text-xs"
+            value={slot}
+            onChange={(e) => updateSlot(i, e.target.value)}
+            placeholder="e.g. TD-05"
+            aria-label={`Rack position ${i + 1}`}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            disabled={i === 0}
+            title="Move up"
+            onClick={() => move(i, i - 1)}
+          >
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            disabled={i === slots.length - 1}
+            title="Move down"
+            onClick={() => move(i, i + 1)}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+            title="Remove position"
+            onClick={() => removeSlot(i)}
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-      )}
+      ))}
+      <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={addSlot}>
+        Add position
+      </Button>
     </div>
+  );
+}
+
+function RackConfigPopover({
+  rackLocationEnabled,
+  rackSlots,
+  onEnabledChange,
+  onSlotsChange,
+  presetOptions,
+  locationLabel,
+}: {
+  rackLocationEnabled?: boolean;
+  rackSlots?: string[];
+  onEnabledChange: (value: boolean) => void;
+  onSlotsChange: (slots: string[]) => void;
+  presetOptions: string[];
+  locationLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasPresets = presetOptions.length > 0;
+  const enabled = rackLocationEnabled === true;
+  const iconClass = enabled
+    ? 'text-primary'
+    : hasPresets
+      ? 'text-muted-foreground'
+      : 'text-muted-foreground/55';
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 shrink-0 px-0 text-muted-foreground hover:text-foreground"
+          title={enabled ? 'Rack positions: custom list' : 'Rack positions'}
+          aria-label={`Rack positions for ${locationLabel}`}
+        >
+          <Warehouse className={cn('h-4 w-4', iconClass)} aria-hidden />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(100vw-2rem,22rem)] p-3" align="end">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium leading-none">Rack positions</span>
+            <Switch
+              checked={enabled}
+              onCheckedChange={(v) => onEnabledChange(Boolean(v))}
+              aria-label="Use custom named rack positions for this row"
+            />
+          </div>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            When on, inventory uses only the list you define below. When off, catalog presets apply for this room name
+            (if any), and rack IDs stay editable on each inventory item.
+          </p>
+          {!enabled && hasPresets ? (
+            <div className="rounded-md border border-border/50 bg-muted/20 p-2">
+              <p className="mb-1 text-[11px] font-medium text-foreground">
+                Catalog presets ({presetOptions.length})
+              </p>
+              <p className="max-h-28 overflow-y-auto font-mono text-[10px] leading-snug text-muted-foreground">
+                {presetOptions.slice(0, 48).join(', ')}
+                {presetOptions.length > 48 ? ` … +${presetOptions.length - 48} more` : ''}
+              </p>
+            </div>
+          ) : null}
+          {!enabled && !hasPresets ? (
+            <p className="text-[11px] text-muted-foreground">
+              No catalog presets match this name. Turn on to add your own rack IDs.
+            </p>
+          ) : null}
+          {enabled ? <RackSlotsEditor rackSlots={rackSlots} onSlotsChange={onSlotsChange} /> : null}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -237,6 +297,12 @@ function SortableItem({
     }
   };
 
+  const parentLeafPresetRacks = React.useMemo(
+    () =>
+      item.children && item.children.length > 0 ? [] : getRackOptionsForFlatLocationLabel(item.name),
+    [item.children, item.name],
+  );
+
   const handleAddSubcategory = () => {
     if (newSubcategory.trim()) {
       onAddSubcategory(item.id, newSubcategory.trim());
@@ -308,6 +374,16 @@ function SortableItem({
           <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
             <Pencil className="h-4 w-4" />
           </Button>
+          {locationRackExtension && onPatchItem && !(item.children && item.children.length > 0) ? (
+            <RackConfigPopover
+              rackLocationEnabled={item.rackLocationEnabled}
+              rackSlots={item.rackSlots}
+              onEnabledChange={(v) => onPatchItem(item.id, { rackLocationEnabled: v })}
+              onSlotsChange={(sl) => onPatchItem(item.id, { rackSlots: sl })}
+              presetOptions={parentLeafPresetRacks}
+              locationLabel={item.name}
+            />
+          ) : null}
           <Button
             variant="ghost"
             size="sm"
@@ -383,22 +459,11 @@ function SortableItem({
         </div>
       )}
 
-      {locationRackExtension &&
-        onPatchItem &&
-        (!(item.children && item.children.length > 0)) && (
-          <RackSlotsBlock
-            className="ml-9 sm:ml-10"
-            rackLocationEnabled={item.rackLocationEnabled}
-            rackSlots={item.rackSlots}
-            onEnabledChange={(v) => onPatchItem(item.id, { rackLocationEnabled: v })}
-            onSlotsChange={(sl) => onPatchItem(item.id, { rackSlots: sl })}
-          />
-        )}
-
       {enableSubcategories && subsExpanded && (item.children?.length ?? 0) > 0 && (
         <div className="ml-1 space-y-1 border-l-2 border-primary/30 pl-3 sm:ml-2 sm:pl-4">
           {item.children?.map((child) => {
             const childKey = child.id ?? child.name;
+            const childPresetRacks = getRackOptionsForSubLocationKey(child.name);
             return (
               <div key={childKey} className="space-y-1">
             <div
@@ -442,6 +507,16 @@ function SortableItem({
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
+                    {locationRackExtension && onPatchChild ? (
+                      <RackConfigPopover
+                        rackLocationEnabled={child.rackLocationEnabled}
+                        rackSlots={child.rackSlots}
+                        onEnabledChange={(v) => onPatchChild(item.id, childKey, { rackLocationEnabled: v })}
+                        onSlotsChange={(sl) => onPatchChild(item.id, childKey, { rackSlots: sl })}
+                        presetOptions={childPresetRacks}
+                        locationLabel={`${item.name} / ${child.name}`}
+                      />
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -454,15 +529,6 @@ function SortableItem({
                 </>
               )}
             </div>
-            {locationRackExtension && onPatchChild && (
-              <RackSlotsBlock
-                className="ml-1 sm:ml-2"
-                rackLocationEnabled={child.rackLocationEnabled}
-                rackSlots={child.rackSlots}
-                onEnabledChange={(v) => onPatchChild(item.id, childKey, { rackLocationEnabled: v })}
-                onSlotsChange={(sl) => onPatchChild(item.id, childKey, { rackSlots: sl })}
-              />
-            )}
               </div>
             );
           })}

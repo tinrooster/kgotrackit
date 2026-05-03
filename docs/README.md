@@ -36,6 +36,9 @@ This docs index is the single entry point for setup, operations, architecture, a
 
 ## Supplemental Guides
 
+- [P3: Workspaces, RBAC, auth](p3-workspaces-auth.md)  
+  Team `workspace_app_data`, SQL invite snippet, magic link, MFA notes.
+
 - [Help Menu Reference](help-menu.md)  
   In-app Help content map and where users should go for each workflow.
 

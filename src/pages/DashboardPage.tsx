@@ -7,12 +7,6 @@ import { InventoryItem } from '@/types/inventory';
 import { Plus, Filter } from 'lucide-react';
 import { SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -129,9 +123,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Button onClick={() => navigate('/inventory')}>
+        <Button onClick={() => navigate('/inventory')} className="w-full shrink-0 sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Manage Inventory
         </Button>
@@ -166,8 +160,8 @@ export default function DashboardPage() {
                   <CardDescription>Distribution of inventory items across projects</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-12">
-                    <div className="w-[300px] h-[300px] relative">
+                  <div className="flex flex-col items-center gap-8 lg:flex-row lg:items-start lg:gap-12">
+                    <div className="relative h-[min(300px,70vw)] w-[min(300px,70vw)] shrink-0">
                       <div className="absolute inset-0 flex items-center justify-center">
                         <svg viewBox="0 0 100 100" className="w-full h-full">
                           {activeStats.map((stat, index) => {
@@ -238,9 +232,9 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="flex-1">
-                      <div className="flex gap-16">
-                        <div className="flex-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col gap-6 xl:flex-row xl:gap-16">
+                        <div className="min-w-0 flex-1">
                           {activeStats.slice(0, Math.ceil(activeStats.length / 2)).map((stat, index) => (
                             <div
                               key={stat.name}
@@ -271,7 +265,7 @@ export default function DashboardPage() {
                             </div>
                           ))}
                         </div>
-                        <div className="flex-1">
+                        <div className="min-w-0 flex-1">
                           {activeStats.slice(Math.ceil(activeStats.length / 2)).map((stat, index) => (
                             <div
                               key={stat.name}
@@ -316,8 +310,8 @@ export default function DashboardPage() {
                   <CardDescription>Distribution of inventory items across locations</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-12">
-                    <div className="w-[300px] h-[300px] relative">
+                  <div className="flex flex-col items-center gap-8 lg:flex-row lg:items-start lg:gap-12">
+                    <div className="relative h-[min(300px,70vw)] w-[min(300px,70vw)] shrink-0">
                       <div className="absolute inset-0 flex items-center justify-center">
                         <svg viewBox="0 0 100 100" className="w-full h-full">
                           {activeStats.map((stat, index) => {
@@ -388,9 +382,9 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="flex-1">
-                      <div className="flex gap-16">
-                        <div className="flex-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col gap-6 xl:flex-row xl:gap-16">
+                        <div className="min-w-0 flex-1">
                           {activeStats.slice(0, Math.ceil(activeStats.length / 2)).map((stat, index) => (
                             <div
                               key={stat.name}
@@ -421,7 +415,7 @@ export default function DashboardPage() {
                             </div>
                           ))}
                         </div>
-                        <div className="flex-1">
+                        <div className="min-w-0 flex-1">
                           {activeStats.slice(Math.ceil(activeStats.length / 2)).map((stat, index) => (
                             <div
                               key={stat.name}

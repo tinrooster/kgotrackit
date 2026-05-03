@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label"
 import { getPasswordError } from '@/utils/passwordUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { DataBackupTab } from "@/components/settings/DataBackupTab"
+import { WorkspaceTeamTab } from '@/components/settings/WorkspaceTeamTab'
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
 import {
   UserDefinedListsSection,
@@ -1734,7 +1735,8 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="data">
+        <TabsContent value="data" className="space-y-6">
+          <WorkspaceTeamTab />
           <DataBackupTab
             onExportData={handleExportData}
             onExportExcel={handleExportExcel}

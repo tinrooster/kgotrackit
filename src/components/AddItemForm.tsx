@@ -70,6 +70,7 @@ const formSchema = z.object({
   fiberMode: z.enum(['sm', 'mm', 'na', 'mtp_mpo']).default('na'),
   connectorType: z.string().optional(),
   cableLotNumber: z.string().optional(),
+  deviceLibraryId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -181,6 +182,7 @@ export function AddItemForm({
           : 'na',
       connectorType: initialValues?.connectorType || "",
       cableLotNumber: initialValues?.cableLotNumber || "",
+      deviceLibraryId: initialValues?.deviceLibraryId || "",
     },
   });
 
@@ -222,6 +224,7 @@ export function AddItemForm({
         fiberMode: values.fiberMode !== 'na' ? values.fiberMode : undefined,
         connectorType: values.connectorType?.trim() || undefined,
         cableLotNumber: values.cableLotNumber?.trim() || undefined,
+        deviceLibraryId: values.deviceLibraryId?.trim() || undefined,
       };
 
       await onSubmit(processedValues);

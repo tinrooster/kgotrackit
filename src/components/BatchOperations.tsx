@@ -11,6 +11,7 @@ import { Trash2, Edit2 } from 'lucide-react';
 import { getSettings, saveItems } from '@/lib/storageService';
 import { recordInventorySnapshotBeforeChange } from '@/lib/inventoryUndo';
 import { useAuth } from '@/contexts/AuthContext';
+import { useInventoryPermissions } from '@/hooks/useInventoryPermissions';
 import { logger } from '@/lib/logging';
 
 // Helper function to flatten categories
@@ -81,6 +82,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
   const [projects, setProjects] = React.useState<ItemWithSubcategories[]>([]);
   const [cabinets, setCabinets] = React.useState<Cabinet[]>([]);
   const { currentUser } = useAuth();
+  const { canBulkDelete, canBatchEdit } = useInventoryPermissions();
   const [isBatchEditOpen, setIsBatchEditOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [batchEditValues, setBatchEditValues] = React.useState<BatchEditValues>({});
@@ -175,6 +177,10 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
       toast.error('Please select items to delete');
       return;
     }
+    if (!canBulkDelete) {
+      toast.error('You do not have permission to delete multiple items.');
+      return;
+    }
 
     try {
       const startTime = performance.now();
@@ -241,6 +247,10 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
 
   // Batch edit selected items
   const handleBatchEdit = async () => {
+    if (!canBatchEdit) {
+      toast.error('You do not have permission to batch-edit items.');
+      return;
+    }
     setIsUpdating(true);
     try {
       const startTime = performance.now();
@@ -416,7 +426,12 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
           <Button
             variant="destructive"
             size="sm"
-            disabled={selectedItems.length === 0}
+            disabled={selectedItems.length === 0 || !canBulkDelete}
+            title={
+              !canBulkDelete
+                ? 'Bulk delete is limited to admins (and workspace admins when a team workspace is active).'
+                : undefined
+            }
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete Selected
@@ -433,7 +448,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleBatchDelete}>
+            <Button variant="destructive" onClick={handleBatchDelete} disabled={!canBulkDelete}>
               Delete
             </Button>
           </DialogFooter>
@@ -445,7 +460,8 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
           <Button
             variant="outline"
             size="sm"
-            disabled={selectedItems.length === 0}
+            disabled={selectedItems.length === 0 || !canBatchEdit}
+            title={!canBatchEdit ? 'Viewers cannot run batch edits.' : undefined}
           >
             <Edit2 className="mr-2 h-4 w-4" />
             Batch Edit ({selectedItems.length})

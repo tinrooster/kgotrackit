@@ -31,6 +31,7 @@ export function applyDeviceLibraryEntryToForm(
 ): void {
   form.setValue('manufacturer', entry.manufacturer, { shouldDirty: true, shouldTouch: true });
   form.setValue('modelNumber', entry.modelNumber || '', { shouldDirty: true, shouldTouch: true });
+  form.setValue('deviceLibraryId', entry.id, { shouldDirty: true, shouldTouch: true });
 
   if (entry.defaultSupplierWebsite?.trim()) {
     form.setValue('supplierWebsite', ensureUrlProtocol(entry.defaultSupplierWebsite.trim()), {

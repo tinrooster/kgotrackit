@@ -251,9 +251,9 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="container max-w-4xl py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Secure Cabinet Check-In/Out</h1>
+    <div className="container max-w-4xl min-w-0 py-6 sm:py-8">
+      <div className="mb-6 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-bold sm:text-2xl">Secure Cabinet Check-In/Out</h1>
       </div>
 
       <div className="grid gap-6">

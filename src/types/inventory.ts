@@ -63,6 +63,8 @@ export interface InventoryItem {
   serialNumber?: string;
   manufacturer?: string;
   modelNumber?: string;
+  /** Optional link to a Settings → Libraries device catalog row (`DeviceLibraryEntry.id`). */
+  deviceLibraryId?: string;
   dateInService?: string | Date;
   lastMaintenanceDate?: Date;
   nextMaintenanceDate?: Date;

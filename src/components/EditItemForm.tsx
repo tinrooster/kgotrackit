@@ -79,6 +79,7 @@ const formSchema = z.object({
   fiberMode: z.enum(['sm', 'mm', 'na', 'mtp_mpo']).default('na'),
   connectorType: z.string().optional(),
   cableLotNumber: z.string().optional(),
+  deviceLibraryId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -484,6 +485,7 @@ export function EditItemForm({
           : 'na',
       connectorType: item.connectorType || '',
       cableLotNumber: item.cableLotNumber || '',
+      deviceLibraryId: item.deviceLibraryId || '',
     };
   }, [item, initialLocationValue, projects]);
 

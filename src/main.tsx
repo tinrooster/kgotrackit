@@ -5,6 +5,7 @@ import App from './App'
 import './index.css'
 import { Toaster } from 'sonner'
 import { AuthProvider } from './contexts/AuthContext'
+import { WorkspaceProvider } from './contexts/WorkspaceContext'
 import { LoginPage } from './components/LoginPage'
 import { SupabaseSyncBridge } from './components/SupabaseSyncBridge'
 
@@ -23,9 +24,11 @@ const router = createBrowserRouter(
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AuthProvider>
-      <SupabaseSyncBridge>
-        <RouterProvider router={router} />
-      </SupabaseSyncBridge>
+      <WorkspaceProvider>
+        <SupabaseSyncBridge>
+          <RouterProvider router={router} />
+        </SupabaseSyncBridge>
+      </WorkspaceProvider>
       <Toaster 
         position="bottom-right"
         richColors

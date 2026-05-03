@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, LogIn, Key } from 'lucide-react';
+import { Loader2, LogIn, Key, Mail } from 'lucide-react';
+import { getSupabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { UserWithPassword, LoginResult } from '@/contexts/AuthContext';
@@ -66,7 +67,7 @@ export function LoginForm() {
     [authBackend]
   );
 
-  const { register, handleSubmit, formState: { errors }, getValues } = useForm<LoginFormValues>({
+  const { register, handleSubmit, formState: { errors }, getValues, watch: watchLogin } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: '',
@@ -75,7 +76,7 @@ export function LoginForm() {
     },
   });
 
-  const { register: registerReset, handleSubmit: handleResetSubmit, formState: { errors: resetErrors }, watch } = useForm<ResetPasswordValues>({
+  const { register: registerReset, handleSubmit: handleResetSubmit, formState: { errors: resetErrors }, watch: watchReset } = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetSchema),
     defaultValues: {
       username: '',
@@ -85,7 +86,38 @@ export function LoginForm() {
   });
 
   const [securityQuestion, setSecurityQuestion] = useState<string>('');
-  const username = watch('username');
+  const [magicBusy, setMagicBusy] = useState(false);
+  const resetUsername = watchReset('username');
+  const loginEmail = watchLogin('username');
+
+  const sendMagicLink = async () => {
+    const email = loginEmail.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Enter a valid email in the field above.');
+      return;
+    }
+    const client = getSupabase();
+    if (!client) {
+      toast.error('Supabase is not configured.');
+      return;
+    }
+    setMagicBusy(true);
+    try {
+      const { error } = await client.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/` },
+      });
+      if (error) {
+        toast.error(error.message || 'Could not send link');
+        return;
+      }
+      toast.success('Check your email for the sign-in link.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not send link');
+    } finally {
+      setMagicBusy(false);
+    }
+  };
 
   // Fetch security question when username changes
   useEffect(() => {
@@ -94,7 +126,7 @@ export function LoginForm() {
         setSecurityQuestion('');
         return;
       }
-      if (!username) {
+      if (!resetUsername) {
         setSecurityQuestion('');
         return;
       }
@@ -105,13 +137,13 @@ export function LoginForm() {
           return rawValue ? (JSON.parse(rawValue) as UserWithPassword[]) : [];
         })();
       const user = storeUsers.find(
-        (u) => u.username.toLowerCase() === username.trim().toLowerCase()
+        (u) => u.username.toLowerCase() === resetUsername.trim().toLowerCase()
       );
       setSecurityQuestion(user?.securityQuestion || '');
     };
 
     fetchSecurityQuestion();
-  }, [username, authBackend]);
+  }, [resetUsername, authBackend]);
 
   const onSubmit = async (data: LoginFormValues) => {
     console.log('Form submitted with:', { username: data.username, remember: data.remember });
@@ -302,6 +334,35 @@ export function LoginForm() {
             </>
           )}
         </Button>
+
+        {authBackend === 'supabase' ? (
+          <div className="rounded-md border border-border/50 bg-muted/15 p-3 space-y-2">
+            <p className="text-xs font-medium text-foreground">Email magic link</p>
+            <p className="text-xs text-muted-foreground leading-snug">
+              Sends a one-time sign-in link to the email field above. In Supabase Dashboard → Authentication → URL configuration, add your site URL and redirect URLs. For TOTP / MFA, use the same dashboard (User → MFA) or enroll factors via the Auth API after sign-in.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-full sm:w-auto"
+              disabled={magicBusy || isLoading}
+              onClick={() => void sendMagicLink()}
+            >
+              {magicBusy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send sign-in link
+                </>
+              )}
+            </Button>
+          </div>
+        ) : null}
       </form>
 
       <p className="mt-3 text-center text-xs text-muted-foreground leading-snug">

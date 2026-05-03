@@ -36,8 +36,8 @@ todos:
     content: "Phase 1 done: cableColor, fiberMode (SM/MM/N/A), connectorType, cableLotNumber on InventoryItem + Add/Edit Additional Info + reports column options + inventory search. Nested project selection in Add/Edit/Template forms now supports parent/child path ids. Supplier read-only panel shipped in ItemDetails. Device library: Settings tab + backup/restore + Additional Info combobox (add/edit/template) applies manufacturer, model, website, supplier when name matches list. Deferred: spool/lot usage entity, project hierarchy features beyond selection, optional deviceLibraryId on items."
     status: pending
   - id: p3-org-rbac-auth
-    content: Workspace shared DB + RBAC; Supabase MFA/email; admin user management via service role backend
-    status: pending
+    content: "Shipped MVP: workspace_app_data + members + RLS (migration); client switch/create in Settings→Data; bootstrap/push routes; admin-only bulk delete + viewer batch-edit lock; magic link (signInWithOtp); deviceLibraryId on items; dashboard/checkout responsive. Deferred: service-role admin API, full MFA enroll UI, invite-by-email."
+    status: completed
 ---
 
 # trackIT: production issues, answers, and phased work
@@ -207,13 +207,13 @@ flowchart LR
 11. **Nested projects** — mirror location tree patterns in settings + filters.
 12. **Supplier** read-only panel on item + optional enrichment (manual URL first; scraping is non-trivial and policy-sensitive).
 
-**P3 — org, security, clients**
+**P3 — org, security, clients** *(MVP shipped in-repo — run new migration on Supabase; see [`docs/p3-workspaces-auth.md`](p3-workspaces-auth.md))*
 
-13. Shared workspace / roles (replace strict per-user isolation).
-14. Role-based delete restrictions (admin-only bulk wipe).
-15. Supabase **Auth** email/TOTP (dashboard + client `signInWithOtp` / MFA APIs); “fast user switching” = multiple sessions UX or workspace switcher, not trivial on shared browsers.
-16. **Mobile**: responsive pass on critical pages; a separate native/React Native app is a different project.
-17. **Device library** — new entity (manufacturer, model, default supplier links) referenced by templates/items.
+13. Shared workspace / roles — `workspace_app_data` + `workspace_members` + switcher in **Settings → Data management** (personal row vs team workspace); invite others by inserting `workspace_members` in SQL until an invite UI exists.
+14. Role-based delete restrictions — **Bulk delete** requires profile **admin** and, when a team workspace is active, **workspace admin**; **viewers** cannot batch-edit.
+15. Supabase **Auth** — **Email magic link** on login (`signInWithOtp`). TOTP/MFA: configure in Supabase Dashboard and/or enroll factors post-login via Auth API (full in-app MFA wizard deferred).
+16. **Mobile** — Responsive pass on **Dashboard** (chart + legend stacks) and **Checkout** header/layout; native app remains out of scope.
+17. **Device library** — Optional **`deviceLibraryId`** on `InventoryItem` (and templates via `ItemTemplate`); **Additional Info** combobox binds catalog row; hints still apply from library entry.
 
 ---
 

@@ -132,19 +132,34 @@ export function AdditionalInfoTab({
 
       {deviceLibraryOptions.length > 0 ? (
         <OptionalFormCollapsible title="Device library">
-          <Combobox
-            key={deviceLibraryPickerKey}
-            options={deviceLibraryOptions}
-            value=""
-            onChange={(id) => {
-              const entry = deviceLibraryEntries.find((e) => e.id === id);
-              if (entry) {
-                applyDeviceLibraryEntryToForm(form, entry, supplierNames, unitNames);
-                setDeviceLibraryPickerKey((k) => k + 1);
-              }
-            }}
-            placeholder="Select catalog row to apply hints…"
-            emptyText="No catalog rows match."
+          <FormField
+            control={form.control}
+            name="deviceLibraryId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Catalog row</FormLabel>
+                <Combobox
+                  key={deviceLibraryPickerKey}
+                  options={[{ value: '', label: 'None' }, ...deviceLibraryOptions]}
+                  value={field.value || ''}
+                  onChange={(id) => {
+                    field.onChange(id || undefined);
+                    if (!id) {
+                      setDeviceLibraryPickerKey((k) => k + 1);
+                      return;
+                    }
+                    const entry = deviceLibraryEntries.find((e) => e.id === id);
+                    if (entry) {
+                      applyDeviceLibraryEntryToForm(form, entry, supplierNames, unitNames);
+                      setDeviceLibraryPickerKey((k) => k + 1);
+                    }
+                  }}
+                  placeholder="Select catalog row…"
+                  emptyText="No catalog rows match."
+                />
+                <FormMessage />
+              </FormItem>
+            )}
           />
         </OptionalFormCollapsible>
       ) : null}

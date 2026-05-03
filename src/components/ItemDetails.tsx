@@ -28,6 +28,7 @@ import {
   FileText,
   DollarSign,
   Building2,
+  Library,
 } from "lucide-react";
 import { InventoryAdjustment } from "@/components/InventoryAdjustment";
 import { toast } from "sonner";
@@ -207,6 +208,15 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                 <span className="text-sm font-medium mr-2">Barcode:</span>
                 <span>{item.barcode || "None"}</span>
               </div>
+              {item.deviceLibraryId ? (
+                <div className="flex min-w-0 items-center gap-2">
+                  <Library className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="text-sm font-medium shrink-0">Device catalog:</span>
+                  <span className="truncate font-mono text-xs text-muted-foreground" title={item.deviceLibraryId}>
+                    {item.deviceLibraryId}
+                  </span>
+                </div>
+              ) : null}
               <div className="rounded-md border border-border/60 bg-muted/15 p-3 text-sm">
                 <p className="mb-2 flex items-center gap-2 font-medium text-foreground">
                   <Building2 className="h-4 w-4 text-muted-foreground" />

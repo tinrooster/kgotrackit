@@ -54,6 +54,7 @@ const FIELD_TO_TAB: Record<string, InventoryFormTabId> = {
   fiberMode: "additional",
   connectorType: "additional",
   cableLotNumber: "additional",
+  deviceLibraryId: "additional",
 };
 
 function collectRootFieldNames(errors: FieldErrors | undefined): string[] {

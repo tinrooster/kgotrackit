@@ -19,6 +19,14 @@ import {
   CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT,
 } from '@/lib/storageService';
 import { getFinancialSettings, saveFinancialSettings } from '@/lib/financialSettingsService';
+import {
+  fetchWorkspaceMemberRole,
+  getActiveWorkspaceId,
+  pullWorkspaceAppData,
+  pushWorkspaceSnapshot,
+  setActiveWorkspaceId,
+  type WorkspaceSnapshotPayload,
+} from '@/lib/supabase/workspaceData';
 
 export type AuthBackend = 'local' | 'supabase';
 
@@ -125,7 +133,21 @@ export function mapSupabaseUserToAppUser(user: SupabaseAuthUser): MappedAppUser 
   };
 }
 
-export function snapshotHasMeaningfulRemoteData(row: UserAppDataRow): boolean {
+/** Shape required to hydrate local stores (personal or workspace row). */
+export type CloudSnapshotPayload = Pick<
+  UserAppDataRow,
+  | 'items'
+  | 'settings'
+  | 'templates'
+  | 'history'
+  | 'cabinets'
+  | 'financial'
+  | 'ui_defaults'
+  | 'general_settings'
+  | 'custom_report_definitions'
+>;
+
+export function snapshotHasMeaningfulRemoteData(row: CloudSnapshotPayload): boolean {
   const items = row.items;
   if (Array.isArray(items) && items.length > 0) {
     return true;
@@ -205,7 +227,7 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
   };
 }
 
-export async function applySnapshotToLocal(row: UserAppDataRow): Promise<void> {
+export async function applySnapshotToLocal(row: CloudSnapshotPayload): Promise<void> {
   const rawItems = Array.isArray(row.items) ? row.items : [];
   const items = rawItems.map((item) => parseItemDates(item));
   saveItems(items);
@@ -256,6 +278,15 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
     return;
   }
   const snapshot = await collectLocalSnapshot();
+  const wsId = getActiveWorkspaceId();
+  if (wsId) {
+    const role = await fetchWorkspaceMemberRole(wsId, userId);
+    if (!role || role === 'viewer') {
+      return;
+    }
+    await pushWorkspaceSnapshot(wsId, snapshot as WorkspaceSnapshotPayload);
+    return;
+  }
   const { error } = await client.from('user_app_data').upsert(
     {
       user_id: userId,
@@ -284,17 +315,37 @@ export async function pullUserAppData(userId: string): Promise<UserAppDataRow | 
   return data as UserAppDataRow;
 }
 
-export async function bootstrapCloudData(userId: string): Promise<void> {
-  const client = getSupabase();
-  if (!client) {
-    return;
-  }
+async function bootstrapPersonalUserRow(userId: string): Promise<void> {
   const remote = await pullUserAppData(userId);
   if (remote && snapshotHasMeaningfulRemoteData(remote)) {
     await applySnapshotToLocal(remote);
   } else {
     await pushFullSnapshotToSupabase(userId);
   }
+}
+
+export async function bootstrapCloudData(userId: string): Promise<void> {
+  const client = getSupabase();
+  if (!client) {
+    return;
+  }
+  const wsId = getActiveWorkspaceId();
+  if (wsId) {
+    const role = await fetchWorkspaceMemberRole(wsId, userId);
+    if (!role) {
+      setActiveWorkspaceId(null);
+      await bootstrapPersonalUserRow(userId);
+      return;
+    }
+    const remote = await pullWorkspaceAppData(wsId);
+    if (remote && snapshotHasMeaningfulRemoteData(remote as CloudSnapshotPayload)) {
+      await applySnapshotToLocal(remote as CloudSnapshotPayload);
+    } else {
+      await pushWorkspaceSnapshot(wsId, (await collectLocalSnapshot()) as WorkspaceSnapshotPayload);
+    }
+    return;
+  }
+  await bootstrapPersonalUserRow(userId);
 }
 
 let pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;

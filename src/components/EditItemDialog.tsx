@@ -150,6 +150,8 @@ export function EditItemDialog({
           typeof values.cableLotNumber === "string"
             ? values.cableLotNumber.trim() || undefined
             : item.cableLotNumber,
+        deviceLibraryId:
+          typeof values.deviceLibraryId === "string" ? values.deviceLibraryId.trim() || undefined : item.deviceLibraryId,
         lastUpdated: new Date()
       };
 
