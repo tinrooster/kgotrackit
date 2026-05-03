@@ -20,6 +20,7 @@ This document outlines the current development status of the Inventory Tracking 
 - ✅ Batch operations for inventory items
 
 ### User Interface
+- ✅ Destructive-action confirmations: full backup restore and settings snapshot restore require explicit confirm (`DataBackupTab`); removing a username from the local Users list requires confirm (`UsersTab`)
 - ✅ Responsive design for desktop and mobile
 - ✅ Inventory **Quick add** dialog for fast mobile-oriented item capture (collapsible sections, selection strip, unit sub-sizes, barcode/camera)
 - ✅ Navigation between main sections
@@ -36,6 +37,7 @@ This document outlines the current development status of the Inventory Tracking 
 - ✅ Barcode scanning for quick item lookup
 - ✅ Template-based item creation
 - ✅ Batch operations for inventory management
+- ✅ Supabase **per-user profile row** (`user_app_data`): inventory snapshot, settings, templates, history, cabinets, financials, UI defaults, general settings, audit/checkout buffers, **custom report definitions**, and **system logs** stream synced to cloud when signed in (see `src/lib/supabase/cloudData.ts` and `supabase/migrations/`)
 
 ## Known Issues
 
@@ -43,9 +45,9 @@ This document outlines the current development status of the Inventory Tracking 
 - 🔴 None currently identified
 
 ### High Priority Issues
-- 🟠 No data backup/restore functionality
 - 🟠 Limited error handling for edge cases
 - 🟠 Performance optimization needed for large datasets
+- 🟠 Daily offline backup (Settings → Backup) only runs while the app is open; production DR should include off-device copies and procedures outside the app
 
 ### Medium Priority Issues
 - 🟡 No dark mode support
@@ -67,8 +69,8 @@ This document outlines the current development status of the Inventory Tracking 
 ## Planned Enhancements
 
 ### Short-term (Next Release)
-1. Add confirmation dialogs for destructive actions
-2. Implement data backup/restore functionality
+1. Extend confirmation dialogs to other destructive flows (e.g. full JSON import) where risk warrants it
+2. Harden backup/restore UX (progress, validation summaries)
 3. Improve error handling and user feedback
 4. Optimize performance for large datasets
 5. Enhance template management features
@@ -81,7 +83,7 @@ This document outlines the current development status of the Inventory Tracking 
 5. Improve mobile responsiveness
 
 ### Long-term
-1. Develop backend integration for cloud storage
+1. Extend hosted backend beyond the current Supabase profile row (e.g. multi-row history, org-wide data)
 2. Implement user authentication and permissions
 3. Add multi-device synchronization
 4. Develop mobile applications (iOS/Android)
@@ -130,3 +132,5 @@ Please ensure your code follows the project's coding standards and includes appr
 ## [Unreleased]
 - Removed all usage of electron-store from the renderer process to fix blank screen and Node.js errors.
 - Logging in the renderer now uses an in-memory fallback. Persistent logs will require IPC to the main process in the future.
+- Cloud sync: custom report definitions and system logs included in `user_app_data` upsert/pull; debounced push from logging; Reports page hooks for cloud sync and cross-tab refresh events.
+- Destructive confirmations: backup/settings restore and local user list removal.

@@ -178,7 +178,7 @@ The application supports barcode scanning using your device's camera:
 
 ## Tips and Best Practices
 
-- **Regular Backups**: Since data is stored in localStorage, consider exporting your inventory regularly
+- **Regular Backups**: Since data is stored in localStorage, use **Settings → Data & Backup** for full backups, optional daily offline exports, and settings-only JSON snapshots. Restoring a full backup or a settings snapshot asks for confirmation before overwriting data.
 - **Consistent Naming**: Use consistent naming conventions for categories, locations, etc.
 - **Set Reorder Levels**: Define appropriate reorder levels for critical items to receive low stock alerts
 - **Document Adjustments**: Always provide clear reasons when adjusting inventory quantities

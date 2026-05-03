@@ -8,6 +8,15 @@ import type { GroupReconcileResult } from '@/lib/groupInventoryReconciliation';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface DataBackupTabProps {
   onExportData: () => void;
@@ -75,6 +84,10 @@ export function DataBackupTab({
   const [isRestoring, setIsRestoring] = useState(false);
   const [isRestoringSettingsSnapshot, setIsRestoringSettingsSnapshot] = useState(false);
   const [reconcileReport, setReconcileReport] = useState<string | null>(null);
+  const [fullRestoreDialogOpen, setFullRestoreDialogOpen] = useState(false);
+  const [pendingFullRestoreFile, setPendingFullRestoreFile] = useState<File | null>(null);
+  const [settingsRestoreDialogOpen, setSettingsRestoreDialogOpen] = useState(false);
+  const [pendingSettingsRestoreFile, setPendingSettingsRestoreFile] = useState<File | null>(null);
   const jsonImportRef = React.useRef<HTMLInputElement>(null);
   const excelImportRef = React.useRef<HTMLInputElement>(null);
   const restoreRef = React.useRef<HTMLInputElement>(null);
@@ -124,10 +137,19 @@ export function DataBackupTab({
     }
   };
 
-  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRestoreFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (restoreRef.current) {
+      restoreRef.current.value = '';
+    }
     if (!file) return;
+    setPendingFullRestoreFile(file);
+    setFullRestoreDialogOpen(true);
+  };
 
+  const executeFullRestore = async () => {
+    const file = pendingFullRestoreFile;
+    if (!file) return;
     try {
       setIsRestoring(true);
       await onRestoreData(file);
@@ -143,16 +165,24 @@ export function DataBackupTab({
       });
     } finally {
       setIsRestoring(false);
-      if (restoreRef.current) {
-        restoreRef.current.value = '';
-      }
+      setPendingFullRestoreFile(null);
+      setFullRestoreDialogOpen(false);
     }
   };
 
-  const handleSettingsSnapshotFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSettingsSnapshotFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (settingsSnapshotRestoreRef.current) {
+      settingsSnapshotRestoreRef.current.value = '';
+    }
     if (!file) return;
+    setPendingSettingsRestoreFile(file);
+    setSettingsRestoreDialogOpen(true);
+  };
 
+  const executeSettingsSnapshotRestore = async () => {
+    const file = pendingSettingsRestoreFile;
+    if (!file) return;
     try {
       setIsRestoringSettingsSnapshot(true);
       await onRestoreSettingsSnapshot(file);
@@ -168,9 +198,8 @@ export function DataBackupTab({
       });
     } finally {
       setIsRestoringSettingsSnapshot(false);
-      if (settingsSnapshotRestoreRef.current) {
-        settingsSnapshotRestoreRef.current.value = '';
-      }
+      setPendingSettingsRestoreFile(null);
+      setSettingsRestoreDialogOpen(false);
     }
   };
 
@@ -364,7 +393,7 @@ export function DataBackupTab({
                   <input
                     type="file"
                     ref={restoreRef}
-                    onChange={handleRestore}
+                    onChange={handleRestoreFileChosen}
                     accept=".backup,.BACKUP,.json,.JSON,application/json"
                     className="hidden"
                   />
@@ -406,7 +435,7 @@ export function DataBackupTab({
                   <input
                     type="file"
                     ref={settingsSnapshotRestoreRef}
-                    onChange={handleSettingsSnapshotFile}
+                    onChange={handleSettingsSnapshotFileChosen}
                     accept=".json,.JSON,application/json"
                     className="hidden"
                   />
@@ -470,6 +499,64 @@ export function DataBackupTab({
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog
+        open={fullRestoreDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isRestoring) return;
+          setFullRestoreDialogOpen(open);
+          if (!open) setPendingFullRestoreFile(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace all local data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Restoring from{' '}
+              <span className="font-mono text-foreground">{pendingFullRestoreFile?.name ?? 'this file'}</span>{' '}
+              overwrites inventory, settings, lists, templates, and other data stored in this browser profile with the
+              backup contents. This cannot be undone from the app.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button type="button" disabled={isRestoring} onClick={() => void executeFullRestore()}>
+              {isRestoring ? 'Restoring…' : 'Restore backup'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={settingsRestoreDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isRestoringSettingsSnapshot) return;
+          setSettingsRestoreDialogOpen(open);
+          if (!open) setPendingSettingsRestoreFile(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace settings from snapshot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Restoring{' '}
+              <span className="font-mono text-foreground">{pendingSettingsRestoreFile?.name ?? 'this file'}</span>{' '}
+              replaces lookup lists, financial codes, cabinets, and general preferences. Inventory rows are not
+              changed by this action.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              disabled={isRestoringSettingsSnapshot}
+              onClick={() => void executeSettingsSnapshotRestore()}
+            >
+              {isRestoringSettingsSnapshot ? 'Restoring…' : 'Restore settings'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

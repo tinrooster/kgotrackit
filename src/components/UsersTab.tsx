@@ -7,10 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { STORAGE_KEYS } from "@/lib/storageService";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function UsersTab() {
   const [users, setUsers] = useState<string[]>([]);
   const [newUser, setNewUser] = useState("");
+  const [userPendingRemoval, setUserPendingRemoval] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUsers = () => {
@@ -46,10 +56,13 @@ export function UsersTab() {
     toast.success(`Added "${newUser}"`);
   };
 
-  const removeUser = (user: string) => {
-    const updatedUsers = users.filter(u => u !== user);
+  const confirmRemoveUser = () => {
+    const user = userPendingRemoval;
+    if (!user) return;
+    const updatedUsers = users.filter((u) => u !== user);
     setUsers(updatedUsers);
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
+    setUserPendingRemoval(null);
     toast.success(`Removed "${user}"`);
   };
 
@@ -99,7 +112,9 @@ export function UsersTab() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => removeUser(user)}
+                      type="button"
+                      onClick={() => setUserPendingRemoval(user)}
+                      aria-label={`Remove user ${user}`}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -110,6 +125,27 @@ export function UsersTab() {
           </TableBody>
         </Table>
       </CardContent>
+
+      <AlertDialog
+        open={userPendingRemoval !== null}
+        onOpenChange={(open) => !open && setUserPendingRemoval(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove <span className="font-medium text-foreground">{userPendingRemoval}</span> from the local user list?
+              This does not delete inventory history attributed to that name.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button type="button" variant="destructive" onClick={confirmRemoveUser}>
+              Remove
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 } 
