@@ -312,7 +312,7 @@ export default function SettingsPage() {
   const [defaultSettings, setDefaultSettings] = useState<DefaultSettings>(() => SettingsService.loadDefaultSettings());
   const [financialSettings, setFinancialSettings] = useState<{ expenseTypes: FinancialCodeEntry[]; costCenters: FinancialCodeEntry[] }>(() => getFinancialSettings());
   const [settingsTab, setSettingsTab] = useState('general');
-  const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>('overview');
+  const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>('categories');
 
   const listUndoStackRef = useRef<ListUndoSnapshot[]>([]);
   const listRedoStackRef = useRef<ListUndoSnapshot[]>([]);

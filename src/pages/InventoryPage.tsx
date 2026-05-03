@@ -466,15 +466,21 @@ export default function InventoryPage() {
               row-gap: ${sheetSpec.gapY}in;
             }
             .label {
-              border: 1px dashed #d1d5db; border-radius: 4px; padding: 4px;
-              display: flex; flex-direction: column; justify-content: center;
+              border: 1px dashed #d1d5db; border-radius: 4px; padding: 3px 4px 4px;
+              display: flex; flex-direction: column; justify-content: flex-start;
+              align-items: stretch;
               overflow: hidden;
             }
             .label-title {
-              font-size: 11px; font-weight: 700; line-height: 1.2;
-              white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+              font-size: 10px; font-weight: 700; line-height: 1.25;
+              max-height: 2.5em;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+              word-break: break-word;
             }
-            .label-id { margin-top: 6px; font-size: 10px; font-family: "Courier New", monospace; }
+            .label-id { margin-top: 2px; font-size: 9px; font-family: "Courier New", monospace; line-height: 1.2; }
             .label-codes { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
             .label-codes svg { max-width: 100%; height: 0.36in; }
             @media print {
@@ -677,7 +683,12 @@ export default function InventoryPage() {
     try {
       recordInventorySnapshotBeforeChange(items);
       const updatedItems = items.filter(item => item.id !== itemToDelete.id);
-      saveItems(updatedItems);
+      if (!saveItems(updatedItems)) {
+        toast.error('Could not save after delete.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
       setItems(updatedItems);
       setInvUndoAvail(canUndoInventory());
       setInvRedoAvail(canRedoInventory());
@@ -777,11 +788,18 @@ export default function InventoryPage() {
         lastModifiedBy: currentUser?.username || currentUser?.displayName || "Unknown",
       };
 
+      const addSaveResult = { ok: true };
       setItems((prev) => {
         const next = [...prev, newItem];
-        saveItems(next);
-        return next;
+        addSaveResult.ok = saveItems(next);
+        return addSaveResult.ok ? next : prev;
       });
+      if (!addSaveResult.ok) {
+        toast.error('Could not save new item.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
       setInvUndoAvail(canUndoInventory());
       setInvRedoAvail(canRedoInventory());
       appendAuditLog("CREATE", newItem);
@@ -829,8 +847,13 @@ export default function InventoryPage() {
           lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown'
         } : item
       );
+      if (!saveItems(updatedItems)) {
+        toast.error('Could not save changes.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return;
+      }
       setItems(updatedItems);
-      saveItems(updatedItems);
       setInvUndoAvail(canUndoInventory());
       setInvRedoAvail(canRedoInventory());
       appendAuditLog('UPDATE', updatedItem, previousItem ? getUpdatedFieldChanges(previousItem, updatedItem) : []);
@@ -873,8 +896,14 @@ export default function InventoryPage() {
       lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown'
     } as InventoryItem;
     
-    setItems([...items, newItem]);
-    saveItems([...items, newItem]);
+    const nextItems = [...items, newItem];
+    if (!saveItems(nextItems)) {
+      toast.error('Could not save duplicated item.', {
+        description: 'Browser storage may be full. Export a backup or free space, then try again.',
+      });
+      return;
+    }
+    setItems(nextItems);
     setInvUndoAvail(canUndoInventory());
     setInvRedoAvail(canRedoInventory());
     setHighlightedItemId(newItem.id);
@@ -888,7 +917,12 @@ export default function InventoryPage() {
       toast.info('Nothing to undo');
       return;
     }
-    applyInventoryState(restored, setItems);
+    if (!applyInventoryState(restored, setItems)) {
+      toast.error('Could not save undo.', {
+        description: 'Browser storage may be full. Export a backup or free space, then try again.',
+      });
+      return;
+    }
     toast.success('Undone');
     setInvUndoAvail(canUndoInventory());
     setInvRedoAvail(canRedoInventory());
@@ -900,7 +934,12 @@ export default function InventoryPage() {
       toast.info('Nothing to redo');
       return;
     }
-    applyInventoryState(restored, setItems);
+    if (!applyInventoryState(restored, setItems)) {
+      toast.error('Could not save redo.', {
+        description: 'Browser storage may be full. Export a backup or free space, then try again.',
+      });
+      return;
+    }
     toast.success('Redone');
     setInvUndoAvail(canUndoInventory());
     setInvRedoAvail(canRedoInventory());

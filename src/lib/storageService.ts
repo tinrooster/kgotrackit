@@ -67,30 +67,30 @@ export const getItems = (): InventoryItem[] => {
   }
 };
 
-// Save items to store
-export const saveItems = (items: InventoryItem[]): void => {
+/** Persist inventory items. Returns false if nothing could be written (e.g. storage quota). */
+export const saveItems = (items: InventoryItem[]): boolean => {
+  const itemsToSave = items.map((item) => ({
+    ...item,
+    lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : new Date().toISOString(),
+    expectedDeliveryDate:
+      item.expectedDeliveryDate instanceof Date ? item.expectedDeliveryDate.toISOString() : undefined,
+  }));
   try {
-    const itemsToSave = items.map(item => ({
-      ...item,
-      lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : new Date().toISOString(),
-      expectedDeliveryDate: item.expectedDeliveryDate instanceof Date ? item.expectedDeliveryDate.toISOString() : undefined,
-    }));
     window.electronStore?.setData?.(STORAGE_KEYS.ITEMS, itemsToSave);
     localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(itemsToSave));
+    requestCloudSync();
+    return true;
   } catch (error) {
     console.error('Error saving items to store:', error);
     try {
-      const itemsToSave = items.map(item => ({
-        ...item,
-        lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : new Date().toISOString(),
-        expectedDeliveryDate: item.expectedDeliveryDate instanceof Date ? item.expectedDeliveryDate.toISOString() : undefined,
-      }));
       localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(itemsToSave));
-    } catch {
-      // no-op fallback
+      requestCloudSync();
+      return true;
+    } catch (secondError) {
+      console.error('Retry saving items to localStorage failed:', secondError);
+      return false;
     }
   }
-  requestCloudSync();
 };
 
 export interface Settings {

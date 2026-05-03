@@ -31,15 +31,15 @@ export function useInventory() {
       loadedItems = getItems();
       console.log('Loaded items from localStorage:', loadedItems.length);
       
-      if (loadedItems.length === 0) {
-        console.log('localStorage empty, loading dummy data...');
-        loadedItems = DUMMY_INVENTORY_DATA.map(item => ({ 
+      if (import.meta.env.DEV && loadedItems.length === 0) {
+        console.log('localStorage empty, loading dummy data (dev only)...');
+        loadedItems = DUMMY_INVENTORY_DATA.map(item => ({
           ...item,
           lastUpdated: new Date(item.lastUpdated),
-          expectedDeliveryDate: item.expectedDeliveryDate ? new Date(item.expectedDeliveryDate) : undefined
+          expectedDeliveryDate: item.expectedDeliveryDate ? new Date(item.expectedDeliveryDate) : undefined,
         }));
-        saveItems(loadedItems); 
-        toast.info("Loaded dummy inventory data.");
+        saveItems(loadedItems);
+        toast.info('Loaded dummy inventory data (development only).');
       }
       
       setItems(loadedItems);

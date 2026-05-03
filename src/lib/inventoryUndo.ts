@@ -36,9 +36,9 @@ export function redoInventoryMutation(currentItems: InventoryItem[]): InventoryI
   return next;
 }
 
-export function applyInventoryState(items: InventoryItem[], setItems: (items: InventoryItem[]) => void): void {
+export function applyInventoryState(items: InventoryItem[], setItems: (items: InventoryItem[]) => void): boolean {
   setItems(items);
-  saveItems(items);
+  return saveItems(items);
 }
 
 export function canUndoInventory(): boolean {

@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/use-toast';
 import type { GroupReconcileResult } from '@/lib/groupInventoryReconciliation';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 
 interface DataBackupTabProps {
   onExportData: () => void;
@@ -293,15 +294,19 @@ export function DataBackupTab({
                 Backup & Restore
               </CardTitle>
               <CardDescription>
-                Create a complete backup of your system or restore from a previous backup.
+                Full app file backup/restore vs settings-only JSON — use the scope labels below.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch md:gap-6">
                 <div className="flex flex-col space-y-2">
-                  <h3 className="text-sm font-medium">Create Backup</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-medium">Create Backup</h3>
+                    <Badge variant="secondary">Full app</Badge>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    Create a complete backup of your data, settings, and configurations.
+                    One file: inventory rows, lists, financial codes, preferences, cabinets, templates. For CSV/Excel
+                    inventory only, use <strong>Import &amp; Export</strong>.
                   </p>
                   <Button
                     type="button"
@@ -337,11 +342,13 @@ export function DataBackupTab({
                 </div>
 
                 <div className="flex flex-col space-y-2">
-                  <h3 className="text-sm font-medium">Restore Backup</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-medium">Restore Backup</h3>
+                    <Badge variant="secondary">Full app</Badge>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    Restore from a <strong>.backup</strong> or <strong>.json</strong> file (both are shown in the file
-                    picker). App-generated backups use the <code className="rounded bg-muted px-1">.backup</code>{' '}
-                    extension.
+                    Choose a <strong>.backup</strong> (app export) or compatible <strong>.json</strong> full snapshot.
+                    This replaces the in-browser dataset for everything in the backup.
                   </p>
                   <Button
                     type="button"
@@ -365,10 +372,14 @@ export function DataBackupTab({
               </div>
 
               <div className="border-t pt-4">
-                <h3 className="mb-2 text-sm font-medium">Settings snapshot (JSON)</h3>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-medium">Settings snapshot (JSON)</h3>
+                  <Badge variant="outline">No inventory rows</Badge>
+                </div>
                 <p className="mb-3 text-sm text-muted-foreground">
-                  Download general preferences, user-defined lists, financial codes, and cabinets in one portable file.
-                  For full inventory rows, use Import &amp; Export.
+                  Portable JSON: general preferences, lookup lists, financial codes, and cabinets only. Inventory lines
+                  stay as they are — use <strong>Import &amp; Export</strong> for inventory, or <strong>Create Backup</strong> for a
+                  full app file.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -400,11 +411,6 @@ export function DataBackupTab({
                     className="hidden"
                   />
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Restore replaces lookup lists, financial codes, cabinets, and general preferences in this app.
-                  It does <strong>not</strong> change inventory rows — use Import &amp; Export or a full backup for
-                  that.
-                </p>
               </div>
             </CardContent>
           </Card>
