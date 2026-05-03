@@ -73,6 +73,12 @@ export function validateFullBackupJsonText(text: string): FullBackupValidation {
     summaryLines.push('Cabinets: none in file');
   }
 
+  if (Array.isArray(data.deviceLibrary) && data.deviceLibrary.length > 0) {
+    summaryLines.push(`Device library: ${data.deviceLibrary.length}`);
+  } else {
+    summaryLines.push('Device library: none in file (existing entries kept)');
+  }
+
   if (data.financial && typeof data.financial === 'object') {
     summaryLines.push('Financial code tables: present');
   } else {

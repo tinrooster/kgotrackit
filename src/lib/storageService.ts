@@ -27,6 +27,7 @@ export const STORAGE_KEYS = {
   GENERAL_SETTINGS: 'inventory-general-settings',
   USERS: 'users',
   CUSTOM_REPORT_DEFINITIONS: 'inventory-custom-report-definitions',
+  DEVICE_LIBRARY: 'inventory-device-library',
 };
 
 export const SETTINGS_UPDATED_EVENT = 'trackit:settings-updated';

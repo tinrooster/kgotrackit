@@ -1,7 +1,7 @@
-import { getItems, getSettings } from '@/lib/storageService';
+import { getItems, getSettings, getTemplates } from '@/lib/storageService';
 import { getFinancialSettings } from '@/lib/financialSettingsService';
 import { SettingsService, defaultSettingsSchema } from '@/lib/settingsService';
-import { getTemplates } from '@/lib/storageService';
+import { getDeviceLibrary } from '@/lib/deviceLibraryStorage';
 
 function todayLocalYmd(): string {
   const d = new Date();
@@ -23,6 +23,7 @@ export async function buildFullOfflineBackupPayload(): Promise<{
   const defaultSettings = SettingsService.loadDefaultSettings();
   const cabinets = await SettingsService.getCabinets();
   const templates = getTemplates();
+  const deviceLibrary = getDeviceLibrary();
 
   return {
     version: '1.1',
@@ -39,6 +40,7 @@ export async function buildFullOfflineBackupPayload(): Promise<{
       defaultSettings,
       cabinets,
       templates,
+      deviceLibrary,
     },
   };
 }

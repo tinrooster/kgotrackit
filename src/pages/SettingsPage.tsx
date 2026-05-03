@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench } from 'lucide-react'
+import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Cpu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label"
 import { getPasswordError } from '@/utils/passwordUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { DataBackupTab } from "@/components/settings/DataBackupTab"
+import { DeviceLibraryTab } from '@/components/settings/DeviceLibraryTab'
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
 import {
   UserDefinedListsSection,
@@ -50,6 +51,7 @@ import {
   fixUnreconciledForLookupPanel,
   panelSupportsListReconcile,
 } from '@/lib/listReconcileFixes'
+import { parseDeviceLibraryFromBackup, saveDeviceLibrary } from '@/lib/deviceLibraryStorage'
 
 interface SettingsState {
   categories: ItemWithSubcategories[];
@@ -1483,6 +1485,10 @@ export default function SettingsPage() {
       saveTemplates(data.templates as ItemTemplate[]);
     }
 
+    if (Object.prototype.hasOwnProperty.call(data, 'deviceLibrary')) {
+      saveDeviceLibrary(parseDeviceLibraryFromBackup(data.deviceLibrary));
+    }
+
     window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT, { detail: getSettings() }));
   };
 
@@ -1653,6 +1659,11 @@ export default function SettingsPage() {
             <span data-settings-tab-long>Lookup Lists</span>
             <span data-settings-tab-short>Lookup Lists</span>
           </TabsTrigger>
+          <TabsTrigger value="devices" title="Device library" className="inline-flex items-center gap-1.5">
+            <Cpu className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span data-settings-tab-long>Device Library</span>
+            <span data-settings-tab-short>Devices</span>
+          </TabsTrigger>
           <TabsTrigger value="users" title="Users" className="inline-flex items-center gap-1.5">
             <Users className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
             <span data-settings-tab-long>Users</span>
@@ -1690,6 +1701,10 @@ export default function SettingsPage() {
             currentUsername={currentUser?.username ?? 'admin'}
             onRequestDeleteReconcile={requestListDeleteReconcile}
           />
+        </TabsContent>
+
+        <TabsContent value="devices">
+          <DeviceLibraryTab />
         </TabsContent>
 
         <TabsContent value="users">
