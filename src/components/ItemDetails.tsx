@@ -25,9 +25,9 @@ import {
   Tag,
   Package,
   Info,
-  Store,
   FileText,
-  DollarSign
+  DollarSign,
+  Building2,
 } from "lucide-react";
 import { InventoryAdjustment } from "@/components/InventoryAdjustment";
 import { toast } from "sonner";
@@ -200,25 +200,37 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                 <span className="text-sm font-medium mr-2">Barcode:</span>
                 <span>{item.barcode || "None"}</span>
               </div>
-              <div className="flex items-center">
-                <Store className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm font-medium mr-2">Supplier:</span>
-                <span>{item.supplier || "Not specified"}</span>
+              <div className="rounded-md border border-border/60 bg-muted/15 p-3 text-sm">
+                <p className="mb-2 flex items-center gap-2 font-medium text-foreground">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  Supplier
+                </p>
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Name:</span>{" "}
+                  {item.supplier || "Not specified"}
+                </p>
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Website:</span>{" "}
+                  {item.supplierWebsite ? (
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 align-baseline text-primary"
+                      onClick={openSupplierWebsite}
+                      title={item.supplierWebsite}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Open link
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </span>
+                    </Button>
+                  ) : (
+                    "Not provided"
+                  )}
+                </p>
+                {item.supplierWebsite ? (
+                  <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{item.supplierWebsite}</p>
+                ) : null}
               </div>
-              {item.supplierWebsite && (
-                <div className="flex items-center">
-                  <ExternalLink className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm font-medium mr-2">Website:</span>
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-primary truncate"
-                    onClick={openSupplierWebsite}
-                    title={item.supplierWebsite}
-                  >
-                    {item.supplierWebsite}
-                  </Button>
-                </div>
-              )}
               <div className="flex items-center">
                 <FileText className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm font-medium mr-2">Project:</span>

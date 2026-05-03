@@ -42,6 +42,10 @@ const FIELD_TO_TAB: Record<string, InventoryFormTabId> = {
   decomCutoverDate: "additional",
   decomLastAuditAt: "additional",
   decomNotes: "additional",
+  cableColor: "additional",
+  fiberMode: "additional",
+  connectorType: "additional",
+  cableLotNumber: "additional",
 };
 
 function collectRootFieldNames(errors: FieldErrors | undefined): string[] {

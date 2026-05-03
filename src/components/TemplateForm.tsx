@@ -20,6 +20,7 @@ import { ensureUrlProtocol } from "@/utils/url";
 import { getFirstTabWithErrors } from "@/lib/inventoryFormTabs";
 import { getTodayDateInputValue, resolveDefaultUnitName } from "@/lib/inventoryFormDefaults";
 import { getFinancialSettings } from "@/lib/financialSettingsService";
+import { resolveProjectValue } from "@/lib/projectOptions";
 
 const templateFormSchema = z
   .object({
@@ -115,7 +116,7 @@ export function TemplateForm({
       location: template?.location || "",
       locationSubcategory: template?.locationSubcategory || "",
       cabinet: template?.cabinet || "",
-      project: template?.project || "",
+      project: resolveProjectValue(template?.project, projects),
       minQuantity: template?.minQuantity ?? 0,
       costPerUnit: template?.costPerUnit ?? 0,
       barcode: template?.barcode || "",

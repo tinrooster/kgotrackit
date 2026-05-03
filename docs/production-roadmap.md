@@ -1,7 +1,7 @@
 ---
 name: trackIT production roadmap
 source: Versioned in-repo production plan (synced from Cursor plan *trackIT production roadmap*).
-last_reviewed: 2026-05-03
+last_reviewed: 2026-05-05
 overview: >-
   Mixes confirmed root causes in the codebase (dummy rows, local-only logging, UI contrast, scanner fragility,
   per-user Supabase payload) with larger product work (shared inventory, cable lots, device library, mobile).
@@ -27,13 +27,13 @@ todos:
     content: Make custom report save discoverable; optionally sync CUSTOM_REPORTS_KEY via user_app_data
     status: completed
   - id: p1-backup-restore
-    content: "Backup/rollback: design restore points (named snapshots, list, restore) — cloud and/or local ring buffer so daily file export is optional; optional unattended file export (FS Access API/Electron) with wizard + System Logs; log all snapshot/create/restore outcomes"
-    status: pending
+    content: "MVP: local IndexedDB named restore points (ring buffer, list, confirm restore) + System Logs on create/delete/restore. Deferred: Supabase snapshot store, FS Access / unattended export wizard."
+    status: completed
   - id: p1-settings-backup-tab-ux
     content: "Settings Backup & Restore tab: shorten redundant Settings snapshot copy; clarify Create Backup vs Restore vs settings-only vs Import/Export (clearer layout). Lookup Lists: default open to Categories (first list) not empty overview"
     status: completed
   - id: p2-inventory-domain
-    content: Model cable lots/spools, color, fiber SM/MM, connectors; nested projects; supplier display + device library
+    content: "Phase 1 done: cableColor, fiberMode (SM/MM/N/A), connectorType, cableLotNumber on InventoryItem + Add/Edit Additional Info + reports column options + inventory search. Nested project selection in Add/Edit/Template forms now supports parent/child path ids. Supplier read-only panel shipped in ItemDetails. Deferred: spool/lot usage entity, project hierarchy features beyond selection, device library."
     status: pending
   - id: p3-org-rbac-auth
     content: Workspace shared DB + RBAC; Supabase MFA/email; admin user management via service role backend
@@ -153,6 +153,8 @@ So logs are **per-browser, not cloud** unless extended. New device, cleared site
 
 **Plan placement:** **P1** — design restore-point model first; then decide whether to slim or repurpose the daily download feature as a secondary export channel.
 
+**Shipped (MVP):** Settings → Data Management → **Local restore points** (`DataBackupTab` + [`src/lib/localRestorePoints.ts`](../src/lib/localRestorePoints.ts)): up to 8 named full-payload snapshots in **IndexedDB**, list with restore/delete, validation summary before apply, `logger` entries for create / delete / restore start+outcome. **Not shipped:** cloud `user_app_snapshots` table, File System Access folder wizard, pruning policy beyond fixed ring size.
+
 ### Settings UX — Backup & Restore tab and Lookup Lists
 
 **Backup & Restore tab** ([`src/components/settings/DataBackupTab.tsx`](../src/components/settings/DataBackupTab.tsx), tab `backup-restore`)
@@ -201,7 +203,7 @@ flowchart LR
 **P2 — data model for operations**
 
 9. Cable **lots** / spools (multiple physical spools, remaining feet, history) — new tables or structured JSON on `InventoryItem` + UI for “usage events”.
-10. **Cable color** / **fiber SM-MM** / **connector type** — extend [`InventoryItem`](../src/types/inventory.ts) + templates + reports.
+10. **Cable color** / **fiber SM-MM** / **connector type** — extend [`InventoryItem`](../src/types/inventory.ts) + templates + reports. **Phase 1:** optional `cableColor`, `fiberMode`, `connectorType`, `cableLotNumber` on items, Add/Edit **Additional Info**, custom report column picker, inventory search.
 11. **Nested projects** — mirror location tree patterns in settings + filters.
 12. **Supplier** read-only panel on item + optional enrichment (manual URL first; scraping is non-trivial and policy-sensitive).
 

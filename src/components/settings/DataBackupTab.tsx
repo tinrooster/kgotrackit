@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, Save, RefreshCw, FileJson, Database, GitMerge, Upload, Loader2 } from 'lucide-react';
+import { Download, Save, RefreshCw, FileJson, Database, GitMerge, Upload, Loader2, History } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import type { GroupReconcileResult } from '@/lib/groupInventoryReconciliation';
 import { Label } from '@/components/ui/label';
@@ -17,7 +17,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { validateFullBackupJsonText, validateSettingsSnapshotJsonText } from '@/lib/backupValidation';
+import { buildFullOfflineBackupPayload } from '@/lib/trackItDailyBackup';
+import {
+  addRestorePoint,
+  deleteRestorePoint,
+  getRestorePointPayloadJson,
+  listRestorePoints,
+  MAX_RESTORE_POINTS,
+  type RestorePointListEntry,
+} from '@/lib/localRestorePoints';
+import { logger } from '@/lib/logging';
 
 interface DataBackupTabProps {
   onExportData: () => void;
@@ -101,6 +120,18 @@ export function DataBackupTab({
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isValidatingFullRestore, setIsValidatingFullRestore] = useState(false);
   const [isValidatingSettingsRestore, setIsValidatingSettingsRestore] = useState(false);
+  const [restorePointEntries, setRestorePointEntries] = useState<RestorePointListEntry[]>([]);
+  const [createRestorePointOpen, setCreateRestorePointOpen] = useState(false);
+  const [newRestorePointName, setNewRestorePointName] = useState('Before risky change');
+  const [isSavingRestorePoint, setIsSavingRestorePoint] = useState(false);
+  const [restorePointLoadingId, setRestorePointLoadingId] = useState<string | null>(null);
+  const [rpRestoreDialogOpen, setRpRestoreDialogOpen] = useState(false);
+  const [rpRestoreJson, setRpRestoreJson] = useState<string | null>(null);
+  const [rpRestoreSummary, setRpRestoreSummary] = useState<{ lines: string[]; warnings: string[] } | null>(null);
+  const [rpRestoreLabel, setRpRestoreLabel] = useState('');
+  const [isRestoringFromPoint, setIsRestoringFromPoint] = useState(false);
+  const [deleteRestorePointTarget, setDeleteRestorePointTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isDeletingRestorePoint, setIsDeletingRestorePoint] = useState(false);
   const jsonImportRef = React.useRef<HTMLInputElement>(null);
   const excelImportRef = React.useRef<HTMLInputElement>(null);
   const restoreRef = React.useRef<HTMLInputElement>(null);
@@ -294,6 +325,147 @@ export function DataBackupTab({
       });
     } finally {
       setIsBackingUp(false);
+    }
+  };
+
+  const refreshRestorePointsList = useCallback(async () => {
+    try {
+      const list = await listRestorePoints();
+      setRestorePointEntries(list);
+    } catch (e) {
+      console.error('listRestorePoints failed', e);
+      setRestorePointEntries([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'backup-restore') return;
+    void refreshRestorePointsList();
+  }, [activeTab, refreshRestorePointsList]);
+
+  const handleSaveNewRestorePoint = async () => {
+    setIsSavingRestorePoint(true);
+    try {
+      const payload = await buildFullOfflineBackupPayload();
+      const text = JSON.stringify(payload, null, 2);
+      const { id } = await addRestorePoint(newRestorePointName, text);
+      const sizeBytes = new Blob([text]).size;
+      logger.info(
+        'system',
+        'Restore point created',
+        { restorePointId: id, name: newRestorePointName.trim() || 'Restore point', sizeBytes },
+        'DataBackupTab'
+      );
+      toast({
+        title: 'Restore point saved',
+        description: `Stored locally (up to ${MAX_RESTORE_POINTS}). Oldest entries roll off automatically.`,
+      });
+      setCreateRestorePointOpen(false);
+      setNewRestorePointName('Before risky change');
+      await refreshRestorePointsList();
+    } catch (error) {
+      toast({
+        title: 'Could not save restore point',
+        description: error instanceof Error ? error.message : 'IndexedDB may be full or unavailable.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingRestorePoint(false);
+    }
+  };
+
+  const beginRestoreFromPoint = async (id: string, name: string) => {
+    setRestorePointLoadingId(id);
+    try {
+      const json = await getRestorePointPayloadJson(id);
+      if (!json) {
+        toast({ title: 'Restore point missing', description: 'Payload was not found in IndexedDB.', variant: 'destructive' });
+        return;
+      }
+      const v = validateFullBackupJsonText(json);
+      if (!v.ok) {
+        toast({ title: 'Invalid restore point payload', description: v.error, variant: 'destructive' });
+        return;
+      }
+      setRpRestoreJson(json);
+      setRpRestoreSummary({ lines: v.summaryLines, warnings: v.warnings });
+      setRpRestoreLabel(name);
+      setRpRestoreDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: 'Could not read restore point',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setRestorePointLoadingId(null);
+    }
+  };
+
+  const executeRestoreFromPoint = async () => {
+    const json = rpRestoreJson;
+    const summary = rpRestoreSummary;
+    const label = rpRestoreLabel;
+    if (!json) return;
+    try {
+      setIsRestoringFromPoint(true);
+      logger.info('system', 'Restore point restore started', { name: label }, 'DataBackupTab');
+      const file = new File([json], 'restore-point.json', { type: 'application/json' });
+      await onRestoreData(file);
+      logger.info(
+        'system',
+        'Restore point restore completed',
+        { name: label },
+        'DataBackupTab'
+      );
+      toast({
+        title: 'Restore point applied',
+        description: summary ? summary.lines.slice(0, 4).join(' · ') : 'Local data was replaced from the snapshot.',
+      });
+    } catch (error) {
+      logger.warn(
+        'system',
+        'Restore point restore failed',
+        { name: label, error: error instanceof Error ? error.message : String(error) },
+        'DataBackupTab'
+      );
+      toast({
+        title: 'Restore failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRestoringFromPoint(false);
+      setRpRestoreDialogOpen(false);
+      setRpRestoreJson(null);
+      setRpRestoreSummary(null);
+      setRpRestoreLabel('');
+    }
+  };
+
+  const executeDeleteRestorePoint = async () => {
+    const target = deleteRestorePointTarget;
+    if (!target) return;
+    try {
+      setIsDeletingRestorePoint(true);
+      await deleteRestorePoint(target.id);
+      logger.info(
+        'system',
+        'Restore point deleted',
+        { restorePointId: target.id, name: target.name },
+        'DataBackupTab'
+      );
+      toast({ title: 'Restore point removed', description: `"${target.name}" was deleted from this browser.` });
+      setDeleteRestorePointTarget(null);
+      await refreshRestorePointsList();
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingRestorePoint(false);
     }
   };
 
@@ -504,6 +676,82 @@ export function DataBackupTab({
                     className="hidden"
                   />
                 </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <History className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <h3 className="text-sm font-medium">Local restore points</h3>
+                    <Badge variant="outline">This browser · IndexedDB</Badge>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void refreshRestorePointsList()}
+                    className="active:bg-accent"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
+                    Refresh list
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Named snapshots of the full in-app payload (same shape as <strong>Create Backup</strong>). Up to{' '}
+                  {MAX_RESTORE_POINTS} are kept; the oldest is removed when you save a new one. This does not replace file
+                  export or cloud sync.
+                </p>
+                <Button type="button" size="sm" variant="secondary" onClick={() => setCreateRestorePointOpen(true)}>
+                  Create restore point…
+                </Button>
+                {restorePointEntries.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No restore points yet.</p>
+                ) : (
+                  <ul className="space-y-2 rounded-md border border-border/60 bg-muted/15 p-2 text-sm">
+                    {restorePointEntries.map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="flex flex-col gap-2 rounded-md border border-transparent px-2 py-2 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-medium text-foreground">{entry.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(entry.createdAt).toLocaleString()} · {(entry.sizeBytes / 1024).toFixed(0)} KB
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                              isRestoring || isRestoringFromPoint || restorePointLoadingId !== null
+                            }
+                            onClick={() => void beginRestoreFromPoint(entry.id, entry.name)}
+                          >
+                            {restorePointLoadingId === entry.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                                Loading…
+                              </>
+                            ) : (
+                              'Restore'
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteRestorePointTarget({ id: entry.id, name: entry.name })}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               <div className="border-t pt-4">
@@ -767,6 +1015,125 @@ export function DataBackupTab({
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
             <Button type="button" disabled={isImportingExcel} onClick={() => void executeExcelImport()}>
               {isImportingExcel ? 'Importing…' : 'Import Excel'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={createRestorePointOpen} onOpenChange={setCreateRestorePointOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create restore point</DialogTitle>
+            <DialogDescription>
+              Saves the same payload as <strong>Create Backup</strong> into private browser storage (up to{' '}
+              {MAX_RESTORE_POINTS} named points; oldest rolls off).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="restore-point-name">Name</Label>
+            <Input
+              id="restore-point-name"
+              value={newRestorePointName}
+              onChange={(e) => setNewRestorePointName(e.target.value)}
+              placeholder="e.g. Before bulk delete"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCreateRestorePointOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={isSavingRestorePoint} onClick={() => void handleSaveNewRestorePoint()}>
+              {isSavingRestorePoint ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  Saving…
+                </>
+              ) : (
+                'Save restore point'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={deleteRestorePointTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && isDeletingRestorePoint) return;
+          if (!open) setDeleteRestorePointTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this restore point?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove{' '}
+              <span className="font-medium text-foreground">{deleteRestorePointTarget?.name ?? 'this snapshot'}</span>{' '}
+              from IndexedDB on this device. Current inventory data is not changed until you restore from another
+              snapshot.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeletingRestorePoint}
+              onClick={() => void executeDeleteRestorePoint()}
+            >
+              {isDeletingRestorePoint ? 'Deleting…' : 'Delete'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={rpRestoreDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isRestoringFromPoint) return;
+          setRpRestoreDialogOpen(open);
+          if (!open) {
+            setRpRestoreJson(null);
+            setRpRestoreSummary(null);
+            setRpRestoreLabel('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace all local data from restore point?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Applying restore point{' '}
+              <span className="font-medium text-foreground">{rpRestoreLabel || 'selected'}</span> overwrites inventory,
+              settings, lists, templates, and related data in this browser profile, same as restoring from a backup
+              file.
+            </AlertDialogDescription>
+            {rpRestoreSummary ? (
+              <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-foreground">
+                <p className="mb-1.5 font-medium text-foreground">Snapshot summary</p>
+                <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+                  {rpRestoreSummary.lines.map((line, i) => (
+                    <li key={i} className="text-foreground">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+                {rpRestoreSummary.warnings.length > 0 ? (
+                  <p className="mt-2 text-amber-800 dark:text-amber-200/90">{rpRestoreSummary.warnings.join(' ')}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </AlertDialogHeader>
+          {isRestoringFromPoint ? (
+            <div className="flex items-center gap-2 px-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+              <span>Applying restore point…</span>
+            </div>
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button type="button" disabled={isRestoringFromPoint} onClick={() => void executeRestoreFromPoint()}>
+              {isRestoringFromPoint ? 'Restoring…' : 'Restore from point'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

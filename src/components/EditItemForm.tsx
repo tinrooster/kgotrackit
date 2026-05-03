@@ -20,6 +20,7 @@ import { Slider } from "@/components/ui/slider";
 import { BasicDetailsTab } from "./BasicDetailsTab";
 import { AdditionalInfoTab } from "@/components/AdditionalInfoTab";
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
+import { resolveProjectValue } from "@/lib/projectOptions";
 
 // Enhanced form schema with stricter validation
 const formSchema = z.object({
@@ -72,6 +73,10 @@ const formSchema = z.object({
   decomCutoverDate: z.string().optional(),
   decomLastAuditAt: z.string().optional(),
   decomNotes: z.string().optional(),
+  cableColor: z.string().optional(),
+  fiberMode: z.enum(['sm', 'mm', 'na']).default('na'),
+  connectorType: z.string().optional(),
+  cableLotNumber: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -462,7 +467,7 @@ export function EditItemForm({
       costCenterDescription: item.costCenterDescription || '',
       assetTrackingMode: item.assetTrackingMode || 'line_item',
       assetTagEnd: item.assetTagEnd || '',
-      project: item.project || '',
+      project: resolveProjectValue(item.project, projects),
       manufacturerNotes: item.manufacturerNotes || '',
       additionalNotes: item.additionalNotes ?? item.notes ?? '',
       orderStatus: item.orderStatus || OrderStatus.COMPLETED,
@@ -483,8 +488,13 @@ export function EditItemForm({
       decomCutoverDate: item.decomCutoverDate || '',
       decomLastAuditAt: item.decomLastAuditAt || '',
       decomNotes: item.decomNotes || '',
+      cableColor: item.cableColor || '',
+      fiberMode:
+        item.fiberMode === 'sm' || item.fiberMode === 'mm' || item.fiberMode === 'na' ? item.fiberMode : 'na',
+      connectorType: item.connectorType || '',
+      cableLotNumber: item.cableLotNumber || '',
     };
-  }, [item, initialLocationValue]);
+  }, [item, initialLocationValue, projects]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

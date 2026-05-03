@@ -6,6 +6,9 @@ export enum OrderStatus {
   BACK_ORDERED = "BACK_ORDERED"
 }
 
+/** Fiber optic characterization for cable inventory (optional). */
+export type FiberOpticMode = 'sm' | 'mm' | 'na';
+
 export interface InventoryItem {
   id: string;
   /** Durable human-readable inventory row identifier (monotonic; never reused). */
@@ -67,6 +70,14 @@ export interface InventoryItem {
   customFields?: Record<string, string>;
   /** Data URL or external https URL for an item photo (stored with the record). */
   photoUrl?: string;
+  /** Jacket or trace color (free text, e.g. Yellow, Aqua). */
+  cableColor?: string;
+  /** Single-mode vs multimode fiber; omit or `na` when not applicable. */
+  fiberMode?: FiberOpticMode;
+  /** Connector family or part (e.g. LC duplex, ST, MTP). */
+  connectorType?: string;
+  /** Manufacturer or reel lot reference (lightweight; full spool/lot model is future work). */
+  cableLotNumber?: string;
   lastUpdated: Date;
   lastModifiedBy?: string; // Username of the person who last modified the item
 }

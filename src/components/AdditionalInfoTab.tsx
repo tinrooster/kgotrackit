@@ -160,6 +160,73 @@ export function AdditionalInfoTab({
           )}
         />
 
+        <div className="col-span-2 space-y-3 border-t border-border/60 pt-4">
+          <p className="text-sm font-medium text-foreground">Cable &amp; fiber</p>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="cableColor"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Jacket / trace color</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ''} placeholder="e.g. Yellow, Aqua" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fiberMode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fiber type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || 'na'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="na">N/A (not fiber)</SelectItem>
+                      <SelectItem value="sm">Single-mode (SM)</SelectItem>
+                      <SelectItem value="mm">Multimode (MM)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="connectorType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Connector</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ''} placeholder="e.g. LC duplex, MTP" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="cableLotNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Lot / reel #</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ''} placeholder="Manufacturer or reel lot" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
         <FormField
           control={form.control}
           name="dateInService"

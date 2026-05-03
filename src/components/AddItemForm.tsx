@@ -65,6 +65,10 @@ const formSchema = z.object({
   decomCutoverDate: z.string().optional(),
   decomLastAuditAt: z.string().optional(),
   decomNotes: z.string().optional(),
+  cableColor: z.string().optional(),
+  fiberMode: z.enum(['sm', 'mm', 'na']).default('na'),
+  connectorType: z.string().optional(),
+  cableLotNumber: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -166,6 +170,13 @@ export function AddItemForm({
       decomCutoverDate: initialValues?.decomCutoverDate || "",
       decomLastAuditAt: initialValues?.decomLastAuditAt || "",
       decomNotes: initialValues?.decomNotes || "",
+      cableColor: initialValues?.cableColor || "",
+      fiberMode:
+        initialValues?.fiberMode === 'sm' || initialValues?.fiberMode === 'mm' || initialValues?.fiberMode === 'na'
+          ? initialValues.fiberMode
+          : 'na',
+      connectorType: initialValues?.connectorType || "",
+      cableLotNumber: initialValues?.cableLotNumber || "",
     },
   });
 
@@ -203,6 +214,10 @@ export function AddItemForm({
         decomCutoverDate: values.decomCutoverDate?.trim() || undefined,
         decomLastAuditAt: values.decomLastAuditAt?.trim() || undefined,
         decomNotes: values.decomNotes?.trim() || undefined,
+        cableColor: values.cableColor?.trim() || undefined,
+        fiberMode: values.fiberMode !== 'na' ? values.fiberMode : undefined,
+        connectorType: values.connectorType?.trim() || undefined,
+        cableLotNumber: values.cableLotNumber?.trim() || undefined,
       };
 
       await onSubmit(processedValues);

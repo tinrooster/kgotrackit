@@ -589,6 +589,9 @@ export default function InventoryPage() {
         item.notes,
         item.rackLocation,
         item.decomNotes,
+        item.cableColor,
+        item.connectorType,
+        item.cableLotNumber,
       ].map(field => field?.toLowerCase() || '');
 
       const matchesSearch = !searchQuery || 

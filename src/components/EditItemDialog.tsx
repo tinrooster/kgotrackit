@@ -138,6 +138,15 @@ export function EditItemDialog({
             : item.decomLastAuditAt,
         decomNotes:
           typeof values.decomNotes === "string" ? values.decomNotes.trim() || undefined : item.decomNotes,
+        cableColor:
+          typeof values.cableColor === "string" ? values.cableColor.trim() || undefined : item.cableColor,
+        fiberMode: values.fiberMode === "sm" || values.fiberMode === "mm" ? values.fiberMode : undefined,
+        connectorType:
+          typeof values.connectorType === "string" ? values.connectorType.trim() || undefined : item.connectorType,
+        cableLotNumber:
+          typeof values.cableLotNumber === "string"
+            ? values.cableLotNumber.trim() || undefined
+            : item.cableLotNumber,
         lastUpdated: new Date()
       };
 

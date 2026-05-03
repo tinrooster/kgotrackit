@@ -12,6 +12,7 @@ import { FinancialCodeEntry } from "@/lib/financialSettingsService";
 import { Cabinet } from "@/types/cabinets";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveProjectValue } from "@/lib/projectOptions";
 
 interface AddItemDialogProps {
   onSubmit: (item: Omit<InventoryItem, "id" | "lastUpdated">) => void;
@@ -39,10 +40,6 @@ function buildValuesFromTemplate(
   const supplierMatch = suppliers.find((s) => s.name === selected.supplier);
   const locationMatch = locations.find((l) => l.id === selected.location);
   const unitMatch = units.find((u) => u.name === selected.unit);
-  const projectMatch = projects.find(
-    (p) => p.id === selected.project || p.name === selected.project
-  );
-
   return {
     name: selected.name,
     description: selected.description,
@@ -54,7 +51,7 @@ function buildValuesFromTemplate(
     location: locationMatch ? locationMatch.id : "",
     supplier: supplierMatch ? supplierMatch.name : "",
     supplierWebsite: selected.supplierWebsite,
-    project: projectMatch ? projectMatch.id : "",
+    project: resolveProjectValue(selected.project, projects),
     dateInService: selected.dateInService
       ? String(selected.dateInService).slice(0, 10)
       : undefined,
@@ -71,6 +68,10 @@ function buildValuesFromTemplate(
     notes: selected.notes,
     orderStatus: selected.orderStatus,
     deliveryPercentage: selected.deliveryPercentage,
+    cableColor: selected.cableColor,
+    fiberMode: selected.fiberMode,
+    connectorType: selected.connectorType,
+    cableLotNumber: selected.cableLotNumber,
   };
 }
 

@@ -70,6 +70,7 @@ To create items from templates:
 ### Viewing Item Details
 Click the edit icon (pencil) on any inventory item to view its details page, which includes:
 - Complete item information
+- Supplier read-only panel (name + website link)
 - Adjustment controls for modifying quantity
 - Edit and delete options
 

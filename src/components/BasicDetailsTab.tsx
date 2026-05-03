@@ -9,6 +9,7 @@ import { Cabinet } from "@/types/cabinets";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Combobox } from "@/components/ui/combobox";
+import { flattenProjectOptions } from "@/lib/projectOptions";
 import {
   getRackOptionsForFlatLocationLabel,
   RACK_LOCATIONS_UPDATED_EVENT,
@@ -118,6 +119,7 @@ export function BasicDetailsTab({
     () => rackOptions.map((o) => ({ label: o, value: o })),
     [rackOptions]
   );
+  const flattenedProjectOptions = React.useMemo(() => flattenProjectOptions(projects), [projects]);
 
   return (
     <div className="space-y-4">
@@ -208,7 +210,7 @@ export function BasicDetailsTab({
               <FormItem>
                 <FormLabel>Project</FormLabel>
                 <Select
-                  onValueChange={field.onChange}
+                  onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
                   value={field.value || undefined}
                 >
                   <FormControl>
@@ -218,9 +220,9 @@ export function BasicDetailsTab({
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
+                    {flattenedProjectOptions.map((projectOption) => (
+                      <SelectItem key={projectOption.id} value={projectOption.id}>
+                        {projectOption.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
