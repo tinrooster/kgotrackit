@@ -226,6 +226,7 @@ interface SortableItemProps {
   onRequestDeleteParent: (id: string) => void;
   onAddSubcategory: (id: string, subcategory: string) => void;
   onEditSubcategory: (id: string, oldValue: string, newValue: string) => void;
+  onMoveSubcategory: (id: string, subcategory: string, direction: "up" | "down") => void;
   onRequestDeleteSubcategory: (id: string, subcategory: string) => void;
   onPatchItem?: (id: string, patch: Partial<ItemWithSubcategories>) => void;
   onPatchChild?: (parentId: string, childKey: string, patch: Partial<ItemWithSubcategories>) => void;
@@ -251,6 +252,7 @@ function SortableItem({
   onRequestDeleteParent,
   onAddSubcategory,
   onEditSubcategory,
+  onMoveSubcategory,
   onRequestDeleteSubcategory,
   onPatchItem,
   onPatchChild,
@@ -461,9 +463,10 @@ function SortableItem({
 
       {enableSubcategories && subsExpanded && (item.children?.length ?? 0) > 0 && (
         <div className="ml-1 space-y-1 border-l-2 border-primary/30 pl-3 sm:ml-2 sm:pl-4">
-          {item.children?.map((child) => {
+          {item.children?.map((child, childIndex) => {
             const childKey = child.id ?? child.name;
             const childPresetRacks = getRackOptionsForSubLocationKey(child.name);
+            const childCount = item.children?.length ?? 0;
             return (
               <div key={childKey} className="space-y-1">
             <div
@@ -496,6 +499,26 @@ function SortableItem({
                 <>
                   <span className="min-w-0 flex-1 truncate italic">{child.name}</span>
                   <div className="flex shrink-0 gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onMoveSubcategory(item.id, child.name, "up")}
+                      disabled={childIndex === 0}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Move up"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onMoveSubcategory(item.id, child.name, "down")}
+                      disabled={childIndex >= childCount - 1}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Move down"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -691,6 +714,27 @@ export function EditableItemWithSubcategoriesList({
     setItems(newItems);
   };
 
+  const handleMoveSubcategory = (id: string, subcategoryName: string, direction: "up" | "down") => {
+    const newItems = items.map((item) => {
+      if (item.id !== id || !item.children?.length) {
+        return item;
+      }
+      const idx = item.children.findIndex((child) => child.name === subcategoryName);
+      if (idx === -1) {
+        return item;
+      }
+      const to = direction === "up" ? idx - 1 : idx + 1;
+      if (to < 0 || to >= item.children.length) {
+        return item;
+      }
+      return {
+        ...item,
+        children: arrayMove(item.children, idx, to),
+      };
+    });
+    setItems(newItems);
+  };
+
   const handleDeleteSubcategory = (id: string, subcategoryName: string) => {
     const newItems = items.map((item) => {
       if (item.id === id) {
@@ -772,6 +816,7 @@ export function EditableItemWithSubcategoriesList({
                 onRequestDeleteParent={(id) => setDeleteTarget({ kind: 'parent', id })}
                 onAddSubcategory={handleAddSubcategory}
                 onEditSubcategory={handleEditSubcategory}
+                onMoveSubcategory={handleMoveSubcategory}
                 onRequestDeleteSubcategory={(parentId, subName) =>
                   setDeleteTarget({ kind: 'sub', parentId, subName })
                 }

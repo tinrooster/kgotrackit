@@ -49,6 +49,7 @@ export interface UserDefinedListsSectionProps {
   >;
   currentUsername: string;
   onRequestDeleteReconcile: (payload: { type: string; value: string; affectedCount: number }) => void;
+  onNormalizeRackIds?: () => void;
 }
 
 export function UserDefinedListsSection({
@@ -60,6 +61,7 @@ export function UserDefinedListsSection({
   setFinancialSettings,
   currentUsername,
   onRequestDeleteReconcile,
+  onNormalizeRackIds,
 }: UserDefinedListsSectionProps) {
   const requestReconcile = (type: string, value: string, affectedCount: number) => {
     onRequestDeleteReconcile({ type, value, affectedCount });
@@ -141,8 +143,13 @@ export function UserDefinedListsSection({
 
           {panel === 'locations' && (
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle>Locations</CardTitle>
+                {onNormalizeRackIds ? (
+                  <Button type="button" size="sm" variant="outline" onClick={onNormalizeRackIds}>
+                    Normalize rack IDs
+                  </Button>
+                ) : null}
               </CardHeader>
               <CardContent>
                 <EditableItemWithSubcategoriesList

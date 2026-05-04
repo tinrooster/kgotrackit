@@ -268,7 +268,7 @@ function AdminResetPasswordDialog({
 }
 
 export default function SettingsPage() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, authBackend } = useAuth();
   
   // Initialize states from URL parameters
   const [mainTab, setMainTab] = useState(() => {
@@ -510,6 +510,57 @@ export default function SettingsPage() {
     };
     setDefaultSettings(nextSettings);
     SettingsService.saveDefaultSettings(nextSettings);
+  };
+
+  const handleNormalizeRackIds = () => {
+    const normalizeRackId = (value: string) => value.replace(/([A-Za-z]+)-(\d+)/g, "$1$2").trim();
+
+    const normalizeRows = (rows: ItemWithSubcategories[]): { next: ItemWithSubcategories[]; changed: number } => {
+      let changed = 0;
+      const walk = (row: ItemWithSubcategories): ItemWithSubcategories => {
+        const nextSlots = (row.rackSlots || []).map((slot) => normalizeRackId(String(slot)));
+        const slotsChanged =
+          nextSlots.length !== (row.rackSlots || []).length ||
+          nextSlots.some((slot, idx) => slot !== (row.rackSlots || [])[idx]);
+        const nextChildren = (row.children || []).map(walk);
+        const childrenChanged = nextChildren.some((child, idx) => child !== (row.children || [])[idx]);
+        if (!slotsChanged && !childrenChanged) return row;
+        changed += (slotsChanged ? 1 : 0) + (childrenChanged ? 1 : 0);
+        return {
+          ...row,
+          rackSlots: nextSlots,
+          children: nextChildren,
+        };
+      };
+      return { next: rows.map(walk), changed };
+    };
+
+    const { next: normalizedLocations, changed: changedLocationRows } = normalizeRows(settings.locations);
+    if (changedLocationRows > 0) {
+      updateSettingsList("locations", normalizedLocations);
+    }
+
+    const items = getItems();
+    let changedItems = 0;
+    const nextItems = items.map((item) => {
+      if (!item.rackLocation) return item;
+      const normalized = normalizeRackId(item.rackLocation);
+      if (normalized === item.rackLocation) return item;
+      changedItems += 1;
+      return { ...item, rackLocation: normalized };
+    });
+    if (changedItems > 0) {
+      saveItems(nextItems);
+    }
+
+    if (changedLocationRows === 0 && changedItems === 0) {
+      toast.info("Rack IDs are already normalized.");
+      return;
+    }
+
+    toast.success("Rack IDs normalized", {
+      description: `Updated ${changedItems} inventory item(s) and ${changedLocationRows} location row(s).`,
+    });
   };
 
   const handleExportSettingsSnapshot = async () => {
@@ -1689,6 +1740,7 @@ export default function SettingsPage() {
             setFinancialSettings={setFinancialSettings}
             currentUsername={currentUser?.username ?? 'admin'}
             onRequestDeleteReconcile={requestListDeleteReconcile}
+            onNormalizeRackIds={handleNormalizeRackIds}
           />
         </TabsContent>
 
@@ -1706,12 +1758,20 @@ export default function SettingsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>User Management</CardTitle>
-              <Button onClick={() => setShowAddUserDialog(true)} className="flex items-center">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add User
-              </Button>
+              {authBackend === 'supabase' ? null : (
+                <Button onClick={() => setShowAddUserDialog(true)} className="flex items-center">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add User
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
+              {authBackend === 'supabase' ? (
+                <div className="mb-4 rounded-md border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
+                  Supabase auth is active. User creation/role assignment should use Supabase Auth (Dashboard or service-role
+                  admin API). Local Add User is disabled in cloud mode.
+                </div>
+              ) : null}
               {renderUsersList()}
             </CardContent>
           </Card>
