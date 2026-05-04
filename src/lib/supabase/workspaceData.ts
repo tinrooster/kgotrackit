@@ -133,11 +133,18 @@ export async function pushWorkspaceSnapshot(workspaceId: string, snapshot: Works
  */
 export async function createWorkspaceWithSnapshot(
   name: string,
-  ownerUserId: string,
   snapshot: WorkspaceSnapshotPayload,
 ): Promise<string> {
   const client = getSupabase();
   if (!client) throw new Error('Supabase client unavailable');
+  const {
+    data: { user: authUser },
+    error: authErr,
+  } = await client.auth.getUser();
+  if (authErr || !authUser?.id) {
+    throw authErr ?? new Error('No authenticated Supabase user found');
+  }
+  const ownerUserId = authUser.id;
 
   const { data: ws, error: wErr } = await client
     .from('workspaces')

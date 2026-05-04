@@ -74,7 +74,7 @@ export function WorkspaceTeamTab() {
     setBusy(true);
     try {
       const snapshot = await collectLocalSnapshot();
-      const id = await createWorkspaceWithSnapshot(newName, currentUser.id, snapshot as WorkspaceSnapshotPayload);
+      const id = await createWorkspaceWithSnapshot(newName, snapshot as WorkspaceSnapshotPayload);
       toast.success('Workspace created. Switching…');
       setActiveWorkspaceId(id);
       window.location.reload();
