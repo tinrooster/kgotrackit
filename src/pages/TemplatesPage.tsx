@@ -166,7 +166,7 @@ export function TemplatesPage() {
         <div>
           <h1 className="text-3xl font-bold">Item Templates</h1>
         </div>
-        <Button onClick={handleCreateTemplate}>
+        <Button onClick={handleCreateTemplate} variant="outline">
           <Plus className="mr-2 h-4 w-4" />
           Create Template
         </Button>

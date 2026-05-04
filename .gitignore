@@ -20,9 +20,9 @@ out
 # electron-vite bundled config temp (should never be committed)
 electron.vite.config.*.mjs
 
-# Local tooling / generated caches (keep graph reports if committed intentionally)
+# Local tooling / generated outputs
 .specstory/
-graphify-out/cache/
+graphify-out/
 
 # Editor directories and files
 .vscode/*

@@ -138,6 +138,13 @@ export async function createWorkspaceWithSnapshot(
   const client = getSupabase();
   if (!client) throw new Error('Supabase client unavailable');
   const {
+    data: { session },
+    error: sessionErr,
+  } = await client.auth.getSession();
+  if (sessionErr || !session?.access_token) {
+    throw sessionErr ?? new Error('No active Supabase session. Sign in again and retry.');
+  }
+  const {
     data: { user: authUser },
     error: authErr,
   } = await client.auth.getUser();

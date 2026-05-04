@@ -18,7 +18,7 @@ interface CameraSettingsDialogProps {
   onClose: () => void;
 }
 
-const CAMERA_DEVICE_ID_KEY = "selectedCameraDeviceId";
+export const CAMERA_DEVICE_ID_KEY = "selectedCameraDeviceId";
 
 export function CameraSettingsDialog({ isOpen, onClose }: CameraSettingsDialogProps) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
