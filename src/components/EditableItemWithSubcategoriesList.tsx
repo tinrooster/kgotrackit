@@ -44,6 +44,21 @@ import { ItemWithSubcategories } from '@/types/inventory';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { getRackOptionsForFlatLocationLabel, getRackOptionsForSubLocationKey } from '@/lib/rackLocationsConfig';
+import { ListDetailCollapsible } from '@/components/ui/list-detail-collapsible';
+
+function supplierProfileHasContent(row: ItemWithSubcategories): boolean {
+  const t = (v: string | undefined) => (v ?? '').trim();
+  return Boolean(
+    t(row.website) ||
+      t(row.contactName) ||
+      t(row.contactEmail) ||
+      t(row.contactPhone) ||
+      t(row.supportEmail) ||
+      t(row.supportPhone) ||
+      t(row.accountReference) ||
+      t(row.supplierNotes),
+  );
+}
 
 function singularFormForListTitle(title: string): string {
   const lower = title.trim().toLowerCase();
@@ -465,10 +480,8 @@ function SortableItem({
       )}
 
       {perItemSupplierProfileFields && onPatchItem && (
-        <div className="ml-9 mt-1 grid max-w-4xl grid-cols-1 gap-2 rounded-md border border-border/60 bg-muted/15 p-3 sm:ml-10 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <p className="text-xs font-medium text-muted-foreground">Supplier profile details</p>
-          </div>
+        <ListDetailCollapsible title="Supplier profile details" defaultOpen={supplierProfileHasContent(item)}>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           <div className="space-y-1">
             <span className="text-xs font-medium text-muted-foreground">Website</span>
             <Input
@@ -576,7 +589,8 @@ function SortableItem({
               }
             />
           </div>
-        </div>
+          </div>
+        </ListDetailCollapsible>
       )}
 
       {enableSubcategories && subsExpanded && (item.children?.length ?? 0) > 0 && (

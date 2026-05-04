@@ -6,14 +6,24 @@ interface OptionalFormCollapsibleProps {
   title: string;
   children: React.ReactNode;
   className?: string;
+  /** When true, section starts expanded (native &lt;details open&gt;). */
+  defaultOpen?: boolean;
 }
 
 /**
  * Collapsible optional section using native &lt;details&gt; (no extra Radix dependency).
  */
-export function OptionalFormCollapsible({ title, children, className }: OptionalFormCollapsibleProps) {
+export function OptionalFormCollapsible({ title, children, className, defaultOpen }: OptionalFormCollapsibleProps) {
+  const detailsRef = React.useRef<HTMLDetailsElement>(null);
+  React.useEffect(() => {
+    if (defaultOpen && detailsRef.current) {
+      detailsRef.current.open = true;
+    }
+  }, [defaultOpen]);
+
   return (
     <details
+      ref={detailsRef}
       className={cn(
         'group rounded-md border border-border/60 bg-muted/10 shadow-sm',
         className,
