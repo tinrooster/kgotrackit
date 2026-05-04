@@ -239,6 +239,8 @@ flowchart LR
 
 ### Batch A — data integrity + workspace reliability (do first)
 
+**Shipped (code):** Supabase errors normalized via `formatSupabaseOrUnknownError` (no opaque object toasts); `normalizeProjectValue` keeps canonical project ids on add/update/duplicate; Reports project/location filters use resolved labels with invalid filter reset; nav shows **Personal** vs **Team · {name}** chip when Supabase is active; Team tab active context shows workspace name plus id.
+
 1. **Workspace create failure (`Could not create workspace (object, object)`)**
   - Replace generic object toast with normalized DB error (`message`, `details`, `hint`, `code`).
   - Add explicit checks for missing migration (`workspace_`* tables) and insufficient RLS role.

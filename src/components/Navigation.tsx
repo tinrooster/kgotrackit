@@ -4,9 +4,14 @@ import { LayoutDashboard, List, FileText, Settings, ShoppingCart } from 'lucide-
 import { cn } from "@/lib/utils"
 import { UserMenu } from '@/components/UserMenu'
 import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService'
+import { useAuth } from '@/contexts/AuthContext'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { isSupabaseConfigured } from '@/lib/supabase/client'
 
 export function Navigation() {
   const location = useLocation()
+  const { authBackend } = useAuth()
+  const { activeWorkspaceId, workspaces } = useWorkspace()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileTabletUi, setMobileTabletUi] = useState(
     () => SettingsService.loadDefaultSettings().mobileTabletUi
@@ -20,6 +25,12 @@ export function Navigation() {
     return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileTablet)
   }, [])
 
+  const showDataContextChip =
+    isSupabaseConfigured() && authBackend === 'supabase'
+  const activeWorkspaceName = activeWorkspaceId
+    ? workspaces.find((w) => w.workspaceId === activeWorkspaceId)?.name
+    : null
+
   const navItems = [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
     { path: "/inventory", label: "Inventory", icon: List },
@@ -31,16 +42,30 @@ export function Navigation() {
   return (
     <nav className="bg-background border-b sticky top-0 z-50">
       <div className="mx-auto flex w-full max-w-full px-3 sm:px-4 lg:px-6">
-        <div className="flex h-16 w-full min-w-0 items-center justify-between">
-          <Link
-            to="/"
-            className={cn(
-              'shrink-0 min-w-0 font-bold hover:text-primary transition-colors',
-              mobileTabletUi ? 'text-base sm:text-lg' : 'text-lg'
-            )}
-          >
-            TEd_trackIT
-          </Link>
+        <div className="flex h-16 w-full min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 max-w-[min(100%,220px)] flex-col gap-0.5 sm:max-w-none sm:flex-row sm:items-center sm:gap-2">
+            <Link
+              to="/"
+              className={cn(
+                'shrink-0 min-w-0 font-bold hover:text-primary transition-colors',
+                mobileTabletUi ? 'text-base sm:text-lg' : 'text-lg'
+              )}
+            >
+              TEd_trackIT
+            </Link>
+            {showDataContextChip ? (
+              <span
+                className="truncate rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                title={
+                  activeWorkspaceId
+                    ? `Team workspace: ${activeWorkspaceName ?? activeWorkspaceId}`
+                    : 'Personal inventory (your user_app_data row)'
+                }
+              >
+                {activeWorkspaceId ? `Team · ${activeWorkspaceName ?? 'Workspace'}` : 'Personal'}
+              </span>
+            ) : null}
+          </div>
 
           <div className="hidden min-w-0 md:flex md:items-center md:space-x-1 lg:space-x-2">
             {navItems.map(item => (

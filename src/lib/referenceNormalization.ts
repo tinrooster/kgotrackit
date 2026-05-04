@@ -1,5 +1,5 @@
 import type { ItemWithSubcategories } from "@/types/inventory";
-import { resolveProjectValue } from "@/lib/projectOptions";
+import { flattenProjectOptions } from "@/lib/projectOptions";
 
 /**
  * Normalize location to canonical id/path id used by forms.
@@ -40,6 +40,9 @@ export function normalizeProjectValue(
 ): string {
   const value = (rawValue ?? "").trim();
   if (!value) return "";
-  const resolved = resolveProjectValue(value, projects);
-  return resolved === value ? "" : resolved;
+  const options = flattenProjectOptions(projects);
+  if (options.some((o) => o.id === value)) return value;
+  const byName = options.find((o) => o.name === value);
+  if (byName) return byName.id;
+  return "";
 }

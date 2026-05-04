@@ -19,6 +19,8 @@ import { requestCloudSync } from '@/lib/cloudSyncEvents';
 import * as XLSX from 'xlsx';
 import { logger } from '@/lib/logging';
 import { useAuth } from '@/contexts/AuthContext';
+import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
+import { resolveProjectDisplay } from '@/lib/projectOptions';
 
 type BuiltInReportId =
   | 'asset-availability'
@@ -173,20 +175,53 @@ export default function ReportsPage() {
     };
   }, [setItems]);
 
-  const filteredItems = useMemo(
-    () =>
-      items.filter((item) => {
-        const matchesProject = projectFilter === 'all' || (item.project || 'Unassigned') === projectFilter;
-        const matchesLocation = locationFilter === 'all' || (item.location || 'Unassigned') === locationFilter;
-        const matchesStatus = statusFilter === 'all' || (item.assetStatus || 'other') === statusFilter;
-        const matchesExpenseType = expenseTypeFilter === 'all' || (item.expenseTypeCode || 'N/A') === expenseTypeFilter;
-        return matchesProject && matchesLocation && matchesStatus && matchesExpenseType;
-      }),
-    [items, projectFilter, locationFilter, statusFilter, expenseTypeFilter]
-  );
+  const projectFilterOptions = useMemo(() => {
+    const settings = getSettings();
+    const projRows = settings.projects || [];
+    const labels = items.map((item) => resolveProjectDisplay(item.project, projRows));
+    return Array.from(new Set(labels)).sort();
+  }, [items]);
 
-  const projects = useMemo(() => Array.from(new Set(items.map((item) => item.project || 'Unassigned'))).sort(), [items]);
-  const locations = useMemo(() => Array.from(new Set(items.map((item) => item.location || 'Unassigned'))).sort(), [items]);
+  const locationFilterOptions = useMemo(() => {
+    const settings = getSettings();
+    const locRows = settings.locations || [];
+    const labels = items.map((item) => {
+      if (!item.location?.trim()) return 'Unassigned';
+      const label = resolveLocationDisplay(item.location, locRows);
+      return label === '-' ? 'Unassigned' : label;
+    });
+    return Array.from(new Set(labels)).sort();
+  }, [items]);
+
+  useEffect(() => {
+    if (projectFilter !== 'all' && !projectFilterOptions.includes(projectFilter)) {
+      setProjectFilter('all');
+    }
+  }, [projectFilter, projectFilterOptions]);
+
+  useEffect(() => {
+    if (locationFilter !== 'all' && !locationFilterOptions.includes(locationFilter)) {
+      setLocationFilter('all');
+    }
+  }, [locationFilter, locationFilterOptions]);
+
+  const filteredItems = useMemo(() => {
+    const settings = getSettings();
+    const locRows = settings.locations || [];
+    const projRows = settings.projects || [];
+    return items.filter((item) => {
+      const projectLabel = resolveProjectDisplay(item.project, projRows);
+      const locationLabel = item.location?.trim()
+        ? resolveLocationDisplay(item.location, locRows)
+        : 'Unassigned';
+      const locationNorm = locationLabel === '-' ? 'Unassigned' : locationLabel;
+      const matchesProject = projectFilter === 'all' || projectLabel === projectFilter;
+      const matchesLocation = locationFilter === 'all' || locationNorm === locationFilter;
+      const matchesStatus = statusFilter === 'all' || (item.assetStatus || 'other') === statusFilter;
+      const matchesExpenseType = expenseTypeFilter === 'all' || (item.expenseTypeCode || 'N/A') === expenseTypeFilter;
+      return matchesProject && matchesLocation && matchesStatus && matchesExpenseType;
+    });
+  }, [items, projectFilter, locationFilter, statusFilter, expenseTypeFilter]);
 
   const toReportRows = (columns: string[]) =>
     filteredItems.map((item) =>
@@ -426,7 +461,11 @@ export default function ReportsPage() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Projects</SelectItem>
-                {projects.map((project) => <SelectItem key={project} value={project}>{project}</SelectItem>)}
+                {projectFilterOptions.map((project) => (
+                  <SelectItem key={project} value={project}>
+                    {project}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -436,7 +475,11 @@ export default function ReportsPage() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Locations</SelectItem>
-                {locations.map((location) => <SelectItem key={location} value={location}>{location}</SelectItem>)}
+                {locationFilterOptions.map((location) => (
+                  <SelectItem key={location} value={location}>
+                    {location}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

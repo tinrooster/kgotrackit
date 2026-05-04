@@ -13,6 +13,7 @@ import {
   setActiveWorkspaceId,
   type WorkspaceSnapshotPayload,
 } from '@/lib/supabase/workspaceData';
+import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
 import { Users } from 'lucide-react';
 
 /**
@@ -33,28 +34,23 @@ export function WorkspaceTeamTab() {
   }, [activeWorkspaceId]);
 
   const formatWorkspaceError = (error: unknown): string => {
-    if (error && typeof error === 'object') {
-      const asObj = error as Record<string, unknown>;
-      const code = typeof asObj.code === 'string' ? asObj.code : '';
-      const message = typeof asObj.message === 'string' ? asObj.message : '';
-      const details = typeof asObj.details === 'string' ? asObj.details : '';
-      const hint = typeof asObj.hint === 'string' ? asObj.hint : '';
-      const joined = [message, details, hint].filter(Boolean).join(' — ');
-      if (code === '42501' && joined.includes('workspaces')) {
-        return `${joined}. Usually fixed by migration 20260508120000_workspace_owner_select.sql (owner can read own workspace before membership row). Also ensure 20260506120000 + 20260507120000 are applied, then npx supabase db push.`;
-      }
-      if (joined) {
-        if (joined.includes('relation "workspaces"') || joined.includes('relation "workspace_')) {
-          return `${joined}. Run the workspace migration first (20260506120000_workspace_shared_data.sql).`;
-        }
-        return code ? `${joined} (${code})` : joined;
-      }
+    const base = formatSupabaseOrUnknownError(error);
+    const lower = base.toLowerCase();
+    if (lower.includes('42501') && lower.includes('workspace')) {
+      return `${base} Usually fixed by migration 20260508120000_workspace_owner_select.sql (owner can read own workspace before membership row). Also ensure 20260506120000 + 20260507120000 are applied, then run your Supabase migration deploy.`;
     }
-    if (error instanceof Error && error.message.trim()) {
-      return error.message;
+    if (lower.includes('relation "workspaces"') || lower.includes('relation "workspace_')) {
+      return `${base} Run the workspace migration first (20260506120000_workspace_shared_data.sql).`;
     }
-    return 'Unknown error. Ensure workspace migration is applied and your account can insert rows in workspaces/workspace_members/workspace_app_data.';
+    if (base === 'Unknown error.') {
+      return `${base} Ensure workspace migrations are applied and your account can insert rows in workspaces, workspace_members, and workspace_app_data.`;
+    }
+    return base;
   };
+
+  const activeWorkspaceRow = activeWorkspaceId
+    ? workspaces.find((w) => w.workspaceId === activeWorkspaceId)
+    : undefined;
 
   if (!isSupabaseConfigured() || authBackend !== 'supabase') {
     return (
@@ -122,8 +118,11 @@ export function WorkspaceTeamTab() {
           <p className="mt-1 text-muted-foreground">
             {activeWorkspaceId ? (
               <>
-                Team workspace <span className="font-mono text-xs">{activeWorkspaceId}</span>
+                Team: <span className="font-medium text-foreground">{activeWorkspaceRow?.name ?? 'Workspace'}</span>
                 {activeWorkspaceRole ? ` · your role: ${activeWorkspaceRole}` : ''}
+                <span className="mt-1 block font-mono text-[11px] text-muted-foreground/90" title="Workspace id">
+                  {activeWorkspaceId}
+                </span>
               </>
             ) : (
               <>Personal cloud snapshot (per-user row)</>
