@@ -15,6 +15,7 @@ import { InventoryItem, OrderStatus, ItemWithSubcategories, CategoryNode } from 
 import { SettingsService } from "@/lib/settingsService";
 import { getTodayDateInputValue, resolveDefaultUnitName } from "@/lib/inventoryFormDefaults";
 import { cn } from "@/lib/utils";
+import { collapsibleSectionSurfaceClass } from "@/lib/ui/collapsibleSectionSurface";
 import {
   Briefcase,
   Camera,
@@ -262,12 +263,6 @@ export function MobileQuickAddDialog({
   type JumpHighlight = "name" | "shortcuts" | "details" | "location" | "category" | "unit" | "project";
   const [jumpHighlight, setJumpHighlight] = React.useState<JumpHighlight | null>(null);
   const jumpTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const quickAddSectionClass = (active: boolean) =>
-    cn(
-      "overflow-hidden rounded-lg border border-border/60 bg-muted/10 shadow-sm transition-[box-shadow,background-color] duration-300",
-      active && "ring-2 ring-primary/45 bg-primary/[0.09] shadow-md",
-    );
 
   const flashJump = React.useCallback((id: JumpHighlight) => {
     if (jumpTimerRef.current) {
@@ -1014,7 +1009,7 @@ export function MobileQuickAddDialog({
 
           <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 [-webkit-overflow-scrolling:touch] sm:px-6">
             <div className="space-y-3 py-3 pr-0 pb-6 sm:space-y-4 sm:py-4">
-              <div ref={sectionNameRef} className={quickAddSectionClass(jumpHighlight === "name")}>
+              <div ref={sectionNameRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "name")}>
                 <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
                   <Type className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="text-xs font-semibold text-foreground">Name</span>
@@ -1067,7 +1062,7 @@ export function MobileQuickAddDialog({
                 </div>
               </div>
 
-              <div ref={sectionQuickRef} className={quickAddSectionClass(jumpHighlight === "shortcuts")}>
+              <div ref={sectionQuickRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "shortcuts")}>
                 <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
                   <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="text-xs font-semibold text-foreground">Shortcuts</span>
@@ -1160,7 +1155,7 @@ export function MobileQuickAddDialog({
                 </div>
               </div>
 
-              <div ref={sectionMetaRef} className={quickAddSectionClass(jumpHighlight === "details")}>
+              <div ref={sectionMetaRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "details")}>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
@@ -1360,7 +1355,7 @@ export function MobileQuickAddDialog({
                 )}
               </div>
 
-              <div ref={sectionAllLocRef} className={quickAddSectionClass(jumpHighlight === "location")}>
+              <div ref={sectionAllLocRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "location")}>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
@@ -1469,7 +1464,7 @@ export function MobileQuickAddDialog({
                 )}
               </div>
 
-              <div ref={sectionAllCatRef} className={quickAddSectionClass(jumpHighlight === "category")}>
+              <div ref={sectionAllCatRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "category")}>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
@@ -1518,7 +1513,7 @@ export function MobileQuickAddDialog({
                 )}
               </div>
 
-              <div ref={sectionUnitRef} className={quickAddSectionClass(jumpHighlight === "unit")}>
+              <div ref={sectionUnitRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "unit")}>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
@@ -1600,7 +1595,7 @@ export function MobileQuickAddDialog({
                 )}
               </div>
 
-              <div ref={sectionProjectRef} className={quickAddSectionClass(jumpHighlight === "project")}>
+              <div ref={sectionProjectRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "project")}>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"

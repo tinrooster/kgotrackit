@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { ChevronDown } from 'lucide-react';
+import { collapsibleSectionSurfaceClass } from '@/lib/ui/collapsibleSectionSurface';
 import { cn } from '@/lib/utils';
 
 interface OptionalFormCollapsibleProps {
@@ -15,19 +16,24 @@ interface OptionalFormCollapsibleProps {
  */
 export function OptionalFormCollapsible({ title, children, className, defaultOpen }: OptionalFormCollapsibleProps) {
   const detailsRef = React.useRef<HTMLDetailsElement>(null);
+  const [isOpen, setIsOpen] = React.useState(Boolean(defaultOpen));
+
   React.useEffect(() => {
-    if (defaultOpen && detailsRef.current) {
-      detailsRef.current.open = true;
+    const el = detailsRef.current;
+    if (!el) return;
+    if (defaultOpen) {
+      el.open = true;
     }
+    setIsOpen(el.open);
   }, [defaultOpen]);
 
   return (
     <details
       ref={detailsRef}
-      className={cn(
-        'group rounded-md border border-border/60 bg-muted/10 shadow-sm',
-        className,
-      )}
+      onToggle={(e) => {
+        setIsOpen(e.currentTarget.open);
+      }}
+      className={cn('group', collapsibleSectionSurfaceClass(isOpen), className)}
     >
       <summary
         className={cn(
