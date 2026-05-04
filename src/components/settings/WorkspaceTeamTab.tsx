@@ -41,7 +41,7 @@ export function WorkspaceTeamTab() {
       const hint = typeof asObj.hint === 'string' ? asObj.hint : '';
       const joined = [message, details, hint].filter(Boolean).join(' — ');
       if (code === '42501' && joined.includes('workspaces')) {
-        return `${joined}. RLS blocked insert. Confirm you are signed in (not expired), then run Supabase migrations (including 20260506120000 + 20260507120000) and retry.`;
+        return `${joined}. Usually fixed by migration 20260508120000_workspace_owner_select.sql (owner can read own workspace before membership row). Also ensure 20260506120000 + 20260507120000 are applied, then npx supabase db push.`;
       }
       if (joined) {
         if (joined.includes('relation "workspaces"') || joined.includes('relation "workspace_')) {
