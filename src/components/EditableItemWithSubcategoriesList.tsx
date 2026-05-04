@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   AlertDialog,
@@ -231,6 +232,7 @@ interface SortableItemProps {
   onPatchItem?: (id: string, patch: Partial<ItemWithSubcategories>) => void;
   onPatchChild?: (parentId: string, childKey: string, patch: Partial<ItemWithSubcategories>) => void;
   perItemWebsiteField?: boolean;
+  perItemSupplierProfileFields?: boolean;
   locationRackExtension?: boolean;
 }
 
@@ -257,6 +259,7 @@ function SortableItem({
   onPatchItem,
   onPatchChild,
   perItemWebsiteField = false,
+  perItemSupplierProfileFields = false,
   locationRackExtension = false,
   showColorPicker = false,
   enableSubcategories = true,
@@ -444,7 +447,7 @@ function SortableItem({
         </div>
       </div>
 
-      {perItemWebsiteField && onPatchItem && (
+      {perItemWebsiteField && onPatchItem && !perItemSupplierProfileFields && (
         <div className="ml-9 flex max-w-md flex-col gap-1 sm:ml-10">
           <span className="text-xs font-medium text-muted-foreground">Supplier website</span>
           <Input
@@ -458,6 +461,121 @@ function SortableItem({
               })
             }
           />
+        </div>
+      )}
+
+      {perItemSupplierProfileFields && onPatchItem && (
+        <div className="ml-9 mt-1 grid max-w-4xl grid-cols-1 gap-2 rounded-md border border-border/60 bg-muted/15 p-3 sm:ml-10 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <p className="text-xs font-medium text-muted-foreground">Supplier profile details</p>
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Website</span>
+            <Input
+              type="url"
+              className="h-8 text-sm"
+              placeholder="https://..."
+              value={item.website ?? ''}
+              onChange={(e) =>
+                onPatchItem(item.id, {
+                  website: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Contact name</span>
+            <Input
+              className="h-8 text-sm"
+              placeholder="Primary contact"
+              value={item.contactName ?? ''}
+              onChange={(e) =>
+                onPatchItem(item.id, {
+                  contactName: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Contact email</span>
+            <Input
+              type="email"
+              className="h-8 text-sm"
+              placeholder="name@company.com"
+              value={item.contactEmail ?? ''}
+              onChange={(e) =>
+                onPatchItem(item.id, {
+                  contactEmail: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Contact phone</span>
+            <Input
+              className="h-8 text-sm"
+              placeholder="+1 ..."
+              value={item.contactPhone ?? ''}
+              onChange={(e) =>
+                onPatchItem(item.id, {
+                  contactPhone: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Support email</span>
+            <Input
+              type="email"
+              className="h-8 text-sm"
+              placeholder="support@company.com"
+              value={item.supportEmail ?? ''}
+              onChange={(e) =>
+                onPatchItem(item.id, {
+                  supportEmail: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Support phone</span>
+            <Input
+              className="h-8 text-sm"
+              placeholder="+1 ..."
+              value={item.supportPhone ?? ''}
+              onChange={(e) =>
+                onPatchItem(item.id, {
+                  supportPhone: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Account reference</span>
+            <Input
+              className="h-8 text-sm"
+              placeholder="Customer/account number"
+              value={item.accountReference ?? ''}
+              onChange={(e) =>
+                onPatchItem(item.id, {
+                  accountReference: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <span className="text-xs font-medium text-muted-foreground">Notes</span>
+            <Textarea
+              className="min-h-[72px] text-sm"
+              placeholder="SLA, procurement notes, escalation details..."
+              value={item.supplierNotes ?? ''}
+              onChange={(e) =>
+                onPatchItem(item.id, {
+                  supplierNotes: e.target.value.trim() || undefined,
+                })
+              }
+            />
+          </div>
         </div>
       )}
 
@@ -575,6 +693,8 @@ interface EditableItemWithSubcategoriesListProps {
   onCheckBeforeDelete?: (value: string, onSafeToDelete: () => void) => void;
   /** Per-row website URL (e.g. supplier portal under Settings → Libraries → Suppliers). */
   perItemWebsiteField?: boolean;
+  /** Supplier mode: structured contact/support/account metadata fields per row. */
+  perItemSupplierProfileFields?: boolean;
   /** Location list: rack checkbox and named rack positions per parent or sub-location row. */
   locationRackExtension?: boolean;
 }
@@ -595,6 +715,7 @@ export function EditableItemWithSubcategoriesList({
   colorPickerLabel = 'Category color',
   onCheckBeforeDelete,
   perItemWebsiteField = false,
+  perItemSupplierProfileFields = false,
   locationRackExtension = false,
 }: EditableItemWithSubcategoriesListProps) {
   const addInputRef = useRef<HTMLInputElement>(null);
@@ -821,10 +942,11 @@ export function EditableItemWithSubcategoriesList({
                   setDeleteTarget({ kind: 'sub', parentId, subName })
                 }
                 onPatchItem={
-                  perItemWebsiteField || locationRackExtension ? handlePatchItem : undefined
+                  perItemWebsiteField || perItemSupplierProfileFields || locationRackExtension ? handlePatchItem : undefined
                 }
                 onPatchChild={locationRackExtension ? handlePatchChild : undefined}
                 perItemWebsiteField={perItemWebsiteField}
+                perItemSupplierProfileFields={perItemSupplierProfileFields}
                 locationRackExtension={locationRackExtension}
                 enableSubcategories={enableSubcategories}
                 showColorPicker={showColorPicker}

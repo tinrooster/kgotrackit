@@ -114,6 +114,20 @@ export interface ItemWithSubcategories {
   description?: string;
   /** Supplier portal URL when this row is used under Suppliers (Settings → Libraries). */
   website?: string;
+  /** Supplier primary contact person. */
+  contactName?: string;
+  /** Supplier sales/account contact email. */
+  contactEmail?: string;
+  /** Supplier sales/account contact phone. */
+  contactPhone?: string;
+  /** Supplier technical support email. */
+  supportEmail?: string;
+  /** Supplier technical support phone. */
+  supportPhone?: string;
+  /** Optional account/customer reference at supplier. */
+  accountReference?: string;
+  /** Internal notes for procurement/vendor management. */
+  supplierNotes?: string;
   color?: string;
   children?: ItemWithSubcategories[];
   /** When this row is a location (or sub-location), enables rack cell UI for inventory at that place. */

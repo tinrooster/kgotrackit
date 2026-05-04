@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { InventoryItem } from "@/types/inventory";
 import { getSettings } from "@/lib/storageService";
 import { resolveLocationDisplay } from "@/lib/resolveLocationLabel";
+import { findSupplierProfile } from "@/lib/supplierProfiles";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +50,8 @@ const formatCurrency = (value: number | undefined) => {
 
 export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const settings = getSettings();
+  const supplierProfile = findSupplierProfile(settings.suppliers || [], item.supplier);
 
   const handleDelete = () => {
     setIsDeleteDialogOpen(false);
@@ -56,8 +59,9 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
   };
 
   const openSupplierWebsite = () => {
-    if (item.supplierWebsite) {
-      window.open(item.supplierWebsite, '_blank');
+    const url = supplierProfile?.website || item.supplierWebsite;
+    if (url) {
+      window.open(url, '_blank');
     }
   };
 
@@ -162,7 +166,7 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                 <span className="text-sm font-medium mr-2">Location:</span>
                 <span>
                   {item.location
-                    ? resolveLocationDisplay(item.location, getSettings().locations || [])
+                    ? resolveLocationDisplay(item.location, settings.locations || [])
                     : "Not specified"}
                 </span>
               </div>
@@ -228,12 +232,12 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                 </p>
                 <p className="text-muted-foreground">
                   <span className="font-medium text-foreground">Website:</span>{" "}
-                  {item.supplierWebsite ? (
+                  {(supplierProfile?.website || item.supplierWebsite) ? (
                     <Button
                       variant="link"
                       className="h-auto p-0 align-baseline text-primary"
                       onClick={openSupplierWebsite}
-                      title={item.supplierWebsite}
+                      title={supplierProfile?.website || item.supplierWebsite}
                     >
                       <span className="inline-flex items-center gap-1">
                         Open link
@@ -244,8 +248,45 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                     "Not provided"
                   )}
                 </p>
-                {item.supplierWebsite ? (
-                  <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{item.supplierWebsite}</p>
+                {(supplierProfile?.website || item.supplierWebsite) ? (
+                  <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                    {supplierProfile?.website || item.supplierWebsite}
+                  </p>
+                ) : null}
+                {supplierProfile?.contactName ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Contact:</span> {supplierProfile.contactName}
+                  </p>
+                ) : null}
+                {supplierProfile?.contactEmail ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Contact email:</span> {supplierProfile.contactEmail}
+                  </p>
+                ) : null}
+                {supplierProfile?.contactPhone ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Contact phone:</span> {supplierProfile.contactPhone}
+                  </p>
+                ) : null}
+                {supplierProfile?.supportEmail ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Support email:</span> {supplierProfile.supportEmail}
+                  </p>
+                ) : null}
+                {supplierProfile?.supportPhone ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Support phone:</span> {supplierProfile.supportPhone}
+                  </p>
+                ) : null}
+                {supplierProfile?.accountReference ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Account ref:</span> {supplierProfile.accountReference}
+                  </p>
+                ) : null}
+                {supplierProfile?.supplierNotes ? (
+                  <p className="whitespace-pre-wrap text-muted-foreground">
+                    <span className="font-medium text-foreground">Vendor notes:</span> {supplierProfile.supplierNotes}
+                  </p>
                 ) : null}
               </div>
               <div className="flex items-center">

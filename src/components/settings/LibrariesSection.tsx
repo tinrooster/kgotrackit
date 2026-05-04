@@ -81,7 +81,7 @@ export function LibrariesSection({
                   setItems={(newItems) => updateSettingsList('suppliers', newItems)}
                   title="Suppliers"
                   enableSubcategories={false}
-                  perItemWebsiteField
+                  perItemSupplierProfileFields
                   onCheckBeforeDelete={(value, onSafeToDelete) => {
                     const items = getItems();
                     const affectedItems = items.filter((item) => item.supplier === value);

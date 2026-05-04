@@ -3,6 +3,7 @@ import type { UseFormReturn } from 'react-hook-form';
 import { useWatch } from 'react-hook-form';
 import type { ItemWithSubcategories } from '@/types/inventory';
 import { ensureUrlProtocol } from '@/utils/url';
+import { findSupplierProfile } from '@/lib/supplierProfiles';
 
 interface SupplierWebsiteStatusBlockProps {
   form: UseFormReturn<any>;
@@ -18,14 +19,11 @@ export function SupplierWebsiteStatusBlock({
   settingsHint = 'Set it under Settings → Libraries → Suppliers.',
 }: SupplierWebsiteStatusBlockProps) {
   const supplierName = useWatch({ control: form.control, name: 'supplier' }) as string | undefined;
-  const configured = React.useMemo(() => {
-    const name = (supplierName || '').trim();
-    if (!name) {
-      return '';
-    }
-    const row = suppliers.find((s) => s.name === name);
-    return (row?.website || '').trim();
-  }, [supplierName, suppliers]);
+  const supplierProfile = React.useMemo(
+    () => findSupplierProfile(suppliers, supplierName),
+    [supplierName, suppliers],
+  );
+  const configured = supplierProfile?.website || '';
 
   React.useEffect(() => {
     form.setValue('supplierWebsite', configured ? ensureUrlProtocol(configured) : '', {
@@ -53,6 +51,40 @@ export function SupplierWebsiteStatusBlock({
             : `Select a supplier first. ${settingsHint}`}
         </p>
       )}
+      {supplierProfile ? (
+        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+          {supplierProfile.contactName ? (
+            <p>
+              <span className="font-medium text-foreground">Contact:</span> {supplierProfile.contactName}
+            </p>
+          ) : null}
+          {supplierProfile.contactEmail ? (
+            <p>
+              <span className="font-medium text-foreground">Contact email:</span> {supplierProfile.contactEmail}
+            </p>
+          ) : null}
+          {supplierProfile.contactPhone ? (
+            <p>
+              <span className="font-medium text-foreground">Contact phone:</span> {supplierProfile.contactPhone}
+            </p>
+          ) : null}
+          {supplierProfile.supportEmail ? (
+            <p>
+              <span className="font-medium text-foreground">Support email:</span> {supplierProfile.supportEmail}
+            </p>
+          ) : null}
+          {supplierProfile.supportPhone ? (
+            <p>
+              <span className="font-medium text-foreground">Support phone:</span> {supplierProfile.supportPhone}
+            </p>
+          ) : null}
+          {supplierProfile.accountReference ? (
+            <p>
+              <span className="font-medium text-foreground">Account ref:</span> {supplierProfile.accountReference}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
