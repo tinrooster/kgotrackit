@@ -67,6 +67,7 @@ import JsBarcode from 'jsbarcode';
 import { FinancialCodeEntry, getFinancialSettings } from '@/lib/financialSettingsService';
 import { logger } from '@/lib/logging';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
+import { normalizeLocationValue, normalizeProjectValue } from '@/lib/referenceNormalization';
 
 function normalizeLocationPath(value: string): string {
   return value.replace(/\s*\/\s*/g, '/').trim();
@@ -778,8 +779,12 @@ export default function InventoryPage() {
       }
       const selectedExpenseType = expenseTypes.find((entry) => entry.code === newItemData.expenseTypeCode);
       const selectedCostCenter = costCenters.find((entry) => entry.code === newItemData.costCenterCode);
+      const normalizedLocation = normalizeLocationValue(newItemData.location, locations);
+      const normalizedProject = normalizeProjectValue(newItemData.project, projects);
       const newItem: InventoryItem = {
         ...newItemData,
+        location: normalizedLocation || undefined,
+        project: normalizedProject || undefined,
         recordId,
         assetId: computedAssetId,
         assetTagEnd: newItemData.assetTagEnd || computedAssetTagEnd,
@@ -843,12 +848,16 @@ export default function InventoryPage() {
     try {
       recordInventorySnapshotBeforeChange(items);
       const previousItem = originalEditItem || items.find((item) => item.id === updatedItem.id) || null;
-      const updatedItems = items.map(item => 
-        item.id === updatedItem.id ? { 
-          ...updatedItem, 
-          lastUpdated: new Date(),
-          lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown'
-        } : item
+      const updatedItems = items.map((item) =>
+        item.id === updatedItem.id
+          ? {
+              ...updatedItem,
+              location: normalizeLocationValue(updatedItem.location, locations) || undefined,
+              project: normalizeProjectValue(updatedItem.project, projects) || undefined,
+              lastUpdated: new Date(),
+              lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown',
+            }
+          : item,
       );
       if (!saveItems(updatedItems)) {
         toast.error('Could not save changes.', {
@@ -889,8 +898,12 @@ export default function InventoryPage() {
       nextAssetId = gen.startId;
       nextTagEnd = gen.endId;
     }
+    const normalizedLocation = normalizeLocationValue(newItemData.location, locations);
+    const normalizedProject = normalizeProjectValue(newItemData.project, projects);
     const newItem: InventoryItem = {
       ...newItemData,
+      location: normalizedLocation || undefined,
+      project: normalizedProject || undefined,
       recordId,
       assetId: nextAssetId,
       assetTagEnd: newItemData.assetTagEnd || nextTagEnd,

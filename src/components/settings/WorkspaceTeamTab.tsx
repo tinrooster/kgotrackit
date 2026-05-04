@@ -8,7 +8,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { collectLocalSnapshot } from '@/lib/supabase/cloudData';
-import { createWorkspaceWithSnapshot, type WorkspaceSnapshotPayload } from '@/lib/supabase/workspaceData';
+import {
+  createWorkspaceWithSnapshot,
+  setActiveWorkspaceId,
+  type WorkspaceSnapshotPayload,
+} from '@/lib/supabase/workspaceData';
 import { Users } from 'lucide-react';
 
 /**
@@ -16,10 +20,38 @@ import { Users } from 'lucide-react';
  */
 export function WorkspaceTeamTab() {
   const { currentUser, authBackend } = useAuth();
-  const { workspaces, activeWorkspaceId, activeWorkspaceRole, loading, refreshWorkspaces, selectPersonalData, selectWorkspace } =
+  const { workspaces, activeWorkspaceId, activeWorkspaceRole, loading, refreshWorkspaces } =
     useWorkspace();
   const [newName, setNewName] = React.useState('Team inventory');
   const [busy, setBusy] = React.useState(false);
+  const [targetKind, setTargetKind] = React.useState<'personal' | 'team'>(activeWorkspaceId ? 'team' : 'personal');
+  const [targetWorkspaceId, setTargetWorkspaceId] = React.useState<string>(activeWorkspaceId ?? '');
+
+  React.useEffect(() => {
+    setTargetKind(activeWorkspaceId ? 'team' : 'personal');
+    setTargetWorkspaceId(activeWorkspaceId ?? '');
+  }, [activeWorkspaceId]);
+
+  const formatWorkspaceError = (error: unknown): string => {
+    if (error && typeof error === 'object') {
+      const asObj = error as Record<string, unknown>;
+      const code = typeof asObj.code === 'string' ? asObj.code : '';
+      const message = typeof asObj.message === 'string' ? asObj.message : '';
+      const details = typeof asObj.details === 'string' ? asObj.details : '';
+      const hint = typeof asObj.hint === 'string' ? asObj.hint : '';
+      const joined = [message, details, hint].filter(Boolean).join(' — ');
+      if (joined) {
+        if (joined.includes('relation "workspaces"') || joined.includes('relation "workspace_')) {
+          return `${joined}. Run the workspace migration first (20260506120000_workspace_shared_data.sql).`;
+        }
+        return code ? `${joined} (${code})` : joined;
+      }
+    }
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+    return 'Unknown error. Ensure workspace migration is applied and your account can insert rows in workspaces/workspace_members/workspace_app_data.';
+  };
 
   if (!isSupabaseConfigured() || authBackend !== 'supabase') {
     return (
@@ -44,13 +76,27 @@ export function WorkspaceTeamTab() {
       const snapshot = await collectLocalSnapshot();
       const id = await createWorkspaceWithSnapshot(newName, currentUser.id, snapshot as WorkspaceSnapshotPayload);
       toast.success('Workspace created. Switching…');
-      selectWorkspace(id);
+      setActiveWorkspaceId(id);
+      window.location.reload();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast.error('Could not create workspace', { description: msg });
+      toast.error('Could not create workspace', { description: formatWorkspaceError(e) });
     } finally {
       setBusy(false);
     }
+  };
+
+  const applyContextSwitch = () => {
+    if (targetKind === 'personal') {
+      setActiveWorkspaceId(null);
+      window.location.reload();
+      return;
+    }
+    if (!targetWorkspaceId) {
+      toast.error('Select a team workspace first.');
+      return;
+    }
+    setActiveWorkspaceId(targetWorkspaceId);
+    window.location.reload();
   };
 
   return (
@@ -100,29 +146,62 @@ export function WorkspaceTeamTab() {
 
         <div className="space-y-2">
           <p className="text-sm font-medium">Switch context</p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Button type="button" variant={!activeWorkspaceId ? 'secondary' : 'outline'} size="sm" onClick={selectPersonalData}>
-              Personal data
+          <div className="inline-flex items-center gap-1 rounded-md border border-border/70 p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={targetKind === 'personal' ? 'secondary' : 'ghost'}
+              onClick={() => setTargetKind('personal')}
+            >
+              Personal
             </Button>
-            {loading ? (
-              <span className="text-xs text-muted-foreground">Loading workspaces…</span>
-            ) : (
-              workspaces.map((w) => (
-                <Button
-                  key={w.workspaceId}
-                  type="button"
-                  variant={activeWorkspaceId === w.workspaceId ? 'secondary' : 'outline'}
-                  size="sm"
-                  onClick={() => selectWorkspace(w.workspaceId)}
-                  title={`Role: ${w.role}`}
-                >
-                  {w.name}
-                </Button>
-              ))
-            )}
-            <Button type="button" variant="ghost" size="sm" onClick={() => void refreshWorkspaces()}>
-              Refresh list
+            <Button
+              type="button"
+              size="sm"
+              variant={targetKind === 'team' ? 'secondary' : 'ghost'}
+              onClick={() => setTargetKind('team')}
+            >
+              Team
             </Button>
+          </div>
+          {targetKind === 'team' ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {loading ? (
+                <span className="text-xs text-muted-foreground">Loading workspaces…</span>
+              ) : (
+                workspaces.map((w) => (
+                  <Button
+                    key={w.workspaceId}
+                    type="button"
+                    variant={targetWorkspaceId === w.workspaceId ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => setTargetWorkspaceId(w.workspaceId)}
+                    title={`Role: ${w.role}`}
+                  >
+                    {w.name}
+                  </Button>
+                ))
+              )}
+              <Button type="button" variant="ghost" size="sm" onClick={() => void refreshWorkspaces()}>
+                Refresh list
+              </Button>
+            </div>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={applyContextSwitch}
+              disabled={
+                (targetKind === 'personal' && !activeWorkspaceId) ||
+                (targetKind === 'team' && (!targetWorkspaceId || targetWorkspaceId === activeWorkspaceId))
+              }
+            >
+              Apply & reload
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Selected target: {targetKind === 'personal' ? 'Personal data' : `Team ${targetWorkspaceId || '(none)'}`}
+            </span>
           </div>
         </div>
       </CardContent>

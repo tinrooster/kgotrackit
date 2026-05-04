@@ -512,20 +512,6 @@ export default function SettingsPage() {
     SettingsService.saveDefaultSettings(nextSettings);
   };
 
-  const saveAllSettings = () => {
-    try {
-      // Use the new saveSettings interface that takes all settings at once
-      saveSettings(settings);
-      saveFinancialSettings(financialSettings);
-      toast.success('Synced to storage', {
-        description: 'User-defined lists and financial codes were written to local storage / Electron store.',
-      });
-    } catch (error) {
-      console.error("Error saving settings:", error)
-      toast.error("Failed to sync settings")
-    }
-  }
-
   const handleExportSettingsSnapshot = async () => {
     try {
       const cabinets = await SettingsService.getCabinets();
@@ -1647,10 +1633,6 @@ export default function SettingsPage() {
               Fix unreconciled
             </Button>
           )}
-          <Button type="button" variant="secondary" onClick={saveAllSettings}>
-            <Save className="mr-2 h-4 w-4" />
-            Sync to storage
-          </Button>
         </div>
       </div>
 

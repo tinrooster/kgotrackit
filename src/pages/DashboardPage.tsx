@@ -7,6 +7,9 @@ import { InventoryItem } from '@/types/inventory';
 import { Plus, Filter } from 'lucide-react';
 import { SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getSettings } from '@/lib/storageService';
+import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
+import { resolveProjectDisplay } from '@/lib/projectOptions';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -58,8 +61,9 @@ export default function DashboardPage() {
 
   // Get project statistics
   const projectStats = useMemo(() => {
+    const settings = getSettings();
     const stats = items.reduce((acc, item) => {
-      const project = item.project || 'Unassigned';
+      const project = resolveProjectDisplay(item.project, settings.projects || []);
       if (!acc[project]) {
         acc[project] = { count: 0, items: [], totalValue: 0 };
       }
@@ -83,8 +87,11 @@ export default function DashboardPage() {
 
   // Get location statistics
   const locationStats = useMemo(() => {
+    const settings = getSettings();
     const stats = items.reduce((acc, item) => {
-      const location = item.location || 'Unspecified';
+      const location = item.location
+        ? resolveLocationDisplay(item.location, settings.locations || [])
+        : 'Unassigned';
       if (!acc[location]) {
         acc[location] = { count: 0, items: [], totalValue: 0 };
       }

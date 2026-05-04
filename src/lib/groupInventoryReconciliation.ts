@@ -32,11 +32,24 @@ export function reconcileInventoryGroup(
   settings: Settings,
   financial: FinancialSettings
 ): { nextItems: InventoryItem[]; result: GroupReconcileResult } {
+  const flattenPathLabels = (rows: { id: string; name: string; children?: { id: string; name: string }[] }[]) => {
+    const values = new Set<string>();
+    for (const row of rows) {
+      values.add(row.id);
+      values.add(row.name);
+      for (const child of row.children || []) {
+        values.add(`${row.id}/${child.id}`);
+        values.add(`${row.name}/${child.name}`);
+        values.add(child.name);
+      }
+    }
+    return values;
+  };
   const validCategories = new Set(settings.categories.map((entry) => entry.name));
   const validUnits = new Set(settings.units.map((entry) => entry.name));
-  const validLocations = new Set(settings.locations.map((entry) => entry.name));
+  const validLocations = flattenPathLabels(settings.locations);
   const validSuppliers = new Set(settings.suppliers.map((entry) => entry.name));
-  const validProjects = new Set(settings.projects.map((entry) => entry.name));
+  const validProjects = flattenPathLabels(settings.projects);
   const validExpenseCodes = new Set(settings.expenseCodes.map((entry) => entry.name));
 
   const validExpenseTypeCodes = new Set(financial.expenseTypes.map((entry) => entry.code));

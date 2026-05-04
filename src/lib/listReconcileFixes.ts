@@ -79,16 +79,25 @@ export function fixUnreconciledUnits(units: ItemWithSubcategories[]): void {
 
 export function fixUnreconciledLocations(locations: ItemWithSubcategories[]): void {
   const items = getItems();
-  const validLocations = locations.map((loc) => loc.name);
+  const validLocations = new Set<string>();
+  locations.forEach((loc) => {
+    validLocations.add(loc.name);
+    validLocations.add(loc.id);
+    (loc.children || []).forEach((child) => {
+      validLocations.add(child.name);
+      validLocations.add(`${loc.id}/${child.id}`);
+      validLocations.add(`${loc.name}/${child.name}`);
+    });
+  });
   const itemsWithInvalidLocations = items.filter(
-    (item) => item.location && !validLocations.includes(item.location)
+    (item) => item.location && !validLocations.has(item.location)
   );
   if (itemsWithInvalidLocations.length === 0) {
     toast.info('No inventory items with invalid locations found');
     return;
   }
   const fixedItems = items.map((item) => {
-    if (item.location && !validLocations.includes(item.location)) {
+    if (item.location && !validLocations.has(item.location)) {
       const newItem = { ...item };
       newItem.customFields = { ...newItem.customFields, previousLocation: item.location };
       delete newItem.location;
@@ -102,16 +111,25 @@ export function fixUnreconciledLocations(locations: ItemWithSubcategories[]): vo
 
 export function fixUnreconciledProjects(projects: ItemWithSubcategories[]): void {
   const items = getItems();
-  const validProjects = projects.map((proj) => proj.name);
+  const validProjects = new Set<string>();
+  projects.forEach((proj) => {
+    validProjects.add(proj.name);
+    validProjects.add(proj.id);
+    (proj.children || []).forEach((child) => {
+      validProjects.add(child.name);
+      validProjects.add(`${proj.id}/${child.id}`);
+      validProjects.add(`${proj.name}/${child.name}`);
+    });
+  });
   const itemsWithInvalidProjects = items.filter(
-    (item) => item.project && !validProjects.includes(item.project)
+    (item) => item.project && !validProjects.has(item.project)
   );
   if (itemsWithInvalidProjects.length === 0) {
     toast.info('No inventory items with invalid projects found');
     return;
   }
   const fixedItems = items.map((item) => {
-    if (item.project && !validProjects.includes(item.project)) {
+    if (item.project && !validProjects.has(item.project)) {
       const newItem = { ...item };
       newItem.customFields = { ...newItem.customFields, previousProject: item.project };
       delete newItem.project;

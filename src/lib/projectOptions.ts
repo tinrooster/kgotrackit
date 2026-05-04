@@ -33,3 +33,17 @@ export function resolveProjectValue(
   if (matchByName) return matchByName.id;
   return rawValue;
 }
+
+/** Resolve stored id/path/name to a user-facing project label. */
+export function resolveProjectDisplay(
+  rawValue: string | undefined,
+  projects: ItemWithSubcategories[],
+): string {
+  if (!rawValue) return "Unassigned";
+  const options = flattenProjectOptions(projects);
+  const matchById = options.find((option) => option.id === rawValue);
+  if (matchById) return matchById.name;
+  const matchByName = options.find((option) => option.name === rawValue);
+  if (matchByName) return matchByName.name;
+  return "Unassigned";
+}

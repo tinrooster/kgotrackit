@@ -225,3 +225,82 @@ flowchart LR
 | Delete all records: local or global? | For Supabase auth: **your user’s cloud row** updates on next successful push; other users unaffected. Clearing browser storage without push can desync until refresh/bootstrap. |
 | Manage Supabase users via API? | **Yes**, via Supabase **Admin API** with **service role** (server-only, never in Vercel client bundle). Typical pattern: small **admin backend** or Edge Function. Not from the browser with anon key. |
 | Is printed UUID the Supabase record id? | It’s the **inventory item’s `id` field** in stored JSON (UUID). There is no separate `inventory` table in the migration you have — payload is JSONB in `user_app_data`. |
+
+---
+
+## May 04 notes (triaged into execution batches)
+
+### Batch A — data integrity + workspace reliability (do first)
+
+1. **Workspace create failure (`Could not create workspace (object, object)`)**
+   - Replace generic object toast with normalized DB error (`message`, `details`, `hint`, `code`).
+   - Add explicit checks for missing migration (`workspace_*` tables) and insufficient RLS role.
+   - Add troubleshooting line in Team workspace card (migration + membership prerequisites).
+
+2. **New records showing DB ids until manual reconciliation**
+   - Root issue: mixed id/path/name values for `location` / `project` in some create/edit paths and dashboard aggregations.
+   - Preventive fix: normalize values at write boundaries (Add/Edit/Quick Add/Template apply) to one canonical form.
+   - Read fix: dashboard/report filters resolve labels robustly from settings trees (not raw string assumptions).
+   - Add auto-reconcile-on-save guard for invalid lookup references.
+
+3. **Team workspace selector clarity**
+   - Add obvious A/B segmented control for **Personal** vs **Team** context.
+   - Show selected target before reload and in persistent top-level context chip.
+
+4. **`Sync to storage` button**
+   - Remove or demote where autosave + backup/restore already cover behavior.
+   - Keep one explicit manual sync action only if it does something unique.
+
+### Batch B — admin model + settings data structures
+
+5. **User management (local vs Supabase)**
+   - Keep local users only for local-auth mode.
+   - For Supabase mode, build server-side admin API (service role) for invite/add/role updates.
+   - In-app “Add user” should route to Supabase-backed flow when cloud auth is active.
+
+6. **Suppliers as records (not only website)**
+   - Promote Suppliers to structured entity: website, contacts, support channels, account notes, SLA/vendor metadata.
+   - Inventory pages show supplier info read-only; edits happen in Settings/Libraries.
+
+7. **Locations: draggable sublocations**
+   - Extend sortable list to support child reorder with persisted hierarchy ordering.
+
+8. **Rack presets migration (`TD-05` → `TD05`)**
+   - Provide one-time migration utility/script for stored item `rackLocation` + rack preset config.
+   - Include room-specific conversions (TE/ITV/Imagine/Dalet) and dry-run preview.
+
+### Batch C — UX polish + docs/content
+
+9. **Buttons style consistency**
+   - Reserve strong/filled white style for true primary CTAs only.
+   - Use neutral/outline secondary style in templates and non-primary list actions.
+
+10. **Camera settings visibility**
+    - Always show currently selected/default camera and active device availability state.
+
+11. **Help/About/docs refresh**
+    - Help page to sidebar navigation.
+    - Remove “non-retail” references.
+    - Update in-app docs/about/help + `changes.md`.
+
+12. **Dashboard aggregation correctness**
+    - Fix project/location grouping to avoid “Unassigned/Unspecified” from id-path mismatches.
+    - Standardize label wording to **Unassigned**.
+
+### Batch D — theme system and accessibility
+
+13. **Dark mode redesign**
+    - Introduce lower-contrast grayscale dark theme with muted accent.
+    - Add separate **High Contrast** mode.
+    - Keep existing theme as fallback during migration.
+
+14. **Light palette option**
+    - Add provided palette as selectable theme variant:
+      - `#A59D84`, `#C1BAA1`, `#D7D3BF`, `#ECEBDE`
+
+### Deferred architecture (still valid from earlier notes)
+
+- Secure cabinet activity cloud persistence (cross-login history).
+- Cable spool/lot usage ledger (remaining feet + event history).
+- Mobile-first pass beyond current quick-add/dashboard/checkout adjustments.
+- Fast user switching UX on shared browsers (session management trade-offs).
