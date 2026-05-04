@@ -1,810 +1,974 @@
 {
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\electron.vite.config.1777695303047.mjs": {
-    "mtime": 1777697082.234896,
-    "hash": "b8948464c0d1318519525dde94d4b4e8"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\electron.vite.config.ts": {
+    "mtime": 1777813154.5968354,
+    "hash": "6a9b41d9d7fd84d2b4fd073a11affd96"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\electron.vite.config.ts": {
-    "mtime": 1777697082.2374392,
-    "hash": "6ec59369788babe89729aa5c4feea00f"
-  },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\eslint.config.js": {
-    "mtime": 1777697082.2530932,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\eslint.config.js": {
+    "mtime": 1777588885.9656086,
     "hash": "3ba10f28cceae21814bb32e43b67ce11"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\postcss.config.js": {
-    "mtime": 1777697082.2744186,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\postcss.config.js": {
+    "mtime": 1777678016.0813384,
     "hash": "584bf188c79af67a8a7f5e96b0b38702"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\tailwind.config.js": {
-    "mtime": 1777697082.848241,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\tailwind.config.js": {
+    "mtime": 1777588888.3998,
     "hash": "fbc9cccebf773aacf6f7a15f322a9519"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\tailwind.config.ts": {
-    "mtime": 1777697082.8506503,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\tailwind.config.ts": {
+    "mtime": 1777588888.4031813,
     "hash": "e88715a845672f3e30e5e1b68239f0ab"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\vite.config.ts": {
-    "mtime": 1777697082.8744836,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\vite.config.ts": {
+    "mtime": 1777588888.639912,
     "hash": "41e5b7fb20579905906b6818f2343162"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\electron\\main.ts": {
-    "mtime": 1777699323.8116508,
-    "hash": "149a3168962c74f0e194ab132cc77e34"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\vite.config.web.ts": {
+    "mtime": 1777813157.09611,
+    "hash": "a399c37b1283d56c4bfdb0c58e43a694"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\electron\\preload.ts": {
-    "mtime": 1777697082.2452514,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\dist-web\\assets\\index-Sh7qn5ko.js": {
+    "mtime": 1777813154.000805,
+    "hash": "04453984d3a5c6492115d8497dcae304"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\electron\\main.ts": {
+    "mtime": 1777813154.6004734,
+    "hash": "45cac94096189d4b9088e8b9c047de9f"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\electron\\preload.ts": {
+    "mtime": 1777639340.4588978,
     "hash": "f6aa657d65b47d68d4081449292fd47a"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\electron\\preload\\index.ts": {
-    "mtime": 1777697082.250501,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\electron\\preload\\index.ts": {
+    "mtime": 1777588885.9336174,
     "hash": "b4f65a64f03dfed19b574311154d9b6e"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\scripts\\baselines\\Compare-ToBaseline.ps1": {
-    "mtime": 1777697082.295595,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\scripts\\vite-web.mjs": {
+    "mtime": 1777813156.6423495,
+    "hash": "da96d39764eb262442ecc907ce9e0613"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\scripts\\baselines\\Compare-ToBaseline.ps1": {
+    "mtime": 1777691974.937815,
     "hash": "7d297ff8728832a93923d5cb7f696a42"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\scripts\\baselines\\Sync-Baselines.ps1": {
-    "mtime": 1777697082.298451,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\scripts\\baselines\\Sync-Baselines.ps1": {
+    "mtime": 1777691787.0956619,
     "hash": "cc188d983c6d2ea661e2aa80db027141"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\App.tsx": {
-    "mtime": 1777714560.7051394,
-    "hash": "6eeffd00f95c4fb49668b268301adc8a"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\App.tsx": {
+    "mtime": 1777836137.381698,
+    "hash": "b5f94bddf595685565465043c68227f1"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\main.tsx": {
-    "mtime": 1777697082.7434437,
-    "hash": "470e8973a225fc6a1fe91c34796c0934"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\main.tsx": {
+    "mtime": 1777843829.7819843,
+    "hash": "ce799874938b1f57b6ea0a404ab698cf"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\TestPage.tsx": {
-    "mtime": 1777697082.3092532,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\TestPage.tsx": {
+    "mtime": 1777588886.5067,
     "hash": "2ac422d5197d45f245ed38e559fcd7c4"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\vite-env.d.ts": {
-    "mtime": 1777697082.8457038,
-    "hash": "8f68c27c3fc38817b2726b20e2d4f1ee"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\vite-env.d.ts": {
+    "mtime": 1777813157.0111237,
+    "hash": "9040a2c388630514ce724e85f97194ed"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\app\\checkout\\page.tsx": {
-    "mtime": 1777697082.3178585,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\app\\checkout\\page.tsx": {
+    "mtime": 1777588886.5462015,
     "hash": "8296e5b7612248a4cb1414835e360cb2"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\app\\checkouts\\page.tsx": {
-    "mtime": 1777697082.323262,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\app\\checkouts\\page.tsx": {
+    "mtime": 1777588886.553373,
     "hash": "30bafbf416bc6dc4de693e690abb14b1"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\AddItemDialog.tsx": {
-    "mtime": 1777716203.3978662,
-    "hash": "bc47c9401d2e9a791ab82fc24e774a38"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\AddItemDialog.tsx": {
+    "mtime": 1777836134.9401643,
+    "hash": "55347514053b2e997534ec4f57a91d83"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\AddItemForm.tsx": {
-    "mtime": 1777715118.7548413,
-    "hash": "a39121c417821c2917dd036f38f0303a"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\AddItemForm.tsx": {
+    "mtime": 1777843877.0360165,
+    "hash": "eee82157854098f97e1ff5381a329357"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\AdditionalInfoTab.tsx": {
-    "mtime": 1777715114.01186,
-    "hash": "8942ed57e0168cd02c3e72b7d1bfcde6"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\AdditionalInfoTab.tsx": {
+    "mtime": 1777843902.2491047,
+    "hash": "52868bbeaae6db057d5f4855b516c1bd"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\AddUserDialog.tsx": {
-    "mtime": 1777697082.335786,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\AddUserDialog.tsx": {
+    "mtime": 1777639340.84347,
     "hash": "3398e045676a89c4ab514d9b276b85c6"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\AutocompleteInput.tsx": {
-    "mtime": 1777697082.3419533,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\AutocompleteInput.tsx": {
+    "mtime": 1777588886.567671,
     "hash": "244cfede8bc61070f895a5b7b452b097"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\BarcodeScanner.tsx": {
-    "mtime": 1777697082.3453505,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\BarcodeScanner.tsx": {
+    "mtime": 1777588886.5748513,
     "hash": "09859a738ace8c10ad94a2ef6fc79c57"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\BarcodeScannerDialog.tsx": {
-    "mtime": 1777697082.349243,
-    "hash": "bd4d836af57404effcc4b10328cebd5a"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\BarcodeScannerDialog.tsx": {
+    "mtime": 1777841866.8966496,
+    "hash": "0d82688d1e0f54b910ed0bc52ee3e9bf"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\BasicDetailsTab.tsx": {
-    "mtime": 1777715106.9533048,
-    "hash": "2725828a988832faaa27a47081f29580"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\BasicDetailsTab.tsx": {
+    "mtime": 1777842233.7781658,
+    "hash": "8a8549d45b2401d6a02c6e5a54aff56f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\BatchOperations.tsx": {
-    "mtime": 1777702362.168214,
-    "hash": "a3b5614a6795ba341d2b01b5e07057fe"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\BatchOperations.tsx": {
+    "mtime": 1777843895.3080451,
+    "hash": "7e98340e3a26a3a7ae42c366ecc262a6"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\CameraSettingsDialog.tsx": {
-    "mtime": 1777708564.958421,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\BulkCableFiberSection.tsx": {
+    "mtime": 1777842344.1555123,
+    "hash": "b373857412bbe418d44d610dbe194d00"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\CameraSettingsDialog.tsx": {
+    "mtime": 1777813156.6741877,
     "hash": "866c9f49d81f85f2d357be033b9ad293"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\CategoryManager.tsx": {
-    "mtime": 1777697082.3623912,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\CategoryManager.tsx": {
+    "mtime": 1777588886.592532,
     "hash": "b50e7c437308c3af4c2c0f1d03f8ac88"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\CategorySummary.tsx": {
-    "mtime": 1777697082.3656404,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\CategorySummary.tsx": {
+    "mtime": 1777588886.592532,
     "hash": "d3dd47ef57fc676b89a8aa17ec0816e1"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\CategoryTreeManager.tsx": {
-    "mtime": 1777697082.3688047,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\CategoryTreeManager.tsx": {
+    "mtime": 1777588886.598381,
     "hash": "eddf714e03fcbd2dc40d3c590c654930"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\DashboardSummaryCard.tsx": {
-    "mtime": 1777697082.3716447,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\DashboardSummaryCard.tsx": {
+    "mtime": 1777588886.598381,
     "hash": "61ea2a5e746caf1dbcb6984e5d1f9c78"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\DebugInfo.tsx": {
-    "mtime": 1777697082.3745012,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\DebugInfo.tsx": {
+    "mtime": 1777588886.598381,
     "hash": "7933074fffe272fcaaf0b855d4077ab2"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\DuplicateItemDialog.tsx": {
-    "mtime": 1777697082.3775911,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\DecommissioningTab.tsx": {
+    "mtime": 1777838331.2066584,
+    "hash": "118fb7fd0deb2c76361995111d962031"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\DuplicateItemDialog.tsx": {
+    "mtime": 1777588886.6380064,
     "hash": "a4a2cb2a897c334d343404652090d3bf"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\EditableItemList.tsx": {
-    "mtime": 1777697082.3875146,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\EditableItemList.tsx": {
+    "mtime": 1777639341.20356,
     "hash": "62ded5afcc7db51e65a6fa3b629c8746"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\EditableItemWithSubcategoriesList.tsx": {
-    "mtime": 1777713616.3187652,
-    "hash": "a180a7e62798546d7075b9d2a27fd3a8"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\EditableItemWithSubcategoriesList.tsx": {
+    "mtime": 1777843215.473518,
+    "hash": "860ce2596f4e0a401a0fe81ce0364a7f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\EditItemDialog.tsx": {
-    "mtime": 1777716204.1955512,
-    "hash": "01d385080a32b4ce1cddf8f5a38d9513"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\EditItemDialog.tsx": {
+    "mtime": 1777843893.4649599,
+    "hash": "e95bd1d9b1281507323ea746821016e2"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\EditItemForm.tsx": {
-    "mtime": 1777715341.2267523,
-    "hash": "d36c9f7e85a3d824166a31ae453dcb2e"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\EditItemForm.tsx": {
+    "mtime": 1777843879.4854643,
+    "hash": "99ddeaa260e7669d06113f8bcf319e24"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ErrorBoundary.tsx": {
-    "mtime": 1777697082.3923159,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ErrorBoundary.tsx": {
+    "mtime": 1777588886.656791,
     "hash": "38cc96ba85569e053df5a4cf5a1c6710"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ExportDialog.tsx": {
-    "mtime": 1777697082.3949454,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ExportDialog.tsx": {
+    "mtime": 1777588886.6603036,
     "hash": "22493254f1a54624edae67f37c7e0b95"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ImportDialog.tsx": {
-    "mtime": 1777697082.3979669,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ImportDialog.tsx": {
+    "mtime": 1777588886.6633053,
     "hash": "ac0f6d57380bf75ca575c218bccea4e9"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\InventoryAdjustment.tsx": {
-    "mtime": 1777697082.4005437,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\InventoryAdjustment.tsx": {
+    "mtime": 1777588886.6668148,
     "hash": "2bc2146f32d9f6b4dc7d41ad95745327"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\InventoryHistory.tsx": {
-    "mtime": 1777697082.403129,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\InventoryHistory.tsx": {
+    "mtime": 1777588886.6694639,
     "hash": "f417e32a3c6600a2ca09a644050bb13a"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\InventorySupplyTab.tsx": {
-    "mtime": 1777706474.3112636,
-    "hash": "e0d9fecfeb892f3fd9d37481f6871dcd"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\InventorySupplyTab.tsx": {
+    "mtime": 1777842240.1030087,
+    "hash": "edbd977e75216091883adc65c996e5d3"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\InventoryTable.old.tsx": {
-    "mtime": 1777697082.408937,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\InventoryTable.old.tsx": {
+    "mtime": 1777588886.6774995,
     "hash": "0a91ffe00402cf1ce3e0e6a147883166"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\InventoryTable.tsx": {
-    "mtime": 1777697082.411782,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\InventoryTable.tsx": {
+    "mtime": 1777639341.3002453,
     "hash": "d3c12fefa8227146653845e96915c0d0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ItemDetails.tsx": {
-    "mtime": 1777713774.7414112,
-    "hash": "e3b3ad9a3f054e79f43191934cffdf6b"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ItemDetails.tsx": {
+    "mtime": 1777844085.8087053,
+    "hash": "581b7d8cbe49c4557e9e6451412c9de1"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ItemPhotoField.tsx": {
-    "mtime": 1777708336.485339,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ItemPhotoField.tsx": {
+    "mtime": 1777813156.6984904,
     "hash": "0dfb9a9f76c9519c20dcc03626bfc158"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ListManagement.tsx": {
-    "mtime": 1777697082.4171288,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ListManagement.tsx": {
+    "mtime": 1777588886.6835067,
     "hash": "161aa6b13236e11689483f503d354fbc"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\LoginForm.tsx": {
-    "mtime": 1777697082.4199152,
-    "hash": "48631a30d032990e9448265fda7f4667"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\LoginForm.tsx": {
+    "mtime": 1777891206.845642,
+    "hash": "3ca6b714e46ed2caf1ec26cd159f1a47"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\LoginPage.tsx": {
-    "mtime": 1777697082.4227142,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\LoginPage.tsx": {
+    "mtime": 1777639341.349063,
     "hash": "207239c5bf2f7b6e8fb57c16cf7d530b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\LowStockItemsTable.tsx": {
-    "mtime": 1777697082.4254556,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\LowStockItemsTable.tsx": {
+    "mtime": 1777588886.6926115,
     "hash": "e7c738aebcc29b290c462e822c6e4292"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ManualBarcodeInput.tsx": {
-    "mtime": 1777697082.4285848,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ManualBarcodeInput.tsx": {
+    "mtime": 1777588886.699143,
     "hash": "5bab06e2348de86a6fcb6b37e24b9a24"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\MinimalTest.tsx": {
-    "mtime": 1777697082.4316444,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\MinimalTest.tsx": {
+    "mtime": 1777588886.71929,
     "hash": "43fe3cba20eefad663b01217d93980cc"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\MobileQuickAddDialog.tsx": {
-    "mtime": 1777716204.4584053,
-    "hash": "5ff155a8d51910fa75926e4029ff5516"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\MobileQuickAddDialog.tsx": {
+    "mtime": 1777842337.397616,
+    "hash": "53624872fc030efe20eb309c3d7d89d5"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\Navigation.tsx": {
-    "mtime": 1777700189.8052557,
-    "hash": "d41bbfbc557305aa0b2b6b6c043c9ee4"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\Navigation.tsx": {
+    "mtime": 1777813156.709747,
+    "hash": "653152ac2b240d5ccd9f3d7e0599100f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\OrderStatusSelector.tsx": {
-    "mtime": 1777697082.4376788,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\OrderStatusSelector.tsx": {
+    "mtime": 1777588886.765558,
     "hash": "1973d814d4f1e797ca82ad07facbd119"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ProjectDetailedReport.tsx": {
-    "mtime": 1777697082.4406056,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ProjectDetailedReport.tsx": {
+    "mtime": 1777588886.765558,
     "hash": "e24e26cb1d527c99bd5cbab52dfeed5f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ProjectSummary.tsx": {
-    "mtime": 1777697082.4438827,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ProjectSummary.tsx": {
+    "mtime": 1777588886.7703156,
     "hash": "103f74d5205031bc24fe2bb64e2d536d"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\QuickCapturePhotoDialog.tsx": {
-    "mtime": 1777710472.8588142,
-    "hash": "d0bf75767f70f9a0940ed53f3647c25c"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\QuickCapturePhotoDialog.tsx": {
+    "mtime": 1777841868.353266,
+    "hash": "691bc36b4a69d19e1d125a93b50c6f35"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\QuickLookup.tsx": {
-    "mtime": 1777697082.446737,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\QuickLookup.tsx": {
+    "mtime": 1777588886.7703156,
     "hash": "0c544ebc28a09601d305055b03013189"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ReassignSettingDialog.tsx": {
-    "mtime": 1777697082.4502988,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ReassignSettingDialog.tsx": {
+    "mtime": 1777588886.7703156,
     "hash": "9c4e9994b894f6d1656d5af68ba96af4"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\SimpleBarcodeScanner.tsx": {
-    "mtime": 1777710607.1727903,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\SimpleBarcodeScanner.tsx": {
+    "mtime": 1777813156.716857,
     "hash": "e79f9d1390425cae2ea2f0c77e30d3f9"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\SortableItem.tsx": {
-    "mtime": 1777697082.4553702,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\SortableItem.tsx": {
+    "mtime": 1777588886.7797632,
     "hash": "8f18abd21ee84ba6c243056320f2d205"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\TemplateForm.tsx": {
-    "mtime": 1777715123.7581334,
-    "hash": "f64e700744ebedccee9f2a2dc88c285d"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\SupabaseSyncBridge.tsx": {
+    "mtime": 1777813156.7203784,
+    "hash": "9631be89fefb430b27f0a95b6cf73d4f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\TestComponent.tsx": {
-    "mtime": 1777697082.4611003,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\SupplierWebsiteStatusBlock.tsx": {
+    "mtime": 1777837925.6254165,
+    "hash": "b890f7fe1a8e3d60e7926213b81e5655"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\TemplateForm.tsx": {
+    "mtime": 1777838335.8698425,
+    "hash": "635e0a2f8762085905082163bb0d7f75"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\TestComponent.tsx": {
+    "mtime": 1777588886.7797632,
     "hash": "e78f83066727bc35b903f94e5814e566"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\UserMenu.tsx": {
-    "mtime": 1777697082.463945,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\UserMenu.tsx": {
+    "mtime": 1777639341.4794729,
     "hash": "b729ffb05edb2762deebd3e0613467b1"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\UsersTab.tsx": {
-    "mtime": 1777697082.4669018,
-    "hash": "64c128573dc4d82aa838a148137d09ae"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\UsersTab.tsx": {
+    "mtime": 1777813389.909859,
+    "hash": "968045a6e82936b39d6aa67578f4aeaa"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\cabinets\\CabinetManager.tsx": {
-    "mtime": 1777697082.472894,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\cabinets\\CabinetManager.tsx": {
+    "mtime": 1777588886.8318105,
     "hash": "94e323fe7c50c1ef42abb945d32c88f9"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\cabinets\\CheckoutHistory.tsx": {
-    "mtime": 1777697082.4766924,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\cabinets\\CheckoutHistory.tsx": {
+    "mtime": 1777588886.8318105,
     "hash": "f338c6a20c88fdf20b11cddd4542ca51"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\cabinets\\ItemCheckInOut.tsx": {
-    "mtime": 1777697082.4795966,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\cabinets\\ItemCheckInOut.tsx": {
+    "mtime": 1777588886.8420517,
     "hash": "b070b00771f28faccc66d18e5d789284"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\cabinets\\QRCodeManager.tsx": {
-    "mtime": 1777697082.482634,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\cabinets\\QRCodeManager.tsx": {
+    "mtime": 1777588886.8420517,
     "hash": "e2a468a1c02f138b2351a7f3aeb5d526"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\cabinets\\QRScanner.tsx": {
-    "mtime": 1777697082.4855645,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\cabinets\\QRScanner.tsx": {
+    "mtime": 1777588886.8465548,
     "hash": "c24783444b4db61729b2b876f8fe0c8a"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\formatting\\CellValue.tsx": {
-    "mtime": 1777709222.6303525,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\formatting\\CellValue.tsx": {
+    "mtime": 1777813156.7296834,
     "hash": "9c4aa1529e5e9a579655f8a17da85a42"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\settings\\DataBackupTab.tsx": {
-    "mtime": 1777713694.3922212,
-    "hash": "60da417c1265e23d736606cd44a009d3"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\forms\\OptionalFormCollapsible.tsx": {
+    "mtime": 1777836015.6583104,
+    "hash": "c81470716f10eea4d83c24c242ebb665"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\settings\\DeleteListItemDialog.tsx": {
-    "mtime": 1777697082.4996881,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\forms\\ReqAsterisk.tsx": {
+    "mtime": 1777842208.175719,
+    "hash": "b29c86653c79207b1fb19a7bd659c9dd"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\DataBackupTab.tsx": {
+    "mtime": 1777815142.2081573,
+    "hash": "dbe97ffeebb370de6d505ec8eeaa5890"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\DeleteListItemDialog.tsx": {
+    "mtime": 1777588886.8596058,
     "hash": "acaaba674f1d24feef4d38217a0e6a1c"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\settings\\FinancialCodesTab.tsx": {
-    "mtime": 1777702285.302627,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\DeviceLibrarySortableList.tsx": {
+    "mtime": 1777842032.66525,
+    "hash": "d8bdbf2b95a88de0652d19562efd429f"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\DeviceLibraryTab.tsx": {
+    "mtime": 1777836540.186068,
+    "hash": "caf684f70ce8c2d062f94970ce45dddc"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\FinancialCodesTab.tsx": {
+    "mtime": 1777813156.758661,
     "hash": "edd89721cf1d049f80e54ef4df052eee"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\settings\\GeneralSettingsTab.tsx": {
-    "mtime": 1777708537.1061008,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\GeneralSettingsTab.tsx": {
+    "mtime": 1777813156.7628057,
     "hash": "56944f3cf6f6dd7cb3f9452198a25728"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\settings\\ListManagement.tsx": {
-    "mtime": 1777697082.509588,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\LibrariesSection.tsx": {
+    "mtime": 1777838022.3588948,
+    "hash": "7b4477f280e9ae2b9cb027b75bfc3f53"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\ListManagement.tsx": {
+    "mtime": 1777588886.8677664,
     "hash": "0d4597aafd29dbe0f08a295a551a65d6"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\settings\\SettingsPage.tsx": {
-    "mtime": 1777697082.5127738,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\SettingsPage.tsx": {
+    "mtime": 1777588886.8677664,
     "hash": "643170ae6cc3fd6e1d7d9b7ad5dd502b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\settings\\SystemLogs.tsx": {
-    "mtime": 1777697082.51595,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\SystemLogs.tsx": {
+    "mtime": 1777639341.6810727,
     "hash": "143d1ab8d598a4d590e6f466c0d48ce7"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\settings\\UserDefinedListsSection.tsx": {
-    "mtime": 1777709230.9245257,
-    "hash": "297affb5f29bc5cdf44f95fdef6b2c7b"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\TemplatesSortableList.tsx": {
+    "mtime": 1777841895.63547,
+    "hash": "d6cb9b0078451c5395ec24322f78f438"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\accordion.tsx": {
-    "mtime": 1777697082.5208354,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\UserDefinedListsSection.tsx": {
+    "mtime": 1777838045.330426,
+    "hash": "a2a34ec5e6a90fb988b2b56e8fe50ddf"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\settings\\WorkspaceTeamTab.tsx": {
+    "mtime": 1777843832.6000133,
+    "hash": "e136c183addaf07ec1453a13788100af"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\accordion.tsx": {
+    "mtime": 1777588886.8708396,
     "hash": "1a18877296af9e613340447038cb8cb1"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\alert-dialog.tsx": {
-    "mtime": 1777697082.5242586,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\alert-dialog.tsx": {
+    "mtime": 1777588886.8708396,
     "hash": "18a643a884fd4f2832ef3abe20b35eb6"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\alert.tsx": {
-    "mtime": 1777697082.527351,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\alert.tsx": {
+    "mtime": 1777588886.8843138,
     "hash": "af9ef5e093af87e08c6107a6e6f02564"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\aspect-ratio.tsx": {
-    "mtime": 1777697082.5303464,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\aspect-ratio.tsx": {
+    "mtime": 1777588886.8843138,
     "hash": "114d53f29a18d0e8b5e48f5ff3811e15"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\avatar.tsx": {
-    "mtime": 1777697082.5332897,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\avatar.tsx": {
+    "mtime": 1777588886.9260213,
     "hash": "8f44230e5058b7ace8269c971da7189e"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\badge.tsx": {
-    "mtime": 1777697082.5363321,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\badge.tsx": {
+    "mtime": 1777588886.9294102,
     "hash": "854cf336ff0dae01fd0ed603702580e7"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\breadcrumb.tsx": {
-    "mtime": 1777697082.5396612,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\breadcrumb.tsx": {
+    "mtime": 1777588886.933889,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\button.tsx": {
-    "mtime": 1777709910.57262,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\button.tsx": {
+    "mtime": 1777813156.7711613,
     "hash": "cddba124dff195e95580875fc5a55bfa"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\calendar.tsx": {
-    "mtime": 1777697082.5462036,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\calendar.tsx": {
+    "mtime": 1777588887.0140314,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\card.tsx": {
-    "mtime": 1777697082.5494606,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\card.tsx": {
+    "mtime": 1777588887.052943,
     "hash": "104fec8a8de4d03b0f5874a442778bbf"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\carousel.tsx": {
-    "mtime": 1777697082.5526104,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\carousel.tsx": {
+    "mtime": 1777588887.0568087,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\chart.tsx": {
-    "mtime": 1777697082.5558558,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\chart.tsx": {
+    "mtime": 1777588887.0927832,
     "hash": "145e8ee7e39401d9b5d59f0e9f05318f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\checkbox.tsx": {
-    "mtime": 1777697082.5599506,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\checkbox.tsx": {
+    "mtime": 1777588887.0981326,
     "hash": "96a881e092aa0a3176a057d1df601d12"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\collapsible.tsx": {
-    "mtime": 1777697082.5629442,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\collapsible.tsx": {
+    "mtime": 1777588887.0981326,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\combobox.tsx": {
-    "mtime": 1777717463.5070846,
-    "hash": "781e0956ebcbec299c7f1aa090b7fbfe"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\combobox.tsx": {
+    "mtime": 1777842214.394032,
+    "hash": "3132afa00fd263682927ce11260e7db4"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\command.tsx": {
-    "mtime": 1777697082.5691967,
-    "hash": "0e60307b97f33f2a501e94f6df538a9f"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\command.tsx": {
+    "mtime": 1777841857.1609154,
+    "hash": "17f0e97cf3a5c15378016d23710c53db"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\context-menu.tsx": {
-    "mtime": 1777697082.5719512,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\context-menu.tsx": {
+    "mtime": 1777588887.1409016,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\dialog.tsx": {
-    "mtime": 1777716200.4982283,
-    "hash": "09924b4143b0d3b843b2d7bf15f3a4b7"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\dialog.tsx": {
+    "mtime": 1777891215.198891,
+    "hash": "6bcd76b28fa86a33dbb1bc26da43e103"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\drawer.tsx": {
-    "mtime": 1777697082.578096,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\drawer.tsx": {
+    "mtime": 1777588887.1837516,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\dropdown-menu.tsx": {
-    "mtime": 1777697082.580941,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\dropdown-menu.tsx": {
+    "mtime": 1777588887.214796,
     "hash": "dbe23b6c9caabf4e32efc48a74ceae3b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\form.tsx": {
-    "mtime": 1777697082.584135,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\form.tsx": {
+    "mtime": 1777588887.2259066,
     "hash": "e8391997b8a1e89d407cc9ad38261952"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\hover-card.tsx": {
-    "mtime": 1777697082.5869787,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\hover-card.tsx": {
+    "mtime": 1777588887.2259066,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\input-otp.tsx": {
-    "mtime": 1777697082.5897188,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\input-otp.tsx": {
+    "mtime": 1777588887.265414,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\input.tsx": {
-    "mtime": 1777697082.5927346,
-    "hash": "6ea5e6ddd0ce555cf1ed5e748fa54ddf"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\input.tsx": {
+    "mtime": 1777842324.315048,
+    "hash": "d53840a21306bc53a8fc2c3c3a1084a6"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\label.tsx": {
-    "mtime": 1777697082.5958016,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\label.tsx": {
+    "mtime": 1777588887.2980433,
     "hash": "27fe7de5be9e7131ac6e9ffe0276f10f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\menubar.tsx": {
-    "mtime": 1777697082.5988975,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\menubar.tsx": {
+    "mtime": 1777588887.2980433,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\navigation-menu.tsx": {
-    "mtime": 1777697082.6018605,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\navigation-menu.tsx": {
+    "mtime": 1777588887.3573718,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\nested-dialog-portal-container.tsx": {
-    "mtime": 1777716199.704538,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\nested-dialog-portal-container.tsx": {
+    "mtime": 1777813156.7811859,
     "hash": "524ddcdd285b94760dee9297d915128d"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\pagination.tsx": {
-    "mtime": 1777697082.6048234,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\pagination.tsx": {
+    "mtime": 1777588887.433653,
     "hash": "202e507b750cc3220fee1758d7909721"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\popover.tsx": {
-    "mtime": 1777716201.1069613,
-    "hash": "dfdf0007603c5601f4d96ac4aa3943c1"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\popover.tsx": {
+    "mtime": 1777813156.8218403,
+    "hash": "177651a409f015cd09b11ac952b95234"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\progress.tsx": {
-    "mtime": 1777697082.6116002,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\progress.tsx": {
+    "mtime": 1777588887.433653,
     "hash": "dd81c7a284c47f9a0844910fe4c83810"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\radio-group.tsx": {
-    "mtime": 1777697082.614491,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\radio-group.tsx": {
+    "mtime": 1777588887.4493809,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\resizable.tsx": {
-    "mtime": 1777697082.6174395,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\resizable.tsx": {
+    "mtime": 1777588887.5305223,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\scroll-area.tsx": {
-    "mtime": 1777697082.6202352,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\scroll-area.tsx": {
+    "mtime": 1777588887.5596788,
     "hash": "e5d8b2a7789bd083c3cde029abdb6618"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\select.tsx": {
-    "mtime": 1777716201.7347763,
-    "hash": "bc259f2f6883d5e68b80f6ffb2bd04cb"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\select.tsx": {
+    "mtime": 1777842211.4936416,
+    "hash": "b37385104ad1993b947c05d366121f92"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\separator.tsx": {
-    "mtime": 1777697082.62652,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\separator.tsx": {
+    "mtime": 1777588887.5652716,
     "hash": "de48104203cabdf41832e3d084afb30d"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\sheet.tsx": {
-    "mtime": 1777697082.6296759,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\sheet.tsx": {
+    "mtime": 1777588887.5687933,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\sidebar.tsx": {
-    "mtime": 1777697082.6331947,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\sidebar.tsx": {
+    "mtime": 1777588887.6073952,
     "hash": "1a26aa46e0801e649150dc50e3851bfe"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\skeleton.tsx": {
-    "mtime": 1777697082.6367373,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\skeleton.tsx": {
+    "mtime": 1777588887.6073952,
     "hash": "074f33b90190294d2e337eebbf4e1553"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\slider.tsx": {
-    "mtime": 1777697082.6396964,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\slider.tsx": {
+    "mtime": 1777588887.6662562,
     "hash": "e0eea1336eaf6ed3c9de41306bc2881d"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\sonner.tsx": {
-    "mtime": 1777697082.6423626,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\sonner.tsx": {
+    "mtime": 1777588887.6710513,
     "hash": "891bff1b4c353429b8b537e0881b0071"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\switch.tsx": {
-    "mtime": 1777697082.645746,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\switch.tsx": {
+    "mtime": 1777588887.6768186,
     "hash": "cbc8bd8b0f36494fa9e56acaa4b9765b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\table.tsx": {
-    "mtime": 1777697082.648815,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\table.tsx": {
+    "mtime": 1777639341.7642374,
     "hash": "5576a4a0539c829279fce2aefd0d4f76"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\tabs.tsx": {
-    "mtime": 1777697082.6515536,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\tabs.tsx": {
+    "mtime": 1777588887.6838362,
     "hash": "69bdee7d3fe10c3f44e3a59fd0bd0bbb"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\textarea.tsx": {
-    "mtime": 1777697082.6542945,
-    "hash": "3de5e6452e0e43a0881a872175a7a9fb"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\textarea.tsx": {
+    "mtime": 1777842325.207441,
+    "hash": "c68425ffc69be5b93e78d7f67bc3ffb8"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\toast.tsx": {
-    "mtime": 1777697082.657081,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\toast.tsx": {
+    "mtime": 1777639341.8126895,
     "hash": "ea68a08bf5ec38d4fbad3d105d822c5b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\toaster.tsx": {
-    "mtime": 1777697082.6596847,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\toaster.tsx": {
+    "mtime": 1777588887.6935506,
     "hash": "83ee08a51a07fdaec47bd018413efdbb"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\toggle-group.tsx": {
-    "mtime": 1777697082.6623724,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\toggle-group.tsx": {
+    "mtime": 1777588887.6994882,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\toggle.tsx": {
-    "mtime": 1777697082.6649616,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\toggle.tsx": {
+    "mtime": 1777588887.7323713,
     "hash": "4d8450b1a3b6d1cdf0741b8caaac1db0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\tooltip.tsx": {
-    "mtime": 1777697082.6678095,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\tooltip.tsx": {
+    "mtime": 1777588887.7786543,
     "hash": "100bd622c7ea79b5b0feec85aed4ad25"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\components\\ui\\use-toast.ts": {
-    "mtime": 1777697082.670853,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\components\\ui\\use-toast.ts": {
+    "mtime": 1777588887.7811656,
     "hash": "0c21dc4b3b7004631d269914c0310b7b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\contexts\\AuthContext.tsx": {
-    "mtime": 1777697082.6753945,
-    "hash": "845e88f9edd42401325dcfad19a36a38"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\contexts\\AuthContext.tsx": {
+    "mtime": 1777891245.217863,
+    "hash": "9a3b559081c5f46fe3feeb638cd77a1f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\data\\dummyInventory.ts": {
-    "mtime": 1777697082.6798494,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\contexts\\WorkspaceContext.tsx": {
+    "mtime": 1777843752.155247,
+    "hash": "e5e15873c1d689abd167059a5cb06d7d"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\data\\dummyInventory.ts": {
+    "mtime": 1777588887.7945905,
     "hash": "d2aaab226c9bc63177a6caec4689ab57"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\deprecated\\AutocompleteInput.tsx": {
-    "mtime": 1777697082.6842701,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\deprecated\\AutocompleteInput.tsx": {
+    "mtime": 1777588887.7991035,
     "hash": "697e6214f27ca41a615a19323f55a178"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\deprecated\\settings\\page.tsx": {
-    "mtime": 1777713765.9114213,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\deprecated\\settings\\page.tsx": {
+    "mtime": 1777813156.8385901,
     "hash": "1a6a4d134ec2a2759111b443a5ad6cd2"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\hooks\\use-mobile.tsx": {
-    "mtime": 1777697082.6968324,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\hooks\\use-mobile.tsx": {
+    "mtime": 1777588887.8271012,
     "hash": "654e2ca2e9fddc27eb7e3954900dc48e"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\hooks\\use-toast.ts": {
-    "mtime": 1777697082.6997013,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\hooks\\use-toast.ts": {
+    "mtime": 1777588887.8656876,
     "hash": "e69924e5c597f9350d681937b80afc51"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\hooks\\useInventory.ts": {
-    "mtime": 1777697082.7030058,
-    "hash": "617cc68b797077973742e1cba5845a31"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\hooks\\useInventory.ts": {
+    "mtime": 1777813156.8417904,
+    "hash": "a5a623d01c59b84e78e9464fbe35fec0"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\hooks\\useLocalStorage.ts": {
-    "mtime": 1777697082.7058487,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\hooks\\useInventoryPermissions.ts": {
+    "mtime": 1777843763.1617763,
+    "hash": "de55997d08dd6f575adf3114a73d2c1e"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\hooks\\useLocalStorage.ts": {
+    "mtime": 1777588887.873768,
     "hash": "06b9234c7f34e0d7e7c32ec136979c2a"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\dummyData.ts": {
-    "mtime": 1777697082.7131844,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\backupValidation.ts": {
+    "mtime": 1777832992.1954558,
+    "hash": "f6ed79ac2b9be96f0146b39f20edfedb"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\cableFacetPicklists.ts": {
+    "mtime": 1777841923.7512493,
+    "hash": "3212c24af04e3094aa886e2690c10ae5"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\cloudSyncEvents.ts": {
+    "mtime": 1777813156.84789,
+    "hash": "eea368b32cd119ae7280bdb195edd078"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\decommissioningAssetStatusOptions.ts": {
+    "mtime": 1777838303.4746451,
+    "hash": "1cf4fee23e5447e2583190c65f1ef0b8"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\deviceLibraryFormApply.ts": {
+    "mtime": 1777843873.1309755,
+    "hash": "610dc7dbbaaeea87736b5db721487f89"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\deviceLibraryStorage.ts": {
+    "mtime": 1777841945.157556,
+    "hash": "0b7f4fc1ebb755864e74b4ab3d0b864a"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\dummyData.ts": {
+    "mtime": 1777588887.873768,
     "hash": "2f970b56b6494b9d7ba479616d5f3f73"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\exportUtils.ts": {
-    "mtime": 1777697082.7160726,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\exportUtils.ts": {
+    "mtime": 1777588887.8895464,
     "hash": "19a1f689bdcb73f4725b242a346286cc"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\financialSettingsService.ts": {
-    "mtime": 1777697082.7193575,
-    "hash": "74529ff9976d69d0df521a5a9e74983e"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\financialSettingsService.ts": {
+    "mtime": 1777813156.8838296,
+    "hash": "a66ef7e07a09685aa6853f0e29905d8a"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\groupInventoryReconciliation.ts": {
-    "mtime": 1777697082.7222533,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\groupInventoryReconciliation.ts": {
+    "mtime": 1777679051.1628048,
     "hash": "20f6b9799e9c59423933c8fa50c05bef"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\initData.ts": {
-    "mtime": 1777697082.7254112,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\initData.ts": {
+    "mtime": 1777588887.8938053,
     "hash": "fd14b250e1fc46a8176a70cb78c3dbc6"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\inventoryFormDefaults.ts": {
-    "mtime": 1777703140.1406646,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\inventoryFormDefaults.ts": {
+    "mtime": 1777813156.8868256,
     "hash": "7e4292c907aaf7d7d2a7f5100dee2d3b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\inventoryFormTabs.ts": {
-    "mtime": 1777715119.7478848,
-    "hash": "4096654118ded0f5d9ec180e160b965d"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\inventoryFormTabs.ts": {
+    "mtime": 1777843880.2199023,
+    "hash": "c8e78712f07c0b73a6f3f03066d09850"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\inventoryIdGeneration.ts": {
-    "mtime": 1777707694.4498708,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\inventoryIdGeneration.ts": {
+    "mtime": 1777813156.8948014,
     "hash": "6ca15fb1dd7a01daa7a54d609ac2a39b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\inventoryUndo.ts": {
-    "mtime": 1777702112.5774624,
-    "hash": "c761d507078cb7175d5730c06793e858"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\inventoryUndo.ts": {
+    "mtime": 1777813156.8977976,
+    "hash": "9d34de935ab52cf10a0530a265aee112"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\itemUpdateService.ts": {
-    "mtime": 1777697082.7282026,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\itemUpdateService.ts": {
+    "mtime": 1777588887.934011,
     "hash": "46627a658828bd0af10b2c208de3da21"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\listReconcileFixes.ts": {
-    "mtime": 1777702119.7458103,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\listReconcileFixes.ts": {
+    "mtime": 1777813156.900209,
     "hash": "516f01169bcd72ed5ba8fb8bba22af40"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\logging.ts": {
-    "mtime": 1777697082.7310398,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\localRestorePoints.ts": {
+    "mtime": 1777815148.882496,
+    "hash": "4ca36bf0830c0a7e6ed49ac4382423ab"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\locationOptions.ts": {
+    "mtime": 1777837918.3163118,
+    "hash": "e34858707d8d1972cf8266b9bbda41b2"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\logging.ts": {
+    "mtime": 1777639342.3346274,
     "hash": "0f6e2fc4535e4ba60cbba50f96eaa27d"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\lookupAccentColors.ts": {
-    "mtime": 1777709219.0081706,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\lookupAccentColors.ts": {
+    "mtime": 1777813156.9031324,
     "hash": "5de75ef1a0f780f53dec0e426c1419d1"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\rackLocationsConfig.ts": {
-    "mtime": 1777714553.6818364,
-    "hash": "135211234eacfd63335aa9d180a4c9e5"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\projectOptions.ts": {
+    "mtime": 1777815513.495602,
+    "hash": "0b3dd48dff6053efb45117dffc8fad6e"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\resolveLocationLabel.ts": {
-    "mtime": 1777707690.8388383,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\rackLocationsConfig.ts": {
+    "mtime": 1777813156.906045,
+    "hash": "e4bdc519557faa78538c96641de7c4e8"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\resolveLocationLabel.ts": {
+    "mtime": 1777813156.9080722,
     "hash": "eb6fa62a3487d43375c8bea0f0f3b0fc"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\settingsService.ts": {
-    "mtime": 1777713590.9651902,
-    "hash": "15ed04197b9ebc4f6f756e5e0e3be4dc"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\restockIntent.ts": {
+    "mtime": 1777836460.367169,
+    "hash": "a9f412f269bfd741a34a48301b0c2ba2"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\storageService.ts": {
-    "mtime": 1777703151.7411838,
-    "hash": "fbba93fc85e77850b485921bd1a7ebad"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\settingsService.ts": {
+    "mtime": 1777813156.9132695,
+    "hash": "9d64fafa533e8c5e172639a2d6d63995"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\trackItDailyBackup.ts": {
-    "mtime": 1777713588.2832084,
-    "hash": "e903a373f0dbce77efc5ac888e0f89fa"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\storageService.ts": {
+    "mtime": 1777832986.2947986,
+    "hash": "cab74448c7d72c84ef12c4a9316491a4"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\lib\\utils.ts": {
-    "mtime": 1777697082.7404747,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\trackItDailyBackup.ts": {
+    "mtime": 1777832989.6930125,
+    "hash": "640fe81215cbe936e9009d886c72f6b2"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\utils.ts": {
+    "mtime": 1777588887.9489713,
     "hash": "80c55e26d1290c3b2dfd87f6c5a3fbfb"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\AboutPage.tsx": {
-    "mtime": 1777697082.7500217,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\supabase\\client.ts": {
+    "mtime": 1777813156.9214976,
+    "hash": "283b1c9df35f4b90331a249582b059f1"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\supabase\\cloudData.ts": {
+    "mtime": 1777843827.2447445,
+    "hash": "a085a600170683fe2f4b10c9127d40f3"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\lib\\supabase\\workspaceData.ts": {
+    "mtime": 1777843816.210642,
+    "hash": "af17f4a7fc6afa58f8ae97c5644b7cea"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\AboutPage.tsx": {
+    "mtime": 1777678516.3002696,
     "hash": "895b5595ed0b36a71dd6c07d7f7fdd72"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\CabinetManagement.tsx": {
-    "mtime": 1777697082.7541652,
-    "hash": "8c42dfb69bd3d33b87447e543b74035c"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\CabinetManagement.tsx": {
+    "mtime": 1777813156.9334297,
+    "hash": "c2c3d0a7c8abb2d1788ad3cf5ed36c57"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\CheckoutPage.tsx": {
-    "mtime": 1777697082.7578707,
-    "hash": "e4c020360ff29f1742f19af9a158d432"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\CheckoutPage.tsx": {
+    "mtime": 1777844066.6580608,
+    "hash": "b6fb2964df339032e98b07569473289c"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\Dashboard.tsx": {
-    "mtime": 1777697082.7610614,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\Dashboard.tsx": {
+    "mtime": 1777588887.965345,
     "hash": "e9eddc279f83818fcc5d68f444b931cd"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\DashboardPage.tsx": {
-    "mtime": 1777697082.7649884,
-    "hash": "ed719bcce69c34b503e56a855dc0f424"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\DashboardPage.tsx": {
+    "mtime": 1777844215.5358536,
+    "hash": "e95d4902448b2995edd2a660d302db33"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\HelpPage.tsx": {
-    "mtime": 1777712467.6165097,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\HelpPage.tsx": {
+    "mtime": 1777813156.9440496,
     "hash": "0298b10bc1217a073a726778878eebc7"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\Inventory.tsx": {
-    "mtime": 1777697082.7712486,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\Inventory.tsx": {
+    "mtime": 1777588887.965345,
     "hash": "4ae180ff845eed571e22b702d63dd329"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\InventoryPage.tsx": {
-    "mtime": 1777713810.4372609,
-    "hash": "63c1b43542de0a3f9fe2e8f1c8830d7c"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\InventoryPage.tsx": {
+    "mtime": 1777841864.300572,
+    "hash": "4950e788bb01dfe3089a57a8a976c2a7"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\ItemDetail.tsx": {
-    "mtime": 1777697082.7780144,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\ItemDetail.tsx": {
+    "mtime": 1777588887.9800487,
     "hash": "1eed6561bc7d6003ab60424daf1a87d2"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\ItemDetailsPage.tsx": {
-    "mtime": 1777697082.7809534,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\ItemDetailsPage.tsx": {
+    "mtime": 1777588887.9800487,
     "hash": "949a4bb83eb1fbc479f8b465baae7f48"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\NotFound.tsx": {
-    "mtime": 1777697082.78396,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\NotFound.tsx": {
+    "mtime": 1777588887.9800487,
     "hash": "d9a463c869fd0b2d634c217b2c95fec5"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\ReportsPage.tsx": {
-    "mtime": 1777713797.7393136,
-    "hash": "0bf568013fe358aef6fe4b86791f94f3"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\ReportsPage.tsx": {
+    "mtime": 1777815284.1483955,
+    "hash": "eed81c5b12199c458e4b195fb3295599"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\RestockPage.tsx": {
-    "mtime": 1777697082.7910972,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\RestockPage.tsx": {
+    "mtime": 1777588887.9945288,
     "hash": "e60254e5154f0d3a6f8004ffd3de9abf"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\SettingsPage.tsx": {
-    "mtime": 1777713733.2878637,
-    "hash": "ab0051a06befb546ec21453fda490854"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\SettingsPage.tsx": {
+    "mtime": 1777843843.3693705,
+    "hash": "1fd12b702995381d642d9c221de911db"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\pages\\TemplatesPage.tsx": {
-    "mtime": 1777716204.7319267,
-    "hash": "b54b712806a46d5d142e41d478e120dc"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\pages\\TemplatesPage.tsx": {
+    "mtime": 1777841913.0111034,
+    "hash": "26fb5b3d7215c6ceed4b89567baaca55"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\types\\cabinets.ts": {
-    "mtime": 1777697082.8042693,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\types\\cabinets.ts": {
+    "mtime": 1777588887.9986389,
     "hash": "9949e985292998a74dcfbd5111798420"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\types\\electron.d.ts": {
-    "mtime": 1777697082.8073833,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\types\\deviceLibrary.ts": {
+    "mtime": 1777841941.8442235,
+    "hash": "af539546d97572098354a3b6b62cdb6d"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\types\\electron.d.ts": {
+    "mtime": 1777588887.9986389,
     "hash": "23093395c26e042de273db94458c9261"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\types\\html5-qrcode.d.ts": {
-    "mtime": 1777697082.8101115,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\types\\html5-qrcode.d.ts": {
+    "mtime": 1777588888.0551617,
     "hash": "ec26f02279da29257581037a41e4eacc"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\types\\inventory.ts": {
-    "mtime": 1777715338.1558743,
-    "hash": "86cd326b04baea5e8218698b9d24f0f8"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\types\\inventory.ts": {
+    "mtime": 1777843871.3307645,
+    "hash": "aa83af181001a623cec337dc95764854"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\types\\logging.ts": {
-    "mtime": 1777697082.8165824,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\types\\logging.ts": {
+    "mtime": 1777588888.1050866,
     "hash": "19957518fdc582b29d5fc7928351776f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\types\\templates.ts": {
-    "mtime": 1777697082.8197875,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\types\\templates.ts": {
+    "mtime": 1777588888.1538796,
     "hash": "17efa0ef680ed9b72a68ba6602aedaa5"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\utils\\fileSystem.ts": {
-    "mtime": 1777697082.8259177,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\utils\\fileSystem.ts": {
+    "mtime": 1777588888.1989417,
     "hash": "bde46fb8ea366de34b0d9d8a09e8c1ab"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\utils\\ipc.ts": {
-    "mtime": 1777697082.8298597,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\utils\\ipc.ts": {
+    "mtime": 1777588888.1989417,
     "hash": "75725eebe648e789251f4db6a0af8654"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\utils\\logger.ts": {
-    "mtime": 1777697082.8337266,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\utils\\logger.ts": {
+    "mtime": 1777588888.2519612,
     "hash": "c766d8e69f26c137598cd43a2a74189f"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\utils\\toast.ts": {
-    "mtime": 1777697082.8397422,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\utils\\toast.ts": {
+    "mtime": 1777588888.265288,
     "hash": "c80d039f39d9316dc7cdd5d30daa09aa"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\src\\utils\\url.ts": {
-    "mtime": 1777697082.8426678,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\src\\utils\\url.ts": {
+    "mtime": 1777588888.310171,
     "hash": "9d666530595e7c5f87755b89d78fbc91"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\index.html": {
-    "mtime": 1777697082.2556543,
-    "hash": "c8ab7092aa40d95d758fb6302a675964"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\supabase\\migrations\\20260502120000_user_app_data.sql": {
+    "mtime": 1777813157.0509214,
+    "hash": "ebac879ecc95ace8efb815e1e3146a54"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\README.md": {
-    "mtime": 1777712479.7801082,
-    "hash": "394034ec31e9f749627c543ec35d1eb5"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\supabase\\migrations\\20260505120000_user_app_data_custom_report_definitions.sql": {
+    "mtime": 1777814863.111021,
+    "hash": "0c02b4c375a7803d7882fddd07ee6a2b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\changes.md": {
-    "mtime": 1777712475.6229305,
-    "hash": "aa20fd682a675731be4a8e376679ed2d"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\supabase\\migrations\\20260506120000_workspace_shared_data.sql": {
+    "mtime": 1777843631.2158675,
+    "hash": "e2c68bf3b93fcf45465a4f184842e72b"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\development-status.md": {
-    "mtime": 1777712486.3283525,
-    "hash": "f0bbcd961dab711101aaa0923bd96edc"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\index.html": {
+    "mtime": 1777813156.4967718,
+    "hash": "412014462dfb1bfb59819c3be33da2d9"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\framework.md": {
-    "mtime": 1777697082.2038236,
-    "hash": "3da0ee8600e50f7f4bda07ae3e68800e"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\README.md": {
+    "mtime": 1777813153.8713448,
+    "hash": "3b1478566464f0ea50118edeb1a1009e"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\getting-started.md": {
-    "mtime": 1777697082.2070405,
-    "hash": "0bfa319909751463d19996b5d5c486f4"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\baseline-reports\\compare-local-trackIT-20260501-201901.txt": {
+    "mtime": 1777691941.3484719,
+    "hash": "2104e1d746426e286c359c3cec50b098"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\help-menu.md": {
-    "mtime": 1777712477.5791252,
-    "hash": "e8e21d1837476dc8ac7eb791969069af"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\baseline-reports\\compare-local-trackIT-20260501-201913.txt": {
+    "mtime": 1777691953.7291937,
+    "hash": "2f8c25196e1ae1e99229fec325cb502d"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\logging.md": {
-    "mtime": 1777697082.2127335,
-    "hash": "d544cfc4326b71418be730f17a8fe4bb"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\baseline-reports\\compare-local-trackIT-20260501-201920.txt": {
+    "mtime": 1777691960.9706867,
+    "hash": "129345a6d42cf3f9552d4f39b9c8af03"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\README.md": {
-    "mtime": 1777712478.7476642,
-    "hash": "a6173be52da70493d9acc3b18fec6ca0"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\baseline-reports\\compare-local-trackIT-20260501-201926.txt": {
+    "mtime": 1777691966.2713432,
+    "hash": "46e40803c67d2314e7708bbd49b7cb34"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\repository-reference.md": {
-    "mtime": 1777697082.2156918,
-    "hash": "9b955644d7b35af2ae47171853621eaf"
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\dist-web\\index.html": {
+    "mtime": 1777813154.409918,
+    "hash": "e373f939a3f996e1f7cdcde08841b9ae"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\settings-architecture.md": {
-    "mtime": 1777697082.218726,
-    "hash": "c73368c95a6da329a894e04de48fd39b"
-  },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\technical-documentation.md": {
-    "mtime": 1777697082.2228167,
-    "hash": "018ef45db14c0344062024b39be7b41d"
-  },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\troubleshooting.md": {
-    "mtime": 1777697082.2260485,
-    "hash": "084e2ca9a125eb4af951af53ef05a105"
-  },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\docs\\user-guide.md": {
-    "mtime": 1777712484.451805,
-    "hash": "c4dd79d9e4bf09aa0329b3b27ed1ff0b"
-  },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\public\\robots.txt": {
-    "mtime": 1777697082.2888873,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\dist-web\\robots.txt": {
+    "mtime": 1777813154.5128162,
     "hash": "a9b03494151fe90e5decd2405400e106"
   },
-  "\\\\tinNAS\\projects\\TEd_dev\\trackIT_v2\\public\\placeholder.svg": {
-    "mtime": 1777697082.2854576,
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\changes.md": {
+    "mtime": 1777844143.1627154,
+    "hash": "4e27c37355514210f72ab58c5537d104"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\development-status.md": {
+    "mtime": 1777813406.7937322,
+    "hash": "3cf7d366ceec18e326d6472cf1474e68"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\framework.md": {
+    "mtime": 1777588885.7382197,
+    "hash": "3da0ee8600e50f7f4bda07ae3e68800e"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\getting-started.md": {
+    "mtime": 1777588885.746996,
+    "hash": "0bfa319909751463d19996b5d5c486f4"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\help-menu.md": {
+    "mtime": 1777813154.5861175,
+    "hash": "80dec40c93dc63ba8a7ef70bc8400574"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\logging.md": {
+    "mtime": 1777692764.5591516,
+    "hash": "d544cfc4326b71418be730f17a8fe4bb"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\p3-workspaces-auth.md": {
+    "mtime": 1777844137.8590698,
+    "hash": "788bac457dd67445e43f4a40e822002d"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\production-roadmap.md": {
+    "mtime": 1777844108.0079336,
+    "hash": "259cad898e629d0fe693f53ae9483a6b"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\README.md": {
+    "mtime": 1777844154.487046,
+    "hash": "9b9bccb8d18e927321e82b69d57b8cf0"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\repository-reference.md": {
+    "mtime": 1777813154.589118,
+    "hash": "c91143e05327bd3c1d2d7ef5165b7fea"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\settings-architecture.md": {
+    "mtime": 1777588885.749154,
+    "hash": "c73368c95a6da329a894e04de48fd39b"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\technical-documentation.md": {
+    "mtime": 1777588885.749154,
+    "hash": "018ef45db14c0344062024b39be7b41d"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\troubleshooting.md": {
+    "mtime": 1777588885.755149,
+    "hash": "084e2ca9a125eb4af951af53ef05a105"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\docs\\user-guide.md": {
+    "mtime": 1777815742.0865903,
+    "hash": "c288aaa67183704b8a03f8560e44c64c"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\public\\robots.txt": {
+    "mtime": 1777588886.4645557,
+    "hash": "a9b03494151fe90e5decd2405400e106"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\dist-web\\placeholder.svg": {
+    "mtime": 1777813154.5101154,
+    "hash": "35707bd9960ba5281c72af927b79291f"
+  },
+  "H:\\projects\\cursor_projects\\TEd_trackIT\\trackIT_v2\\public\\placeholder.svg": {
+    "mtime": 1777588886.4604528,
     "hash": "35707bd9960ba5281c72af927b79291f"
   }
 }

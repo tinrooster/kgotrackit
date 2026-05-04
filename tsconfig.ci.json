@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src/types/electron.d.ts",
+    "src/contexts/AuthContext.tsx",
+    "src/contexts/WorkspaceContext.tsx",
+    "src/hooks/useInventoryPermissions.ts",
+    "src/lib/supabase/cloudData.ts",
+    "src/lib/supabase/workspaceData.ts",
+    "src/lib/deviceLibraryFormApply.ts",
+    "src/components/LoginForm.tsx",
+    "src/components/BatchOperations.tsx",
+    "src/components/AdditionalInfoTab.tsx",
+    "src/components/settings/WorkspaceTeamTab.tsx",
+    "src/types/inventory.ts",
+    "src/types/deviceLibrary.ts"
+  ]
+}

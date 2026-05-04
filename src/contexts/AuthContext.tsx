@@ -43,11 +43,12 @@ export function useAuth() {
 }
 
 function getStore() {
-  if (window.electron && window.electron.store) return window.electron.store;
-  if (window.electronStore) return {
-    get: async (key: string) => window.electronStore.getData(key),
-    set: async (key: string, value: any) => window.electronStore.setData(key, value),
-    delete: async (key: string) => window.electronStore.deleteData(key),
+  if (window.electron?.store) return window.electron.store;
+  const electronStore = window.electronStore;
+  if (electronStore) return {
+    get: async (key: string) => electronStore.getData(key),
+    set: async (key: string, value: any) => electronStore.setData(key, value),
+    delete: async (key: string) => electronStore.deleteData(key),
   };
   return {
     get: async (key: string) => {

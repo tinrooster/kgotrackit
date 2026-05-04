@@ -16,6 +16,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "check": "tsc --noEmit",
+    "check:ci": "tsc --noEmit -p tsconfig.ci.json",
+    "gate:ci": "npm run check:ci && npm run build",
     "build:web": "node -e \"require(require('path').join(require('path').dirname(process.env.npm_package_json),'scripts','npm-launch-vite-web.cjs'))\"",
     "preview:web": "node -e \"require(require('path').join(require('path').dirname(process.env.npm_package_json),'scripts','npm-launch-vite-web.cjs'))\"",
     "baselines:sync": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/baselines/Sync-Baselines.ps1",

@@ -30,7 +30,7 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-function outsideEventTarget(event: { target: EventTarget; detail?: unknown }): EventTarget | null {
+function outsideEventTarget(event: { target: EventTarget | null; detail?: unknown }): EventTarget | null {
   if (
     event.detail &&
     typeof event.detail === "object" &&
@@ -89,15 +89,15 @@ const DialogContent = React.forwardRef<
     ref,
   ) => {
   const dismissOnOutsidePointer = dismissOnOutsidePointerProp ?? false;
-  const [nestedPortalHost, setNestedPortalHost] = React.useState<HTMLElement | null>(null);
+  const [nestedPortalHost, setNestedPortalHost] = React.useState<HTMLDivElement | null>(null);
 
   const setContentNode = React.useCallback(
-    (node: HTMLElement | null) => {
+    (node: React.ElementRef<typeof DialogPrimitive.Content> | null) => {
       setNestedPortalHost((prev) => (prev === node ? prev : node));
       if (typeof ref === "function") {
         ref(node);
       } else if (ref) {
-        (ref as React.MutableRefObject<HTMLElement | null>).current = node;
+        (ref as React.MutableRefObject<React.ElementRef<typeof DialogPrimitive.Content> | null>).current = node;
       }
     },
     [ref]

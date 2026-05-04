@@ -198,7 +198,7 @@ export function LoginForm() {
       }
     } catch (error) {
       console.error('Login error:', error);
-      logger.error('Login error', error);
+      logger.error(`Login error: ${String(error)}`);
       setLoginError('An error occurred during login. Please try again.');
       toast.error('Login failed. Please try again.');
     } finally {
@@ -221,7 +221,11 @@ export function LoginForm() {
         }
         return;
       }
-      const success = await resetPassword(data.username, data.securityAnswer, data.newPassword);
+      const success = await resetPassword(
+        data.username,
+        data.securityAnswer ?? "",
+        data.newPassword ?? "",
+      );
       if (success) {
         logger.log(`Password reset successful for user: ${data.username}`);
         setShowResetDialog(false);
@@ -232,7 +236,7 @@ export function LoginForm() {
         toast.error('Incorrect security answer');
       }
     } catch (error) {
-      logger.error('Password reset error', error);
+      logger.error(`Password reset error: ${String(error)}`);
       setResetError('An error occurred while resetting password. Please try again.');
       toast.error('Password reset failed');
     } finally {
