@@ -385,7 +385,7 @@ export default function AboutPage() {
           <CardDescription>Purpose, scope, and operating focus.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>TEd_trackIT is built to track technical assets, consumables, and storage movement in a non-retail production environment.</p>
+          <p>TEd_trackIT is built to track technical assets, consumables, and storage movement in production and engineering environments.</p>
           <p>Core workflows include inventory maintenance, secure cabinet check-in/out, reporting, user-defined taxonomy management, and durable auditing.</p>
           <p>The application supports both operational day-to-day usage and periodic review tasks such as budget allocation and lifecycle planning.</p>
         </CardContent>

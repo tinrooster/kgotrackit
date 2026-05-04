@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Camera } from 'lucide-react';
 import type { DefaultSettings } from '@/lib/settingsService';
+import { CAMERA_DEVICE_ID_KEY } from "@/components/CameraSettingsDialog";
 
 interface GeneralSettingsTabProps {
   onOpenCameraSettings: () => void;
@@ -18,6 +19,50 @@ interface GeneralSettingsTabProps {
 export function GeneralSettingsTab({ onOpenCameraSettings, settings, onSettingsChange, currentUsername }: GeneralSettingsTabProps) {
   const confirmDeletesEnabled = settings.deleteConfirmationByUser?.[currentUsername] ?? true;
   const undoEnabled = settings.undoByUser?.[currentUsername] ?? true;
+  const [cameraSummary, setCameraSummary] = React.useState('Checking available cameras...');
+
+  React.useEffect(() => {
+    let isCancelled = false;
+
+    const refreshCameraSummary = async () => {
+      const selectedDeviceId = localStorage.getItem(CAMERA_DEVICE_ID_KEY) || '';
+      if (!navigator.mediaDevices?.enumerateDevices) {
+        setCameraSummary('Camera APIs are unavailable in this environment.');
+        return;
+      }
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (isCancelled) return;
+        const videoInputs = devices.filter((device) => device.kind === 'videoinput');
+        if (videoInputs.length === 0) {
+          setCameraSummary('No cameras detected. Check permissions and connected devices.');
+          return;
+        }
+        if (!selectedDeviceId) {
+          setCameraSummary(`No camera selected. ${videoInputs.length} camera device(s) available.`);
+          return;
+        }
+        const selectedDevice = videoInputs.find((device) => device.deviceId === selectedDeviceId);
+        if (!selectedDevice) {
+          setCameraSummary(
+            `Saved camera is unavailable. ${videoInputs.length} camera device(s) currently detected.`,
+          );
+          return;
+        }
+        const selectedLabel = selectedDevice.label || 'Selected camera';
+        setCameraSummary(`${selectedLabel} (${videoInputs.length} camera device(s) detected).`);
+      } catch {
+        if (!isCancelled) {
+          setCameraSummary('Could not read camera devices. Open Configure Camera to refresh permission.');
+        }
+      }
+    };
+
+    void refreshCameraSummary();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -102,7 +147,8 @@ export function GeneralSettingsTab({ onOpenCameraSettings, settings, onSettingsC
         <CardHeader>
           <CardTitle>Camera Settings</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">{cameraSummary}</p>
           <Button onClick={onOpenCameraSettings} variant="outline">
             <Camera className="h-4 w-4 mr-2" />
             Configure Camera

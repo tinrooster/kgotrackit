@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const navLinkClass =
-  'text-sm font-medium text-primary underline-offset-4 hover:underline';
+  'block rounded-md px-2 py-1.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted/40 hover:underline';
 
 export default function HelpPage() {
   return (
@@ -35,24 +35,28 @@ export default function HelpPage() {
         </h1>
       </div>
 
-      <Card className="sticky top-16 z-20 border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <CardHeader className="py-3">
-          <CardTitle className="text-base">In this page</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-x-4 gap-y-2 pt-0 text-sm">
-          <a className={navLinkClass} href="#lookup-lists">Lookup lists</a>
-          <a className={navLinkClass} href="#settings-saving">Settings & saving</a>
-          <a className={navLinkClass} href="#financial-codes">Financial codes</a>
-          <a className={navLinkClass} href="#reconciliation">Reconciliation</a>
-          <a className={navLinkClass} href="#overview">Overview</a>
-          <a className={navLinkClass} href="#inventory">Inventory</a>
-          <a className={navLinkClass} href="#quick-add">Quick add</a>
-          <a className={navLinkClass} href="#reports">Reports</a>
-          <a className={navLinkClass} href="#logging">Logging</a>
-          <a className={navLinkClass} href="#backup">Backup & restore</a>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
+        <aside className="lg:sticky lg:top-16 lg:self-start">
+          <Card className="border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+            <CardHeader className="py-3">
+              <CardTitle className="text-base">In this page</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 pt-0 text-sm">
+              <a className={navLinkClass} href="#lookup-lists">Lookup lists</a>
+              <a className={navLinkClass} href="#settings-saving">Settings & saving</a>
+              <a className={navLinkClass} href="#financial-codes">Financial codes</a>
+              <a className={navLinkClass} href="#reconciliation">Reconciliation</a>
+              <a className={navLinkClass} href="#overview">Overview</a>
+              <a className={navLinkClass} href="#inventory">Inventory</a>
+              <a className={navLinkClass} href="#quick-add">Quick add</a>
+              <a className={navLinkClass} href="#reports">Reports</a>
+              <a className={navLinkClass} href="#logging">Logging</a>
+              <a className={navLinkClass} href="#backup">Backup & restore</a>
+            </CardContent>
+          </Card>
+        </aside>
 
+        <main className="space-y-6">
       <section id="lookup-lists" className={cn('scroll-mt-24 space-y-3')}>
         <h2 className="text-lg font-semibold text-foreground">Lookup lists</h2>
         <p className="text-sm text-muted-foreground">
@@ -65,8 +69,7 @@ export default function HelpPage() {
       <section id="settings-saving" className="scroll-mt-24 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Settings & saving</h2>
         <p className="text-sm text-muted-foreground">
-          Edits to lookup lists and General preferences usually save as you make them. Use <strong>Sync to storage</strong>{' '}
-          in Settings to force-write the current screen state to storage. You can download a portable settings snapshot
+          Edits to lookup lists and General preferences usually save as you make them. You can download a portable settings snapshot
           from <strong>Data Management → Backup &amp; Restore</strong>.
         </p>
       </section>
@@ -235,6 +238,8 @@ export default function HelpPage() {
           <p>Store backup files in versioned folders with date + operator name for easier rollback traceability.</p>
         </CardContent>
       </Card>
+        </main>
+      </div>
     </div>
   );
 }

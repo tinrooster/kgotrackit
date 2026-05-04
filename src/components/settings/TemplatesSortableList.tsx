@@ -117,7 +117,7 @@ function SortableTemplateRow({
         </div>
       </div>
       <div className="flex shrink-0 flex-wrap justify-end gap-1.5 sm:flex-nowrap">
-        <Button type="button" variant="default" size="sm" className="gap-1" onClick={() => onUseTemplate(template)}>
+        <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => onUseTemplate(template)}>
           <Copy className="h-3.5 w-3.5" />
           Use template
         </Button>
