@@ -1455,7 +1455,11 @@ export default function InventoryPage() {
                   />
                 </TableCell>
                 {activeColumns.map((column) => (
-                  <TableCell key={column} style={{ width: columnWidths[column] ? `${columnWidths[column]}px` : undefined }}>
+                  <TableCell
+                    key={column}
+                    style={{ width: columnWidths[column] ? `${columnWidths[column]}px` : undefined }}
+                    className="align-top whitespace-normal break-words [overflow-wrap:anywhere]"
+                  >
                     <FormatCellValue item={item} column={column} />
                   </TableCell>
                 ))}

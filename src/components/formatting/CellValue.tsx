@@ -98,8 +98,8 @@ export function FormatCellValue({ item, column }: { item: InventoryItem; column:
   }
   if (column === 'name') {
     return (
-      <div className="flex items-center gap-2">
-        <span>{item[column]?.toString() || '-'}</span>
+      <div className="flex min-w-0 items-start gap-2">
+        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{item[column]?.toString() || '-'}</span>
         {item.reorderLevel !== undefined && item.quantity <= item.reorderLevel && (
           <TooltipProvider>
             <Tooltip>
@@ -136,13 +136,13 @@ export function FormatCellValue({ item, column }: { item: InventoryItem; column:
     const resolvedCategory = getResolvedLabel(item.category, 'categories');
     const categoryColor = getCategoryColor(item.category);
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         <span
           className="inline-block h-4 w-1.5 rounded-sm border border-border/60"
           style={{ backgroundColor: categoryColor || 'hsl(var(--muted-foreground))' }}
           aria-hidden="true"
         />
-        <span>{resolvedCategory}</span>
+        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{resolvedCategory}</span>
       </div>
     );
   }
@@ -150,13 +150,13 @@ export function FormatCellValue({ item, column }: { item: InventoryItem; column:
     const locLabel = resolveLocationDisplay(item.location, (settings.locations || []) as ItemWithSubcategories[]);
     const locColor = accentColorForLocation(item.location, (settings.locations || []) as ItemWithSubcategories[]);
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         <span
           className="inline-block h-4 w-1.5 rounded-sm border border-border/60"
           style={{ backgroundColor: locColor }}
           aria-hidden="true"
         />
-        <span>{locLabel}</span>
+        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{locLabel}</span>
       </div>
     );
   }
@@ -164,13 +164,13 @@ export function FormatCellValue({ item, column }: { item: InventoryItem; column:
     const projectLabel = getResolvedLabel(item.project, 'projects');
     const projectColor = accentColorForProject(item.project, (settings.projects || []) as ItemWithSubcategories[]);
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         <span
           className="inline-block h-4 w-1.5 rounded-sm border border-border/60"
           style={{ backgroundColor: projectColor }}
           aria-hidden="true"
         />
-        <span>{projectLabel}</span>
+        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{projectLabel}</span>
       </div>
     );
   }

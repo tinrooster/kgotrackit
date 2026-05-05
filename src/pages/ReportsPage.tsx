@@ -230,14 +230,37 @@ export default function ReportsPage() {
   const toReportRows = (columns: string[]) =>
     filteredItems.map((item) =>
       columns.reduce((acc, column) => {
+        const settings = getSettings();
+        const projects = settings.projects || [];
+        const locations = settings.locations || [];
+        const categories = settings.categories || [];
         const totalValue = (item.quantity || 0) * (item.costPerUnit || 0);
         const restockRequired = (item.quantity || 0) <= (item.minQuantity || 0) ? 'Yes' : 'No';
         const recommendedTopUp = restockRequired === 'Yes' ? Math.max((item.minQuantity || 0) * 2 - (item.quantity || 0), 0) : 0;
+        const resolveCategoryDisplay = (rawValue: string | undefined) => {
+          if (!rawValue) return 'Uncategorized';
+          const flattened = (nodes: any[], parentPath = ''): { id: string; namePath: string }[] =>
+            nodes.flatMap((node) => {
+              const namePath = parentPath ? `${parentPath}/${node.name}` : node.name;
+              const current = { id: String(node.id), namePath };
+              const children = Array.isArray(node.children) ? flattened(node.children, namePath) : [];
+              return [current, ...children];
+            });
+          const options = flattened(categories as any[]);
+          const byId = options.find((entry) => entry.id === rawValue);
+          if (byId) return byId.namePath;
+          const byName = options.find((entry) => entry.namePath === rawValue);
+          if (byName) return byName.namePath;
+          return rawValue;
+        };
 
         const values: Record<string, unknown> = {
           ...item,
           recordId: item.recordId ?? '',
           assetId: item.assetId ?? '',
+          category: resolveCategoryDisplay(item.category),
+          location: item.location?.trim() ? resolveLocationDisplay(item.location, locations) : 'Unassigned',
+          project: resolveProjectDisplay(item.project, projects),
           totalValue,
           restockRequired,
           recommendedTopUp,
@@ -724,11 +747,11 @@ export default function ReportsPage() {
           <div className="space-y-2">
             <Label>Preview</Label>
             <div className="max-h-72 overflow-auto rounded-md border">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[900px] table-fixed text-sm">
                 <thead className="bg-muted">
                   <tr>
                     {selectedReport.columns.map((column) => (
-                      <th key={column} className="px-2 py-1 text-left font-medium">{column}</th>
+                      <th key={column} className="px-2 py-1 text-left font-medium whitespace-normal break-words [overflow-wrap:anywhere]">{column}</th>
                     ))}
                   </tr>
                 </thead>
@@ -736,7 +759,7 @@ export default function ReportsPage() {
                   {previewRows.map((row, index) => (
                     <tr key={index} className="border-t">
                       {selectedReport.columns.map((column) => (
-                        <td key={column} className="px-2 py-1">{String(row[column] ?? '')}</td>
+                        <td key={column} className="px-2 py-1 align-top whitespace-normal break-words [overflow-wrap:anywhere]">{String(row[column] ?? '')}</td>
                       ))}
                     </tr>
                   ))}
@@ -761,7 +784,13 @@ export default function ReportsPage() {
             <Button
               type="button"
               size="sm"
-              variant={aiSummaryMode === 'executive' ? 'default' : 'outline'}
+              variant="secondary"
+              className={cn(
+                'border border-transparent',
+                aiSummaryMode === 'executive'
+                  ? 'bg-secondary text-secondary-foreground'
+                  : 'bg-secondary/60 text-muted-foreground hover:bg-secondary/80'
+              )}
               onClick={() => setAiSummaryMode('executive')}
             >
               Executive
@@ -769,7 +798,13 @@ export default function ReportsPage() {
             <Button
               type="button"
               size="sm"
-              variant={aiSummaryMode === 'operations' ? 'default' : 'outline'}
+              variant="secondary"
+              className={cn(
+                'border border-transparent',
+                aiSummaryMode === 'operations'
+                  ? 'bg-secondary text-secondary-foreground'
+                  : 'bg-secondary/60 text-muted-foreground hover:bg-secondary/80'
+              )}
               onClick={() => setAiSummaryMode('operations')}
             >
               Operations
