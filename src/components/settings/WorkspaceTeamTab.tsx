@@ -7,6 +7,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
+import {
+  inviteWorkspaceMember,
+  listWorkspaceMembers,
+  removeWorkspaceMember,
+  updateWorkspaceMemberRole,
+  type WorkspaceMemberView,
+} from '@/lib/supabase/workspaceMemberAdmin';
 import { collectLocalSnapshot } from '@/lib/supabase/cloudData';
 import {
   createWorkspaceWithSnapshot,
@@ -15,6 +22,7 @@ import {
 } from '@/lib/supabase/workspaceData';
 import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
 import { Users } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
  * Settings → Data management: switch between personal cloud row and shared workspace payload.
@@ -27,6 +35,11 @@ export function WorkspaceTeamTab() {
   const [busy, setBusy] = React.useState(false);
   const [targetKind, setTargetKind] = React.useState<'personal' | 'team'>(activeWorkspaceId ? 'team' : 'personal');
   const [targetWorkspaceId, setTargetWorkspaceId] = React.useState<string>(activeWorkspaceId ?? '');
+  const [members, setMembers] = React.useState<WorkspaceMemberView[]>([]);
+  const [membersLoading, setMembersLoading] = React.useState(false);
+  const [inviteEmail, setInviteEmail] = React.useState('');
+  const [inviteRole, setInviteRole] = React.useState<'admin' | 'editor' | 'viewer'>('editor');
+  const [memberActionBusyUserId, setMemberActionBusyUserId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setTargetKind(activeWorkspaceId ? 'team' : 'personal');
@@ -97,6 +110,28 @@ export function WorkspaceTeamTab() {
     setActiveWorkspaceId(targetWorkspaceId);
     window.location.reload();
   };
+
+  const activeTeamAdmin = !!activeWorkspaceId && activeWorkspaceRole === 'admin';
+
+  const loadMembers = React.useCallback(async () => {
+    if (!activeWorkspaceId || activeWorkspaceRole !== 'admin') {
+      setMembers([]);
+      return;
+    }
+    setMembersLoading(true);
+    try {
+      const rows = await listWorkspaceMembers(activeWorkspaceId);
+      setMembers(rows);
+    } catch (error) {
+      toast.error('Could not load workspace members', { description: formatWorkspaceError(error) });
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [activeWorkspaceId, activeWorkspaceRole]);
+
+  React.useEffect(() => {
+    void loadMembers();
+  }, [loadMembers]);
 
   return (
     <Card>
@@ -203,6 +238,144 @@ export function WorkspaceTeamTab() {
             </span>
           </div>
         </div>
+
+        {activeTeamAdmin ? (
+          <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">Team member management</p>
+              <Button type="button" variant="ghost" size="sm" onClick={() => void loadMembers()} disabled={membersLoading}>
+                Refresh members
+              </Button>
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_160px_auto] md:items-end">
+              <div className="space-y-1.5">
+                <Label htmlFor="workspace-invite-email">Invite by email</Label>
+                <Input
+                  id="workspace-invite-email"
+                  type="email"
+                  placeholder="name@company.com"
+                  value={inviteEmail}
+                  onChange={(event) => setInviteEmail(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Role</Label>
+                <Select value={inviteRole} onValueChange={(value: 'admin' | 'editor' | 'viewer') => setInviteRole(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="editor">Editor</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                onClick={async () => {
+                  const email = inviteEmail.trim().toLowerCase();
+                  if (!email) {
+                    toast.error('Enter an email address.');
+                    return;
+                  }
+                  setMemberActionBusyUserId('invite');
+                  try {
+                    await inviteWorkspaceMember(activeWorkspaceId!, email, inviteRole);
+                    toast.success('Invite/membership updated');
+                    setInviteEmail('');
+                    await loadMembers();
+                  } catch (error) {
+                    toast.error('Could not invite member', { description: formatWorkspaceError(error) });
+                  } finally {
+                    setMemberActionBusyUserId(null);
+                  }
+                }}
+                disabled={memberActionBusyUserId === 'invite'}
+              >
+                {memberActionBusyUserId === 'invite' ? 'Inviting…' : 'Invite'}
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {membersLoading ? (
+                <p className="text-xs text-muted-foreground">Loading members…</p>
+              ) : members.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No members found.</p>
+              ) : (
+                members.map((member) => {
+                  const roleBusy = memberActionBusyUserId === `role:${member.userId}`;
+                  const removeBusy = memberActionBusyUserId === `remove:${member.userId}`;
+                  return (
+                    <div
+                      key={member.userId}
+                      className="grid gap-2 rounded-md border border-border/60 bg-background/70 px-3 py-2 md:grid-cols-[minmax(220px,1fr)_160px_auto]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {member.displayName || member.email}
+                          {member.userId === currentUser?.id ? ' (you)' : ''}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+                      </div>
+                      <Select
+                        value={member.role}
+                        onValueChange={async (value: 'admin' | 'editor' | 'viewer') => {
+                          if (!activeWorkspaceId) return;
+                          setMemberActionBusyUserId(`role:${member.userId}`);
+                          try {
+                            await updateWorkspaceMemberRole(activeWorkspaceId, member.userId, value);
+                            await loadMembers();
+                            await refreshWorkspaces();
+                            toast.success('Member role updated');
+                          } catch (error) {
+                            toast.error('Could not update role', { description: formatWorkspaceError(error) });
+                          } finally {
+                            setMemberActionBusyUserId(null);
+                          }
+                        }}
+                        disabled={roleBusy}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="editor">Editor</SelectItem>
+                          <SelectItem value="viewer">Viewer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex items-center justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={removeBusy || member.userId === currentUser?.id}
+                          onClick={async () => {
+                            if (!activeWorkspaceId) return;
+                            setMemberActionBusyUserId(`remove:${member.userId}`);
+                            try {
+                              await removeWorkspaceMember(activeWorkspaceId, member.userId);
+                              await loadMembers();
+                              toast.success('Member removed');
+                            } catch (error) {
+                              toast.error('Could not remove member', { description: formatWorkspaceError(error) });
+                            } finally {
+                              setMemberActionBusyUserId(null);
+                            }
+                          }}
+                        >
+                          {removeBusy ? 'Removing…' : 'Remove'}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
