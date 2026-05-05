@@ -482,10 +482,9 @@ export function DataBackupTab({
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="import-export">Import & Export</TabsTrigger>
           <TabsTrigger value="backup-restore">Backup & Restore</TabsTrigger>
-          <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
         </TabsList>
 
         <TabsContent value="import-export" className="space-y-4 pt-4">
@@ -775,60 +774,64 @@ export function DataBackupTab({
           </Card>
         </TabsContent>
 
-        <TabsContent value="reconciliation" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <GitMerge className="h-5 w-5" />
-                Group inventory reconciliation
-              </CardTitle>
-              <CardDescription>
-                Scan all inventory rows against the current user-defined lists and financial code tables, then fix
-                mismatched references in one pass (same rules as the per-list &quot;Fix unreconciled&quot; tools).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Invalid categories are cleared (previous value is preserved in custom fields). Invalid locations,
-                suppliers, projects, and legacy expense-code labels are cleared. Invalid units fall back to your first
-                configured unit (or &quot;each&quot;). Unknown expense type / cost center codes are cleared when they are
-                not blank and not N/A.
-              </p>
-              <div className="flex flex-wrap gap-2">
+      </Tabs>
+
+      <div className="space-y-4">
+        <div className="px-1">
+          <h3 className="text-sm font-semibold text-foreground">Reconciliation</h3>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GitMerge className="h-5 w-5" />
+              Group inventory reconciliation
+            </CardTitle>
+            <CardDescription>
+              Scan all inventory rows against the current user-defined lists and financial code tables, then fix
+              mismatched references in one pass (same rules as the per-list &quot;Fix unreconciled&quot; tools).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Invalid categories are cleared (previous value is preserved in custom fields). Invalid locations,
+              suppliers, projects, and legacy expense-code labels are cleared. Invalid units fall back to your first
+              configured unit (or &quot;each&quot;). Unknown expense type / cost center codes are cleared when they are
+              not blank and not N/A.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="active:bg-accent"
+                onClick={handleRunGroupReconcile}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Run group reconciliation
+              </Button>
+              {reconcileReport !== null && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="active:bg-accent"
-                  onClick={handleRunGroupReconcile}
+                  onClick={() => setReconcileReport(null)}
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Run group reconciliation
+                  Clear report
                 </Button>
-                {reconcileReport !== null && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="active:bg-accent"
-                    onClick={() => setReconcileReport(null)}
-                  >
-                    Clear report
-                  </Button>
-                )}
-              </div>
-              {reconcileReport !== null && (
-                <div>
-                  <h4 className="mb-2 text-sm font-medium text-foreground">Last run report</h4>
-                  <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground">
-                    {reconcileReport}
-                  </pre>
-                </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+            {reconcileReport !== null && (
+              <div>
+                <h4 className="mb-2 text-sm font-medium text-foreground">Last run report</h4>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground">
+                  {reconcileReport}
+                </pre>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <AlertDialog
         open={fullRestoreDialogOpen}

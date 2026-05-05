@@ -1883,7 +1883,6 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="data" className="space-y-6">
-          <WorkspaceTeamTab />
           <DataBackupTab
             onExportData={handleExportData}
             onExportExcel={handleExportExcel}
@@ -1895,6 +1894,7 @@ export default function SettingsPage() {
             onRestoreSettingsSnapshot={handleRestoreSettingsSnapshot}
             onRunGroupInventoryReconcile={handleGroupInventoryReconcile}
           />
+          <WorkspaceTeamTab />
         </TabsContent>
 
         <TabsContent value="logs">

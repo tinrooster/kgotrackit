@@ -19,6 +19,7 @@ interface CameraSettingsDialogProps {
 }
 
 export const CAMERA_DEVICE_ID_KEY = "selectedCameraDeviceId";
+export const CAMERA_SETTINGS_UPDATED_EVENT = "trackit:camera-settings-updated";
 
 export function CameraSettingsDialog({ isOpen, onClose }: CameraSettingsDialogProps) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -113,6 +114,7 @@ export function CameraSettingsDialog({ isOpen, onClose }: CameraSettingsDialogPr
       return;
     }
     localStorage.setItem(CAMERA_DEVICE_ID_KEY, selectedDeviceId);
+    window.dispatchEvent(new Event(CAMERA_SETTINGS_UPDATED_EVENT));
     toast.success("Camera setting saved.");
     onClose();
   };

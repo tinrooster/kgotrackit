@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Camera } from 'lucide-react';
 import type { DefaultSettings } from '@/lib/settingsService';
-import { CAMERA_DEVICE_ID_KEY } from "@/components/CameraSettingsDialog";
+import { CAMERA_DEVICE_ID_KEY, CAMERA_SETTINGS_UPDATED_EVENT } from "@/components/CameraSettingsDialog";
 
 interface GeneralSettingsTabProps {
   onOpenCameraSettings: () => void;
@@ -29,49 +29,48 @@ export function GeneralSettingsTab({
   const confirmDeletesEnabled = settings.deleteConfirmationByUser?.[currentUsername] ?? true;
   const undoEnabled = settings.undoByUser?.[currentUsername] ?? true;
   const [cameraSummary, setCameraSummary] = React.useState('Checking available cameras...');
-
-  React.useEffect(() => {
-    let isCancelled = false;
-
-    const refreshCameraSummary = async () => {
-      const selectedDeviceId = localStorage.getItem(CAMERA_DEVICE_ID_KEY) || '';
-      if (!navigator.mediaDevices?.enumerateDevices) {
-        setCameraSummary('Camera APIs are unavailable in this environment.');
+  const refreshCameraSummary = React.useCallback(async () => {
+    const selectedDeviceId = localStorage.getItem(CAMERA_DEVICE_ID_KEY) || '';
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setCameraSummary('Camera APIs are unavailable in this environment.');
+      return;
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter((device) => device.kind === 'videoinput');
+      if (videoInputs.length === 0) {
+        setCameraSummary('No cameras detected. Check permissions and connected devices.');
         return;
       }
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        if (isCancelled) return;
-        const videoInputs = devices.filter((device) => device.kind === 'videoinput');
-        if (videoInputs.length === 0) {
-          setCameraSummary('No cameras detected. Check permissions and connected devices.');
-          return;
-        }
-        if (!selectedDeviceId) {
-          setCameraSummary(`No camera selected. ${videoInputs.length} camera device(s) available.`);
-          return;
-        }
-        const selectedDevice = videoInputs.find((device) => device.deviceId === selectedDeviceId);
-        if (!selectedDevice) {
-          setCameraSummary(
-            `Saved camera is unavailable. ${videoInputs.length} camera device(s) currently detected.`,
-          );
-          return;
-        }
-        const selectedLabel = selectedDevice.label || 'Selected camera';
-        setCameraSummary(`${selectedLabel} (${videoInputs.length} camera device(s) detected).`);
-      } catch {
-        if (!isCancelled) {
-          setCameraSummary('Could not read camera devices. Open Configure Camera to refresh permission.');
-        }
+      if (!selectedDeviceId) {
+        setCameraSummary(`No camera selected. ${videoInputs.length} camera device(s) available.`);
+        return;
       }
-    };
-
-    void refreshCameraSummary();
-    return () => {
-      isCancelled = true;
-    };
+      const selectedDevice = videoInputs.find((device) => device.deviceId === selectedDeviceId);
+      if (!selectedDevice) {
+        setCameraSummary(
+          `Saved camera is unavailable. ${videoInputs.length} camera device(s) currently detected.`,
+        );
+        return;
+      }
+      const selectedLabel = selectedDevice.label || 'Selected camera';
+      setCameraSummary(`${selectedLabel} (${videoInputs.length} camera device(s) detected).`);
+    } catch {
+      setCameraSummary('Could not read camera devices. Open Configure Camera to refresh permission.');
+    }
   }, []);
+
+  React.useEffect(() => {
+    const handleCameraUpdated = () => {
+      void refreshCameraSummary();
+    };
+    void refreshCameraSummary();
+    window.addEventListener(CAMERA_SETTINGS_UPDATED_EVENT, handleCameraUpdated);
+
+    return () => {
+      window.removeEventListener(CAMERA_SETTINGS_UPDATED_EVENT, handleCameraUpdated);
+    };
+  }, [refreshCameraSummary]);
 
   return (
     <div className="space-y-6">

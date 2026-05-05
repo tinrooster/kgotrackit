@@ -21,6 +21,7 @@ import {
   Camera,
   ChevronDown,
   Copy,
+  History,
   ImagePlus,
   Layers,
   LayoutList,
@@ -32,6 +33,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  Type,
   Warehouse,
   X,
   Zap,
@@ -249,14 +251,13 @@ export function MobileQuickAddDialog({
 
   const sectionNameRef = React.useRef<HTMLDivElement>(null);
   const sectionRackInLocRef = React.useRef<HTMLDivElement>(null);
-  const sectionQuickRef = React.useRef<HTMLDivElement>(null);
   const sectionMetaRef = React.useRef<HTMLDivElement>(null);
   const sectionAllLocRef = React.useRef<HTMLDivElement>(null);
   const sectionAllCatRef = React.useRef<HTMLDivElement>(null);
   const sectionUnitRef = React.useRef<HTMLDivElement>(null);
   const sectionProjectRef = React.useRef<HTMLDivElement>(null);
 
-  type JumpHighlight = "name" | "shortcuts" | "details" | "location" | "category" | "unit" | "project";
+  type JumpHighlight = "name" | "details" | "location" | "category" | "unit" | "project";
   const [jumpHighlight, setJumpHighlight] = React.useState<JumpHighlight | null>(null);
   const jumpTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -955,15 +956,6 @@ export function MobileQuickAddDialog({
               ) : null}
               <Button
                 type="button"
-                variant={jumpHighlight === "shortcuts" ? "secondary" : "outline"}
-                size="sm"
-                className="h-7 touch-manipulation px-2 text-[11px]"
-                onClick={() => jumpTo("shortcuts", sectionQuickRef)}
-              >
-                Shortcuts
-              </Button>
-              <Button
-                type="button"
                 variant={jumpHighlight === "details" ? "secondary" : "outline"}
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
@@ -1064,45 +1056,28 @@ export function MobileQuickAddDialog({
                       title="Use last item name"
                       aria-label="Use last item name"
                     >
-                      <Copy className="h-4 w-4" />
+                      <Type className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  {lastSnapshot ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 shrink-0 touch-manipulation"
+                      onClick={applySameAsLast}
+                      title="Apply same as last details"
+                      aria-label="Apply same as last details"
+                    >
+                      <History className="h-4 w-4" />
                     </Button>
                   ) : null}
                 </div>
                 {listening ? (
                   <p className="mt-1 text-[10px] leading-tight text-muted-foreground">Listening…</p>
                 ) : null}
-                </div>
-              </div>
-
-              <div ref={sectionQuickRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "shortcuts")}>
-                <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
-                  <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="text-xs font-semibold text-foreground">Shortcuts</span>
-                </div>
-                <div className="p-2.5 sm:p-3">
-                {lastSnapshot ? (
-                  <div
-                    className="mb-2 flex min-h-0 items-center gap-2 rounded-md border border-border/60 bg-background/60 py-1.5 pl-2 pr-1.5"
-                    title="Reuse location, category, unit, and project from your last successful quick add."
-                  >
-                    <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium">Same as last</span>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 touch-manipulation"
-                      onClick={applySameAsLast}
-                      aria-label="Apply same as last selections"
-                      title="Apply same as last"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ) : null}
-
                 {favoriteLocationIds.length > 0 || favoriteCategories.length > 0 ? (
-                  <div className="space-y-1.5">
+                  <div className="mt-2.5 space-y-1.5 border-t border-dashed border-border/50 pt-2">
                     <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                       <Sparkles className="h-3 w-3 shrink-0 text-amber-500" aria-hidden />
                       <span>Often used</span>
@@ -1110,9 +1085,7 @@ export function MobileQuickAddDialog({
                     {favoriteLocationIds.length > 0 ? (
                       <div className="space-y-0.5">
                         {favoriteCategories.length > 0 ? (
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">
-                            Loc
-                          </p>
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">Loc</p>
                         ) : null}
                         <div className="flex flex-wrap gap-1">
                           {favoriteLocationIds.map((id) => {
@@ -1143,9 +1116,7 @@ export function MobileQuickAddDialog({
                     {favoriteCategories.length > 0 ? (
                       <div className="space-y-0.5">
                         {favoriteLocationIds.length > 0 ? (
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">
-                            Cat
-                          </p>
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">Cat</p>
                         ) : null}
                         <div className="flex flex-wrap gap-1">
                           {favoriteCategories.map((path) => (
@@ -1163,7 +1134,7 @@ export function MobileQuickAddDialog({
                     ) : null}
                   </div>
                 ) : !lastSnapshot ? (
-                  <p className="text-[11px] text-muted-foreground">Shortcuts appear after you add items.</p>
+                  <p className="mt-2 text-[11px] text-muted-foreground">Often used shortcuts appear after you add items.</p>
                 ) : null}
                 </div>
               </div>
@@ -1360,7 +1331,7 @@ export function MobileQuickAddDialog({
                   </div>
                 ) : (
                   <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    {detailsIndicator} — tap header to expand.
+                    Tap header to expand.
                   </p>
                 )}
               </div>
@@ -1470,9 +1441,7 @@ export function MobileQuickAddDialog({
                   </div>
                 ) : (
                   <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    {locationStripLabel
-                      ? `Selected: ${locationStripLabel}${rackLocation ? ` · Rack: ${rackLocation}` : ""}`
-                      : "Collapsed — tap header to expand."}
+                    Tap header to expand.
                   </p>
                 )}
               </div>
@@ -1524,7 +1493,7 @@ export function MobileQuickAddDialog({
                   </div>
                 ) : (
                   <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    {category ? `Selected: ${category}` : "Collapsed — tap header to expand."}
+                    Tap header to expand.
                   </p>
                 )}
               </div>
@@ -1607,9 +1576,7 @@ export function MobileQuickAddDialog({
                   </div>
                 ) : (
                   <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    {unitStripLabel
-                      ? `Selected: ${unitStripLabel}`
-                      : "Collapsed — tap header to expand."}
+                    Tap header to expand.
                   </p>
                 )}
               </div>
@@ -1677,9 +1644,7 @@ export function MobileQuickAddDialog({
                   </div>
                 ) : (
                   <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    {project
-                      ? `Selected: ${projectStripLabel}`
-                      : "Selected: None — tap header to expand."}
+                    Tap header to expand.
                   </p>
                 )}
               </div>

@@ -143,6 +143,7 @@ const getBestHand = (cards: Card[]) => {
 
 export default function AboutPage() {
   const [microTableOpen, setMicroTableOpen] = useState(false);
+  const [showPokerCheatsheet, setShowPokerCheatsheet] = useState(false);
   const [deck, setDeck] = useState<Card[]>([]);
   const [playerCards, setPlayerCards] = useState<Card[]>([]);
   const [dealerCards, setDealerCards] = useState<Card[]>([]);
@@ -410,35 +411,8 @@ export default function AboutPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Poker helper (novice mode)</CardTitle>
-          <CardDescription>Short practical guidance while playing stronger opponents.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p><strong>1) Preflop baseline:</strong> fold weak offsuit hands, play pairs/strong broadways, and avoid calling big raises out of position.</p>
-          <p><strong>2) Pot control:</strong> when unsure, check/call small and avoid large river hero calls with one pair.</p>
-          <p><strong>3) Value first:</strong> if you think you are ahead, bet for value; do not slow-play by default.</p>
-          <p><strong>4) Bluff less, choose spots:</strong> bluff more often on scare cards where your line can represent strong hands.</p>
-          <p><strong>5) Simple table rule:</strong> if to-call is large and your hand is marginal, fold and wait for a clearer edge.</p>
-          <p><strong>6) Session habit:</strong> note one mistake and one good fold each hand block to improve quickly.</p>
-        </CardContent>
-      </Card>
-
       {microTableOpen && (
         <div className="space-y-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Micro-table trainer controls</CardTitle>
-                  <CardDescription>How to use the demo hand-by-hand.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <p><strong>Deal Hand</strong> starts a new hand and posts blinds.</p>
-                  <p><strong>Check/Call/Raise/Fold</strong> records your action on the current street.</p>
-                  <p><strong>Next Street</strong> unlocks after an action so you can advance flow correctly.</p>
-                  <p><strong>Hand History</strong> chips show the sequence so you can review decisions after each hand.</p>
-                </CardContent>
-              </Card>
               <div className="relative overflow-hidden rounded-xl border border-emerald-900/60 bg-[radial-gradient(circle_at_top,_#14532d,_#052e16_55%,_#03160c)] p-4 space-y-3 text-sm shadow-lg">
                 <div className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_0%,_rgba(16,185,129,0.5),_transparent_45%)]" />
                 <div className="relative">
@@ -573,6 +547,28 @@ export default function AboutPage() {
                     Next Street
                   </Button>
                 </div>
+                <button
+                  type="button"
+                  className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-950/55 text-emerald-100 hover:bg-emerald-900/65"
+                  onClick={() => setShowPokerCheatsheet((previousValue) => !previousValue)}
+                  aria-label="Toggle poker cheat sheet"
+                  title="Cheat sheet"
+                >
+                  <Info className="h-4 w-4" />
+                </button>
+                {showPokerCheatsheet ? (
+                  <div className="absolute bottom-14 right-3 w-80 max-w-[calc(100%-1.5rem)] rounded-md border border-emerald-300/40 bg-emerald-950/95 p-3 text-[11px] text-emerald-100 shadow-lg">
+                    <p className="mb-1.5 font-semibold uppercase tracking-wide text-emerald-200/90">Cheat sheet</p>
+                    <ol className="list-decimal space-y-1 pl-4">
+                      <li>Preflop baseline: fold weak offsuit hands, play pairs and strong broadways.</li>
+                      <li>Pot control: check/call small when unsure; avoid large hero calls with one pair.</li>
+                      <li>Value first: when ahead, bet for value instead of slow-playing by default.</li>
+                      <li>Bluff less, choose spots: bluff more on scare cards that fit your line.</li>
+                      <li>If to-call is large and your hand is marginal, fold and wait for clearer edges.</li>
+                      <li>After each block, note one mistake and one good fold.</li>
+                    </ol>
+                  </div>
+                ) : null}
               </div>
             </div>
       )}

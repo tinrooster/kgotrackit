@@ -3,8 +3,10 @@ import type { UseFormReturn } from "react-hook-form";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Camera, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { normalizeImageFileToDataUrl, estimateDataUrlBytes } from "@/lib/imageNormalization";
+import { QuickCapturePhotoDialog } from "@/components/QuickCapturePhotoDialog";
 
 const TARGET_PHOTO_BYTES = 1_800_000;
 
@@ -15,19 +17,31 @@ interface ItemPhotoFieldProps {
 }
 
 export function ItemPhotoField({ form, name = "photoUrl", className }: ItemPhotoFieldProps) {
+  const [captureOpen, setCaptureOpen] = React.useState(false);
+  const galleryInputRef = React.useRef<HTMLInputElement>(null);
+
   return (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem className={className}>
-          <FormLabel>Photo</FormLabel>
-          <div className="flex flex-wrap items-center gap-3">
-            <FormControl>
+    <>
+      <QuickCapturePhotoDialog
+        open={captureOpen}
+        onOpenChange={setCaptureOpen}
+        onCapture={(dataUrl) => {
+          form.setValue(name, dataUrl, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+        }}
+        onFallbackToFiles={() => galleryInputRef.current?.click()}
+      />
+      <FormField
+        control={form.control}
+        name={name}
+        render={({ field }) => (
+          <FormItem className={className}>
+            <FormLabel>Photo</FormLabel>
+            <div className="flex flex-wrap items-center gap-2">
               <Input
+                ref={galleryInputRef}
                 type="file"
                 accept="image/*"
-                className="max-w-xs cursor-pointer"
+                className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = "";
@@ -41,30 +55,46 @@ export function ItemPhotoField({ form, name = "photoUrl", className }: ItemPhoto
                         toast.error("Image is still too large after compression. Try a smaller photo.");
                         return;
                       }
-                      field.onChange(normalizedDataUrl);
+                      form.setValue(name, normalizedDataUrl, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
                     })
                     .catch(() => {
                       toast.error("Could not process the selected image.");
                     });
                 }}
               />
-            </FormControl>
-            {field.value ? (
-              <>
-                <img
-                  src={field.value}
-                  alt=""
-                  className="h-16 w-16 rounded border object-cover"
-                />
-                <Button type="button" variant="outline" size="sm" onClick={() => field.onChange("")}>
-                  Remove
-                </Button>
-              </>
-            ) : null}
-          </div>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
+              <Button type="button" variant="outline" size="sm" onClick={() => setCaptureOpen(true)}>
+                <Camera className="mr-1.5 h-4 w-4" />
+                Take photo
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => galleryInputRef.current?.click()}>
+                <ImagePlus className="mr-1.5 h-4 w-4" />
+                Upload file
+              </Button>
+              <FormControl>
+                <Input {...field} type="hidden" />
+              </FormControl>
+              {field.value ? (
+                <>
+                  <img
+                    src={field.value}
+                    alt=""
+                    className="h-16 w-16 rounded border object-cover"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => form.setValue(name, "", { shouldDirty: true, shouldTouch: true, shouldValidate: true })}
+                  >
+                    Remove
+                  </Button>
+                </>
+              ) : null}
+            </div>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </>
   );
 }
