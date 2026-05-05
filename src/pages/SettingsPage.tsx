@@ -35,6 +35,7 @@ import { getPasswordError } from '@/utils/passwordUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { DataBackupTab } from "@/components/settings/DataBackupTab"
 import { WorkspaceTeamTab } from '@/components/settings/WorkspaceTeamTab'
+import { SupabaseWorkspaceUsersCard } from '@/components/settings/SupabaseWorkspaceUsersCard'
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
 import {
   UserDefinedListsSection,
@@ -1859,26 +1860,37 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="users">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle>User Management</CardTitle>
-              {authBackend === 'supabase' ? null : (
+          {authBackend === 'supabase' ? (
+            activeWorkspaceId ? (
+              <SupabaseWorkspaceUsersCard
+                workspaceId={activeWorkspaceId}
+                currentUserId={currentUser?.id || ''}
+                canManageUsers={canManageSharedConfig}
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>User Management</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
+                    Switch to a team workspace to manage users. Personal mode does not expose team user administration.
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle>User Management</CardTitle>
                 <Button onClick={() => setShowAddUserDialog(true)} className="flex items-center">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Add User
                 </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {authBackend === 'supabase' ? (
-                <div className="mb-4 rounded-md border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
-                  Supabase auth is active. User creation/role assignment should use Supabase Auth (Dashboard or service-role
-                  admin API). Local Add User is disabled in cloud mode.
-                </div>
-              ) : null}
-              {renderUsersList()}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent>{renderUsersList()}</CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="data" className="space-y-6">

@@ -84,10 +84,22 @@ export function WorkspaceTeamTab() {
 
   const handleCreate = async () => {
     if (!currentUser?.id) return;
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      toast.error('Workspace name is required.');
+      return;
+    }
+    const hasNameConflict = workspaces.some(
+      (workspace) => workspace.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (hasNameConflict) {
+      toast.error('A team with that name already exists. Choose a different name.');
+      return;
+    }
     setBusy(true);
     try {
       const snapshot = await collectLocalSnapshot();
-      const id = await createWorkspaceWithSnapshot(newName, snapshot as WorkspaceSnapshotPayload);
+      const id = await createWorkspaceWithSnapshot(trimmedName, snapshot as WorkspaceSnapshotPayload);
       toast.success('Workspace created. Switching…');
       setActiveWorkspaceId(id);
       window.location.reload();
@@ -106,6 +118,10 @@ export function WorkspaceTeamTab() {
     }
     if (!targetWorkspaceId) {
       toast.error('Select a team workspace first.');
+      return;
+    }
+    if (!workspaces.some((workspace) => workspace.workspaceId === targetWorkspaceId)) {
+      toast.error('You can only switch to team workspaces where you are already invited.');
       return;
     }
     setActiveWorkspaceId(targetWorkspaceId);
@@ -198,7 +214,9 @@ export function WorkspaceTeamTab() {
               id="workspace-name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
+              autoComplete="off"
               placeholder="e.g. Engineering shared"
+              className="placeholder:text-muted-foreground/40"
               disabled={busy}
             />
           </div>
@@ -283,9 +301,11 @@ export function WorkspaceTeamTab() {
                 <Input
                   id="workspace-invite-email"
                   type="email"
+                  autoComplete="off"
                   placeholder="name@company.com"
                   value={inviteEmail}
                   onChange={(event) => setInviteEmail(event.target.value)}
+                  className="placeholder:text-muted-foreground/40"
                 />
               </div>
               <div className="space-y-1.5">

@@ -3,11 +3,19 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 type WorkspaceMemberRole = 'admin' | 'editor' | 'viewer';
 
 type RequestPayload = {
-  action?: 'list_members' | 'invite_member' | 'update_member_role' | 'remove_member';
+  action?:
+    | 'list_members'
+    | 'invite_member'
+    | 'update_member_role'
+    | 'remove_member'
+    | 'set_member_status'
+    | 'reset_member_password';
   workspaceId?: string;
   email?: string;
   userId?: string;
   role?: WorkspaceMemberRole;
+  disabled?: boolean;
+  newPassword?: string;
 };
 
 const corsHeaders = {
@@ -100,15 +108,17 @@ Deno.serve(async (request) => {
         const role = isRole(member.role) ? member.role : 'viewer';
         const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(member.user_id);
         if (userError) {
-          rows.push({ userId: member.user_id, role, email: '(unknown user)' });
+          rows.push({ userId: member.user_id, role, email: '(unknown user)', disabled: false });
           continue;
         }
         const appMetaName = userData.user?.app_metadata?.display_name;
         const userMetaName = userData.user?.user_metadata?.display_name;
+        const isDisabled = userData.user?.app_metadata?.disabled === true;
         rows.push({
           userId: member.user_id,
           role,
           email: userData.user?.email || '(no email)',
+          disabled: isDisabled,
           displayName:
             typeof appMetaName === 'string'
               ? appMetaName
@@ -129,17 +139,18 @@ Deno.serve(async (request) => {
         return jsonResponse(400, { error: 'role must be admin, editor, or viewer.' });
       }
 
-      const { data: existingAuthUsers, error: existingUsersError } = await adminClient
-        .schema('auth')
-        .from('users')
-        .select('id, email')
-        .eq('email', email)
-        .limit(1);
-      if (existingUsersError) {
-        return jsonResponse(500, { error: existingUsersError.message });
+      let targetUserId: string | null = null;
+      const { data: listUsersData, error: listUsersError } = await adminClient.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+      if (listUsersError) {
+        return jsonResponse(500, { error: listUsersError.message });
       }
-
-      let targetUserId: string | null = existingAuthUsers?.[0]?.id ?? null;
+      const matchedUser = (listUsersData?.users || []).find(
+        (authUser) => String(authUser.email || '').toLowerCase() === email
+      );
+      targetUserId = matchedUser?.id ?? null;
       if (!targetUserId) {
         const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email);
         if (inviteError) {
@@ -258,6 +269,53 @@ Deno.serve(async (request) => {
         .eq('user_id', targetUserId);
       if (deleteError) {
         return jsonResponse(500, { error: deleteError.message });
+      }
+      return jsonResponse(200, { ok: true });
+    }
+
+    if (payload.action === 'set_member_status') {
+      const targetUserId = String(payload.userId || '').trim();
+      if (!targetUserId) {
+        return jsonResponse(400, { error: 'userId is required.' });
+      }
+      if (targetUserId === actor.id && payload.disabled === true) {
+        return jsonResponse(400, { error: 'You cannot disable your own account.' });
+      }
+      const disabled = payload.disabled === true;
+      const { data: userData, error: userFetchError } = await adminClient.auth.admin.getUserById(targetUserId);
+      if (userFetchError || !userData.user) {
+        return jsonResponse(404, { error: userFetchError?.message || 'User not found.' });
+      }
+      const currentAppMeta =
+        userData.user.app_metadata && typeof userData.user.app_metadata === 'object'
+          ? userData.user.app_metadata
+          : {};
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+        app_metadata: {
+          ...currentAppMeta,
+          disabled,
+        },
+      });
+      if (updateError) {
+        return jsonResponse(500, { error: updateError.message });
+      }
+      return jsonResponse(200, { ok: true });
+    }
+
+    if (payload.action === 'reset_member_password') {
+      const targetUserId = String(payload.userId || '').trim();
+      const newPassword = String(payload.newPassword || '').trim();
+      if (!targetUserId) {
+        return jsonResponse(400, { error: 'userId is required.' });
+      }
+      if (!newPassword || newPassword.length < 8) {
+        return jsonResponse(400, { error: 'newPassword must be at least 8 characters.' });
+      }
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+        password: newPassword,
+      });
+      if (updateError) {
+        return jsonResponse(500, { error: updateError.message });
       }
       return jsonResponse(200, { ok: true });
     }

@@ -90,6 +90,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: { session } } = await client.auth.getSession();
           if (cancelled) return;
           if (session?.user) {
+            if (session.user.app_metadata?.disabled === true) {
+              await client.auth.signOut();
+              setCurrentUser(null);
+              toast.error('Your account is disabled. Contact an administrator.');
+              setLoading(false);
+              return;
+            }
             const mapped = mapSupabaseUserToAppUser(session.user) as User;
             setCurrentUser(mapped);
             try {
@@ -109,6 +116,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
             if (!session?.user) {
+              return;
+            }
+            if (session.user.app_metadata?.disabled === true) {
+              await client.auth.signOut();
+              setCurrentUser(null);
+              toast.error('Your account is disabled. Contact an administrator.');
               return;
             }
             const mapped = mapSupabaseUserToAppUser(session.user) as User;
@@ -217,6 +230,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ok: false, message: detail };
         }
         if (data.user) {
+          if (data.user.app_metadata?.disabled === true) {
+            await client.auth.signOut();
+            durableLogger.warn('security', 'AUTH_LOGIN_FAILED', { username: email, error: 'Account disabled' }, 'AuthContext');
+            return { ok: false, message: 'Account is disabled. Contact an administrator.' };
+          }
           const mapped = mapSupabaseUserToAppUser(data.user) as User;
           setCurrentUser(mapped);
           bootstrappedUserIdRef.current = data.user.id;

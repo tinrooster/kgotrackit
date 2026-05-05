@@ -6,6 +6,7 @@ export interface WorkspaceMemberView {
   email: string;
   role: WorkspaceMemberRole;
   displayName?: string;
+  disabled?: boolean;
   invitedAt?: string | null;
 }
 
@@ -25,6 +26,21 @@ async function invokeWorkspaceMemberAdmin(
   }
   const { data, error } = await client.functions.invoke('workspace-member-admin', { body });
   if (error) {
+    const errorLike = error as { context?: Response; message?: string };
+    if (errorLike.context instanceof Response) {
+      try {
+        const responseBody = await errorLike.context.json();
+        const message =
+          typeof responseBody?.error === 'string'
+            ? responseBody.error
+            : typeof errorLike.message === 'string'
+              ? errorLike.message
+              : 'Edge function request failed.';
+        throw new Error(message);
+      } catch {
+        throw new Error(errorLike.message || 'Edge function request failed.');
+      }
+    }
     throw error;
   }
   return (data || {}) as WorkspaceMemberAdminResponse;
@@ -69,5 +85,31 @@ export async function removeWorkspaceMember(workspaceId: string, userId: string)
     action: 'remove_member',
     workspaceId,
     userId,
+  });
+}
+
+export async function setWorkspaceMemberDisabled(
+  workspaceId: string,
+  userId: string,
+  disabled: boolean
+): Promise<void> {
+  await invokeWorkspaceMemberAdmin({
+    action: 'set_member_status',
+    workspaceId,
+    userId,
+    disabled,
+  });
+}
+
+export async function resetWorkspaceMemberPassword(
+  workspaceId: string,
+  userId: string,
+  newPassword: string
+): Promise<void> {
+  await invokeWorkspaceMemberAdmin({
+    action: 'reset_member_password',
+    workspaceId,
+    userId,
+    newPassword,
   });
 }
