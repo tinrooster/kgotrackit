@@ -263,3 +263,36 @@ body:not(.mt-compact-ui) .settings-page [data-settings-tab-long] {
     flex-shrink: 0;
   }
 }
+
+/* Mobile/tablet mode: visibly touch-first density (distinct from condensed mode) */
+body.mt-compact-ui main {
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+}
+
+body.mt-compact-ui button,
+body.mt-compact-ui input,
+body.mt-compact-ui select,
+body.mt-compact-ui textarea,
+body.mt-compact-ui [role="combobox"],
+body.mt-compact-ui [role="tab"] {
+  min-height: 2.6rem;
+}
+
+body.mt-compact-ui th {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+body.mt-compact-ui td {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+body.mt-compact-ui .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1rem;
+}
+
+body.mt-compact-ui .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.75rem;
+}
