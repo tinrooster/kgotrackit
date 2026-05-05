@@ -55,32 +55,38 @@ export function SupplierWebsiteStatusBlock({
         <div className="mt-2 space-y-1 text-xs text-muted-foreground">
           {supplierProfile.contactName ? (
             <p>
-              <span className="font-medium text-foreground">Contact:</span> {supplierProfile.contactName}
+              <span className="text-foreground">Contact:</span>{' '}
+              <span className="font-semibold text-foreground">{supplierProfile.contactName}</span>
             </p>
           ) : null}
           {supplierProfile.contactEmail ? (
             <p>
-              <span className="font-medium text-foreground">Contact email:</span> {supplierProfile.contactEmail}
+              <span className="text-foreground">Contact email:</span>{' '}
+              <span className="font-semibold text-foreground">{supplierProfile.contactEmail}</span>
             </p>
           ) : null}
           {supplierProfile.contactPhone ? (
             <p>
-              <span className="font-medium text-foreground">Contact phone:</span> {supplierProfile.contactPhone}
+              <span className="text-foreground">Contact phone:</span>{' '}
+              <span className="font-semibold text-foreground">{supplierProfile.contactPhone}</span>
             </p>
           ) : null}
           {supplierProfile.supportEmail ? (
             <p>
-              <span className="font-medium text-foreground">Support email:</span> {supplierProfile.supportEmail}
+              <span className="text-foreground">Support email:</span>{' '}
+              <span className="font-semibold text-foreground">{supplierProfile.supportEmail}</span>
             </p>
           ) : null}
           {supplierProfile.supportPhone ? (
             <p>
-              <span className="font-medium text-foreground">Support phone:</span> {supplierProfile.supportPhone}
+              <span className="text-foreground">Support phone:</span>{' '}
+              <span className="font-semibold text-foreground">{supplierProfile.supportPhone}</span>
             </p>
           ) : null}
           {supplierProfile.accountReference ? (
             <p>
-              <span className="font-medium text-foreground">Account ref:</span> {supplierProfile.accountReference}
+              <span className="text-foreground">Account ref:</span>{' '}
+              <span className="font-semibold text-foreground">{supplierProfile.accountReference}</span>
             </p>
           ) : null}
         </div>

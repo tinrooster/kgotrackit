@@ -14,9 +14,16 @@ interface GeneralSettingsTabProps {
   settings: DefaultSettings;
   onSettingsChange: (updates: Partial<DefaultSettings>) => void;
   currentUsername: string;
+  canEditAssetTagPrefix: boolean;
 }
 
-export function GeneralSettingsTab({ onOpenCameraSettings, settings, onSettingsChange, currentUsername }: GeneralSettingsTabProps) {
+export function GeneralSettingsTab({
+  onOpenCameraSettings,
+  settings,
+  onSettingsChange,
+  currentUsername,
+  canEditAssetTagPrefix,
+}: GeneralSettingsTabProps) {
   const confirmDeletesEnabled = settings.deleteConfirmationByUser?.[currentUsername] ?? true;
   const undoEnabled = settings.undoByUser?.[currentUsername] ?? true;
   const [cameraSummary, setCameraSummary] = React.useState('Checking available cameras...');
@@ -192,11 +199,21 @@ export function GeneralSettingsTab({ onOpenCameraSettings, settings, onSettingsC
             <Input
               id="asset-id-prefix"
               value={settings.assetIdPrefix || 'AST'}
-              onChange={(event) => onSettingsChange({ assetIdPrefix: event.target.value.toUpperCase() })}
+              onChange={(event) =>
+                onSettingsChange({
+                  assetIdPrefix: event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                })
+              }
               className="w-full md:w-64"
               placeholder="AST"
               maxLength={12}
+              disabled={!canEditAssetTagPrefix}
             />
+            <p className="text-xs text-muted-foreground">
+              {canEditAssetTagPrefix
+                ? 'Admin setting. Updates affect shared asset tag generation rules.'
+                : 'Admin only. Contact an administrator to change global asset tag prefix rules.'}
+            </p>
           </div>
         </CardContent>
       </Card>

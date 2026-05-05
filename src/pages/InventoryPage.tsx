@@ -129,6 +129,55 @@ const getUniqueValues = (items: InventoryItem[], field: keyof InventoryItem): st
   return [...new Set(values)].sort();
 };
 
+const SIMPLE_COLUMNS_DEFAULT = ['name', 'category', 'location', 'project', 'quantity', 'photoUrl', 'lastUpdated'];
+const DETAILED_COLUMNS_DEFAULT = [
+  'name',
+  'category',
+  'location',
+  'project',
+  'quantity',
+  'unit',
+  'photoUrl',
+  'recordId',
+  'assetId',
+  'rackLocation',
+  'lastUpdated',
+  'expenseTypeCode',
+  'costCenterCode',
+  'costPerUnit',
+  'totalValue',
+];
+const DETAILED_FINANCIAL_COLUMNS = ['expenseTypeCode', 'costCenterCode', 'costPerUnit', 'totalValue'];
+const PINNED_PRIMARY_COLUMNS = ['name', 'category', 'location'];
+
+interface InventoryTablePreferencePayload {
+  isDetailedView: boolean;
+  columnWidths: Record<string, number>;
+  simpleColumns?: string[];
+  detailedColumns?: string[];
+}
+
+function getInventoryPreferenceKey(userKey: string): string {
+  return `inventory-table-preferences:${userKey}`;
+}
+
+function normalizeColumnOrder(input: string[] | undefined, defaults: string[], enforceFinancialLast: boolean): string[] {
+  const source = Array.isArray(input) ? input : defaults;
+  const unique = Array.from(new Set(source)).filter((column) => defaults.includes(column));
+  const missing = defaults.filter((column) => !unique.includes(column));
+  const merged = [...unique, ...missing];
+
+  const primaryColumns = PINNED_PRIMARY_COLUMNS.filter((column) => merged.includes(column));
+  const withoutPrimaryColumns = merged.filter((column) => !primaryColumns.includes(column));
+  if (!enforceFinancialLast) {
+    return [...primaryColumns, ...withoutPrimaryColumns];
+  }
+
+  const financialColumns = DETAILED_FINANCIAL_COLUMNS.filter((column) => withoutPrimaryColumns.includes(column));
+  const withoutFinancialColumns = withoutPrimaryColumns.filter((column) => !financialColumns.includes(column));
+  return [...primaryColumns, ...withoutFinancialColumns, ...financialColumns];
+}
+
 // Helper function to convert ItemWithSubcategories to CategoryNode
 const convertToCategories = (items: ItemWithSubcategories[]): CategoryNode[] => {
   return items.map(item => ({
@@ -147,6 +196,10 @@ export default function InventoryPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser } = useAuth();
+  const inventoryPreferenceUserKey = useMemo(
+    () => currentUser?.username || currentUser?.displayName || 'admin',
+    [currentUser?.username, currentUser?.displayName]
+  );
   
   // Get any filter params from URL
   const categoryFilter = searchParams.get('category') || '';
@@ -244,6 +297,10 @@ export default function InventoryPage() {
 
   const [updateTrigger, setUpdateTrigger] = useState(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [columnOrderByView, setColumnOrderByView] = useState<{ simple: string[]; detailed: string[] }>({
+    simple: SIMPLE_COLUMNS_DEFAULT,
+    detailed: DETAILED_COLUMNS_DEFAULT,
+  });
   const resizeStateRef = React.useRef<{ column: string; startX: number; startWidth: number } | null>(null);
   const [invUndoAvail, setInvUndoAvail] = useState(false);
   const [invRedoAvail, setInvRedoAvail] = useState(false);
@@ -988,11 +1045,53 @@ export default function InventoryPage() {
 
   const [isDetailedView, setIsDetailedView] = useState(false);
 
-  // Define column sets for different views
-  const SIMPLE_COLUMNS = ['photoUrl', 'name', 'category', 'location', 'project', 'quantity', 'lastUpdated'];
-  const DETAILED_COLUMNS = ['photoUrl', 'recordId', 'assetId', 'name', 'category', 'expenseTypeCode', 'costCenterCode', 'quantity', 'unit', 'costPerUnit', 'totalValue', 'location', 'rackLocation', 'project', 'lastUpdated'];
+  useEffect(() => {
+    try {
+      const rawPreference = localStorage.getItem(getInventoryPreferenceKey(inventoryPreferenceUserKey));
+      if (!rawPreference) {
+        setIsDetailedView(false);
+        setColumnWidths({});
+        setColumnOrderByView({
+          simple: normalizeColumnOrder(undefined, SIMPLE_COLUMNS_DEFAULT, false),
+          detailed: normalizeColumnOrder(undefined, DETAILED_COLUMNS_DEFAULT, true),
+        });
+        return;
+      }
 
-  const activeColumns = isDetailedView ? DETAILED_COLUMNS : SIMPLE_COLUMNS;
+      const parsedPreference = JSON.parse(rawPreference) as InventoryTablePreferencePayload;
+      setIsDetailedView(Boolean(parsedPreference.isDetailedView));
+      setColumnWidths(
+        parsedPreference.columnWidths && typeof parsedPreference.columnWidths === 'object'
+          ? parsedPreference.columnWidths
+          : {}
+      );
+      setColumnOrderByView({
+        simple: normalizeColumnOrder(parsedPreference.simpleColumns, SIMPLE_COLUMNS_DEFAULT, false),
+        detailed: normalizeColumnOrder(parsedPreference.detailedColumns, DETAILED_COLUMNS_DEFAULT, true),
+      });
+    } catch {
+      setIsDetailedView(false);
+      setColumnWidths({});
+      setColumnOrderByView({
+        simple: normalizeColumnOrder(undefined, SIMPLE_COLUMNS_DEFAULT, false),
+        detailed: normalizeColumnOrder(undefined, DETAILED_COLUMNS_DEFAULT, true),
+      });
+    }
+  }, [inventoryPreferenceUserKey]);
+
+  useEffect(() => {
+    const preferencePayload: InventoryTablePreferencePayload = {
+      isDetailedView,
+      columnWidths,
+      simpleColumns: normalizeColumnOrder(columnOrderByView.simple, SIMPLE_COLUMNS_DEFAULT, false),
+      detailedColumns: normalizeColumnOrder(columnOrderByView.detailed, DETAILED_COLUMNS_DEFAULT, true),
+    };
+    localStorage.setItem(getInventoryPreferenceKey(inventoryPreferenceUserKey), JSON.stringify(preferencePayload));
+  }, [inventoryPreferenceUserKey, isDetailedView, columnWidths, columnOrderByView]);
+
+  const activeColumns = isDetailedView
+    ? normalizeColumnOrder(columnOrderByView.detailed, DETAILED_COLUMNS_DEFAULT, true)
+    : normalizeColumnOrder(columnOrderByView.simple, SIMPLE_COLUMNS_DEFAULT, false);
 
   const handleColumnResizeStart = (event: React.MouseEvent, column: string) => {
     event.preventDefault();

@@ -504,12 +504,30 @@ export default function SettingsPage() {
   }, [defaultSettings]);
 
   const handleGeneralSettingsChange = (updates: Partial<DefaultSettings>) => {
+    if (
+      Object.prototype.hasOwnProperty.call(updates, 'assetIdPrefix') &&
+      currentUser?.role !== 'admin'
+    ) {
+      toast.error('Only administrators can change the global asset tag prefix.');
+      return;
+    }
+
+    const nextAssetIdPrefix = updates.assetIdPrefix?.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
     const nextSettings = {
       ...defaultSettings,
       ...updates,
+      ...(nextAssetIdPrefix !== undefined ? { assetIdPrefix: nextAssetIdPrefix } : {}),
     };
     setDefaultSettings(nextSettings);
     SettingsService.saveDefaultSettings(nextSettings);
+
+    if (
+      nextAssetIdPrefix !== undefined &&
+      nextAssetIdPrefix.length > 0 &&
+      nextAssetIdPrefix !== defaultSettings.assetIdPrefix
+    ) {
+      toast.success(`Global asset tag prefix updated to ${nextAssetIdPrefix}.`);
+    }
   };
 
   const handleNormalizeRackIds = () => {
@@ -1727,6 +1745,7 @@ export default function SettingsPage() {
             settings={defaultSettings}
             onSettingsChange={handleGeneralSettingsChange}
             currentUsername={currentUser?.username ?? 'admin'}
+            canEditAssetTagPrefix={currentUser?.role === 'admin'}
           />
         </TabsContent>
 
