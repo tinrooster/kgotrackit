@@ -8,6 +8,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { bootstrapCloudData } from '@/lib/supabase/cloudData';
+import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS } from '@/lib/dummyData';
+import { STORAGE_KEYS, type Settings } from '@/lib/storageService';
 import {
   inviteWorkspaceMember,
   listWorkspaceMembers,
@@ -32,7 +34,9 @@ export function WorkspaceTeamTab() {
   const { currentUser, authBackend } = useAuth();
   const { workspaces, activeWorkspaceId, activeWorkspaceRole, loading, refreshWorkspaces } =
     useWorkspace();
-  const [newName, setNewName] = React.useState('Team inventory');
+  const [newName, setNewName] = React.useState('');
+  const [createMode, setCreateMode] = React.useState<'current' | 'blank' | 'starter'>('blank');
+  const [includeSampleItems, setIncludeSampleItems] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [targetKind, setTargetKind] = React.useState<'personal' | 'team'>(activeWorkspaceId ? 'team' : 'personal');
   const [targetWorkspaceId, setTargetWorkspaceId] = React.useState<string>(activeWorkspaceId ?? '');
@@ -99,7 +103,54 @@ export function WorkspaceTeamTab() {
     setBusy(true);
     try {
       const snapshot = await collectLocalSnapshot();
-      const id = await createWorkspaceWithSnapshot(trimmedName, snapshot as WorkspaceSnapshotPayload);
+      const nextSnapshot: WorkspaceSnapshotPayload = { ...snapshot } as WorkspaceSnapshotPayload;
+
+      if (createMode === 'blank') {
+        nextSnapshot.items = [];
+        nextSnapshot.settings = {
+          categories: [],
+          units: [],
+          locations: [],
+          suppliers: [],
+          projects: [],
+          expenseCodes: [],
+        } as Settings;
+        nextSnapshot.templates = [];
+        nextSnapshot.history = [];
+        nextSnapshot.cabinets = [];
+        nextSnapshot.custom_report_definitions = [];
+      } else if (createMode === 'starter') {
+        const starterSettings: Settings = {
+          categories: JSON.parse(JSON.stringify(INITIAL_SETTINGS[STORAGE_KEYS.CATEGORIES])),
+          units: JSON.parse(JSON.stringify(INITIAL_SETTINGS[STORAGE_KEYS.UNITS])),
+          locations: JSON.parse(JSON.stringify(INITIAL_SETTINGS[STORAGE_KEYS.LOCATIONS])),
+          suppliers: JSON.parse(JSON.stringify(INITIAL_SETTINGS[STORAGE_KEYS.SUPPLIERS])),
+          projects: JSON.parse(JSON.stringify(INITIAL_SETTINGS[STORAGE_KEYS.PROJECTS])),
+          expenseCodes: [],
+        };
+
+        nextSnapshot.settings = starterSettings;
+        nextSnapshot.items = includeSampleItems
+          ? JSON.parse(
+              JSON.stringify(
+                DUMMY_INVENTORY_DATA.map((item) => ({
+                  ...item,
+                  lastUpdated:
+                    item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : item.lastUpdated,
+                  expectedDeliveryDate:
+                    item.expectedDeliveryDate instanceof Date
+                      ? item.expectedDeliveryDate.toISOString()
+                      : item.expectedDeliveryDate,
+                })),
+              ),
+            )
+          : [];
+        nextSnapshot.templates = [];
+        nextSnapshot.history = [];
+        nextSnapshot.cabinets = [];
+      }
+
+      const id = await createWorkspaceWithSnapshot(trimmedName, nextSnapshot);
       toast.success('Workspace created. Switching…');
       setActiveWorkspaceId(id);
       window.location.reload();
@@ -132,7 +183,7 @@ export function WorkspaceTeamTab() {
   const canManageMembers = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
 
   const loadMembers = React.useCallback(async () => {
-    if (!activeWorkspaceId || activeWorkspaceRole !== 'admin') {
+    if (!activeWorkspaceId || !canManageMembers) {
       setMembers([]);
       return;
     }
@@ -145,7 +196,7 @@ export function WorkspaceTeamTab() {
     } finally {
       setMembersLoading(false);
     }
-  }, [activeWorkspaceId, activeWorkspaceRole]);
+  }, [activeWorkspaceId, canManageMembers]);
 
   React.useEffect(() => {
     void loadMembers();
@@ -215,14 +266,66 @@ export function WorkspaceTeamTab() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               autoComplete="off"
-              placeholder="e.g. Engineering shared"
+              placeholder="Team inventory"
               className="placeholder:text-muted-foreground/40"
               disabled={busy}
             />
           </div>
           <Button type="button" onClick={() => void handleCreate()} disabled={busy || !newName.trim()}>
-            {busy ? 'Creating…' : 'Create from current data'}
+            {busy ? 'Creating…' : 'Create workspace'}
           </Button>
+        </div>
+        <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+          <p className="text-sm font-medium text-foreground">New workspace defaults</p>
+          <div className="mt-2 inline-flex flex-wrap items-center gap-1 rounded-md border border-border/70 p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={createMode === 'blank' ? 'secondary' : 'ghost'}
+              onClick={() => setCreateMode('blank')}
+              disabled={busy}
+            >
+              Blank
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={createMode === 'starter' ? 'secondary' : 'ghost'}
+              onClick={() => setCreateMode('starter')}
+              disabled={busy}
+            >
+              Starter lists
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={createMode === 'current' ? 'secondary' : 'ghost'}
+              onClick={() => setCreateMode('current')}
+              disabled={busy}
+            >
+              Current data
+            </Button>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={includeSampleItems ? 'secondary' : 'outline'}
+              onClick={() => setIncludeSampleItems((current) => !current)}
+              disabled={busy || createMode !== 'starter'}
+            >
+              Include sample inventory
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {createMode === 'blank'
+                ? 'Starts with no lookup lists and no inventory.'
+                : createMode === 'starter'
+                  ? includeSampleItems
+                    ? 'Loads starter lookup lists and sample test items.'
+                    : 'Loads starter lookup lists only.'
+                  : 'Copies your current workspace data into the new team workspace.'}
+            </span>
+          </div>
         </div>
 
         <div className="space-y-2">
