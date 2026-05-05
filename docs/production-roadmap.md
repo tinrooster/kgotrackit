@@ -59,8 +59,8 @@ Paths below are **repository-relative** (this workspace).
 
 ### Logging / audit “broken” on Vercel
 
-- Durable logger uses `**localStorage*`* key `durable-system-audit-logs` (`[src/lib/logging.ts](../src/lib/logging.ts)`).
-- Inventory audit append uses `**inventory-audit-log**` in `[src/pages/InventoryPage.tsx](../src/pages/InventoryPage.tsx)`.
+- Durable logger uses `**localStorage`** key `durable-system-audit-logs` (`[src/lib/logging.ts](../src/lib/logging.ts)`).
+- Inventory audit append uses `**inventory-audit-log*`* in `[src/pages/InventoryPage.tsx](../src/pages/InventoryPage.tsx)`.
 - `[collectLocalSnapshot](../src/lib/supabase/cloudData.ts)` syncs `items`, `settings`, `templates`, `history`, `cabinets`, `financial`, `ui_defaults`, `general_settings`, and `**custom_report_definitions**` (see migration `supabase/migrations/20260505120000_user_app_data_custom_report_definitions.sql`).
 
 So logs are **per-browser, not cloud** unless extended. New device, cleared site data, or different profile = empty logs. “Worked locally” is expected if you never cleared storage.
@@ -167,7 +167,7 @@ So logs are **per-browser, not cloud** unless extended. New device, cleared site
 
 **Lookup Lists** (`[src/pages/SettingsPage.tsx](../src/pages/SettingsPage.tsx)` `userDefinedPanel`, `[UserDefinedListsSection.tsx](../src/components/settings/UserDefinedListsSection.tsx)`)
 
-- Today the panel state can start as `**overview`**, which renders **no list content** (`panel === 'overview' && null`) even though the chip nav shows list types—so opening **Lookup Lists** can feel like an empty page until the user clicks **Categories**. **Direction:** when entering this tab, default `**panel` to `categories`** (first item in `LIST_NAV`) so **Categories** is selected and the editor is visible immediately.
+- Today the panel state can start as `**overview`**, which renders no list content (`panel === 'overview' && null`) even though the chip nav shows list types—so opening Lookup Lists can feel like an empty page until the user clicks Categories. Direction: when entering this tab, default `**panel` to `categories`** (first item in `LIST_NAV`) so **Categories** is selected and the editor is visible immediately.
 
 ```mermaid
 flowchart LR
@@ -303,4 +303,70 @@ flowchart LR
 - Cable spool/lot usage ledger (remaining feet + event history).
 - Mobile-first pass beyond current quick-add/dashboard/checkout adjustments.
 - Fast user switching UX on shared browsers (session management trade-offs).
+
+## May 05 additional notes / issues
+
+### Theme and visual system
+
+1. **Theme direction confirmation**
+  - Keep revised theme work, but soften light mode with:
+    - `#A59D84`, `#C1BAA1`, `#D7D3BF`, `#ECEBDE`
+  - Lighten dark mode toward neutral grays to improve readability and reduce harsh contrast.
+2. **Transparent input treatment**
+  - Apply consistent transparent treatment to team inventory and form field hints/placeholders across the app.
+3. **Tooltip coverage**
+  - Add tooltip text for icon-only actions throughout the UI for discoverability/accessibility.
+
+### Team workspace behavior and access model
+
+1. **Observed behavior**
+  - Testing across different logins showed session isolation (team names and updates were not visible across accounts unless sharing is explicitly configured).
+2. **Open architecture questions**
+  - If two users each create a Team Inventory, define which team space is canonical for shared work and how conflicts/reconciliation are handled.
+  - Document invite and user-management boundaries so demos/guests cannot access production inventory.
+  - Add/ship programmatic user creation/management path via Supabase Admin API (server-side only, service-role protected).
+3. **Default context**
+  - Personal vs Team mode should default to **Team** when a valid team workspace is available.
+
+### Backup and restore scope clarification
+
+1. **Decision**
+  - Remove the daily offline backup function (`trackItDailyBackup`) from product scope; no scheduled daily download behavior.
+2. **Docs clarification required**
+  - Explain how restore points reconcile with networked/team data:
+    - whether restore is local-only, user-only, or workspace-wide;
+    - whether restore creates merge/overwrite behavior in shared team payloads;
+    - what audit events are emitted for restore actions.
+3. **In-app copy cleanup**
+  - Move explanatory training/help text from Settings UI into docs where possible.
+  - Specifically remove this long inline hint from app UI and keep it in docs:
+    - "Team workspace: Personal data lives in your user_app_data row. A team workspace uses a shared workspace_app_data row; members need rows in workspace_members..."
+
+### Data quality and logging
+
+1. **System logs false positives**
+  - System logs currently record invalid item/quantity errors on canceled add/edit actions; treat cancel flows as non-errors and suppress invalid-entry logging for aborted edits.
+2. **Invalid-record exception handling**
+  - Add explicit guardrails for invalid record submission paths (user-facing errors without hard failure states), including the Select empty-value runtime case.
+
+### Settings and library UX notes
+
+1. **Suppliers**
+  - Keep recent suppliers interface updates.
+  - Make hint/placeholder text transparent per global UI rule.
+  - Move "Supplier profile details" expand action to a settings/options icon-triggered dropdown on the right side.
+2. **Lookup lists**
+  - Confirm whether Categories/Locations/Projects support autofill suggestions and document which values are derived from configured lookup data vs hard-coded defaults.
+
+### Media capture and responsive layout
+
+1. **Camera/file picker behavior**
+  - When camera is selected, prefer direct camera capture on supported devices; otherwise show a clear "no camera detected" fallback message before file picker flow.
+2. **Image upload normalization**
+  - Add client-side normalization/resize/compression so oversized photos are accepted and stored within payload/storage limits.
+3. **Mobile layout width**
+  - Reduce nested-frame/container constraints that narrow content on phones; use full available screen width for key inventory/forms flows.
+4. **Desktop filter overflow**
+  - Prevent horizontal overflow from wide filter controls on larger screens; adapt spacing and stack filter inputs into two rows when needed.
+  - Remove/highly minimize distracting white scrollbar artifacts in main inventory/filter regions.
 

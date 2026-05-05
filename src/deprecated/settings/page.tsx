@@ -313,8 +313,6 @@ export default function Settings() {
               onRestoreData={handleRestoreData}
               onExportSettingsSnapshot={() => {}}
               onRestoreSettingsSnapshot={async () => {}}
-              dailyOfflineBackupEnabled={false}
-              onDailyOfflineBackupEnabledChange={() => {}}
               onRunGroupInventoryReconcile={() => ({
                 itemsTouched: 0,
                 issues: [],

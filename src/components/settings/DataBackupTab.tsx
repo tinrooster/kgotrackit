@@ -6,7 +6,6 @@ import { Download, Save, RefreshCw, FileJson, Database, GitMerge, Upload, Loader
 import { useToast } from '@/components/ui/use-toast';
 import type { GroupReconcileResult } from '@/lib/groupInventoryReconciliation';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -47,9 +46,6 @@ interface DataBackupTabProps {
   onRestoreData: (file: File) => Promise<void>;
   onExportSettingsSnapshot: () => void;
   onRestoreSettingsSnapshot: (file: File) => Promise<void>;
-  dailyOfflineBackupEnabled: boolean;
-  onDailyOfflineBackupEnabledChange: (enabled: boolean) => void;
-  dailyOfflineBackupLastDate?: string;
   onRunGroupInventoryReconcile: () => GroupReconcileResult;
 }
 
@@ -93,9 +89,6 @@ export function DataBackupTab({
   onRestoreData,
   onExportSettingsSnapshot,
   onRestoreSettingsSnapshot,
-  dailyOfflineBackupEnabled,
-  onDailyOfflineBackupEnabledChange,
-  dailyOfflineBackupLastDate,
   onRunGroupInventoryReconcile,
 }: DataBackupTabProps) {
   const { toast } = useToast();
@@ -621,27 +614,6 @@ export function DataBackupTab({
                   {isBackingUp ? (
                     <p className="text-xs text-muted-foreground">Gathering inventory, lists, and related data for download…</p>
                   ) : null}
-                  <div className="mt-3 flex flex-col gap-2 rounded-md border border-border/60 bg-muted/20 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <Label htmlFor="daily-offline-backup" className="text-sm font-medium leading-snug">
-                        Daily offline backup
-                      </Label>
-                      <Switch
-                        id="daily-offline-backup"
-                        checked={dailyOfflineBackupEnabled}
-                        onCheckedChange={onDailyOfflineBackupEnabledChange}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      While the app is open, downloads one full JSON backup per calendar day (lists, inventory,
-                      financial codes, preferences, cabinets, templates). Uses your browser download folder.
-                    </p>
-                    {dailyOfflineBackupLastDate ? (
-                      <p className="text-xs text-muted-foreground">
-                        Last daily file: <span className="font-mono text-foreground">{dailyOfflineBackupLastDate}</span>
-                      </p>
-                    ) : null}
-                  </div>
                 </div>
 
                 <div className="flex flex-col space-y-2">

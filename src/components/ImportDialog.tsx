@@ -35,6 +35,7 @@ const EXPECTED_HEADERS = [
   'expectedDeliveryDate' 
   // 'id' and 'lastUpdated' will be handled by the import logic
 ];
+const UNMAPPED_HEADER_VALUE = "__UNMAPPED_HEADER__";
 
 export function ImportDialog({ isOpen, onClose, onImport, onComplete }: ImportDialogProps) {
   const { user } = useAuth();
@@ -221,7 +222,8 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete }: ImportDi
   };
 
   const handleFieldMappingChange = (expectedField: string, fileHeader: string) => {
-    const newMapping = { ...fieldMapping, [expectedField]: fileHeader };
+    const normalizedFileHeader = fileHeader === UNMAPPED_HEADER_VALUE ? "" : fileHeader;
+    const newMapping = { ...fieldMapping, [expectedField]: normalizedFileHeader };
     setFieldMapping(newMapping);
     validateData(headers, parsedData, newMapping);
   };
@@ -387,14 +389,14 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete }: ImportDi
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       
                       <Select
-                        value={fieldMapping[expectedField] || ""}
+                        value={fieldMapping[expectedField] || UNMAPPED_HEADER_VALUE}
                         onValueChange={(value) => handleFieldMappingChange(expectedField, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select column" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Not mapped</SelectItem>
+                          <SelectItem value={UNMAPPED_HEADER_VALUE}>Not mapped</SelectItem>
                           {headers.map(header => (
                             <SelectItem key={header} value={header}>{header}</SelectItem>
                           ))}

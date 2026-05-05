@@ -45,10 +45,6 @@ export const defaultSettingsSchema = z.object({
   assetIdSequence: z.number().int().min(0).default(0),
   deleteConfirmationByUser: z.record(z.string(), z.boolean()).default({}),
   undoByUser: z.record(z.string(), z.boolean()).default({}),
-  /** When true, a full JSON backup is downloaded once per local calendar day while the app is open. */
-  dailyOfflineBackupEnabled: z.boolean().default(false),
-  /** YYYY-MM-DD (local) of the last successful daily backup download. */
-  dailyOfflineBackupLastDate: z.string().optional(),
 });
 
 export type DefaultSettings = z.infer<typeof defaultSettingsSchema>;
@@ -114,8 +110,6 @@ export class SettingsService {
       assetIdSequence: 0,
       deleteConfirmationByUser: {},
       undoByUser: {},
-      dailyOfflineBackupEnabled: false,
-      dailyOfflineBackupLastDate: undefined,
     };
   }
 

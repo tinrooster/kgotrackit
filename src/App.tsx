@@ -12,8 +12,7 @@ import { useAuth } from './contexts/AuthContext';
 import { initializeSettings } from './lib/dummyData';
 import CheckoutPage from './pages/CheckoutPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { SettingsService, DEFAULT_SETTINGS_CHANGED_EVENT } from './lib/settingsService';
-import { maybeRunDailyOfflineBackup } from './lib/trackItDailyBackup';
+import { SettingsService } from './lib/settingsService';
 import { refreshRackLocationsFromServer } from './lib/rackLocationsConfig';
 import HelpPage from './pages/HelpPage';
 import AboutPage from './pages/AboutPage';
@@ -42,18 +41,6 @@ export default function App() {
     document.documentElement.classList.toggle('dark', shouldUseDarkTheme);
     document.body.classList.toggle('compact-ui', uiSettings.condensedView);
     document.body.classList.toggle('mt-compact-ui', uiSettings.mobileTabletUi);
-  }, []);
-
-  useEffect(() => {
-    const tick = () => void maybeRunDailyOfflineBackup();
-    void tick();
-    const intervalId = window.setInterval(tick, 60 * 60 * 1000);
-    const onDefaultsChanged = () => void tick();
-    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, onDefaultsChanged);
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, onDefaultsChanged);
-    };
   }, []);
 
   return (

@@ -1788,16 +1788,6 @@ export default function SettingsPage() {
             onRestoreData={handleRestoreData}
             onExportSettingsSnapshot={() => void handleExportSettingsSnapshot()}
             onRestoreSettingsSnapshot={handleRestoreSettingsSnapshot}
-            dailyOfflineBackupEnabled={defaultSettings.dailyOfflineBackupEnabled}
-            onDailyOfflineBackupEnabledChange={(enabled) => {
-              const next = defaultSettingsSchema.parse({
-                ...defaultSettings,
-                dailyOfflineBackupEnabled: enabled,
-              });
-              setDefaultSettings(next);
-              SettingsService.saveDefaultSettings(next);
-            }}
-            dailyOfflineBackupLastDate={defaultSettings.dailyOfflineBackupLastDate}
             onRunGroupInventoryReconcile={handleGroupInventoryReconcile}
           />
         </TabsContent>

@@ -21,6 +21,8 @@ interface DeleteListItemDialogProps {
   onConfirmDelete: (reassignToId: string | null) => void;
 }
 
+const LEAVE_AS_IS_VALUE = "__LEAVE_AS_IS__";
+
 export function DeleteListItemDialog({
   open,
   onOpenChange,
@@ -30,7 +32,7 @@ export function DeleteListItemDialog({
   inventoryItems,
   onConfirmDelete,
 }: DeleteListItemDialogProps) {
-  const [selectedReassignId, setSelectedReassignId] = useState<string>("");
+  const [selectedReassignId, setSelectedReassignId] = useState<string>(LEAVE_AS_IS_VALUE);
   const [affectedItems, setAffectedItems] = useState<InventoryItem[]>([]);
 
   // Find items that use the list item to be deleted
@@ -72,7 +74,7 @@ export function DeleteListItemDialog({
                 <SelectValue placeholder={`Select ${listType.slice(0, -1)}`} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Leave as is</SelectItem>
+                <SelectItem value={LEAVE_AS_IS_VALUE}>Leave as is</SelectItem>
                 {otherItems.map(item => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.name}
@@ -90,7 +92,7 @@ export function DeleteListItemDialog({
           <Button
             variant="destructive"
             onClick={() => {
-              onConfirmDelete(selectedReassignId || null);
+              onConfirmDelete(selectedReassignId === LEAVE_AS_IS_VALUE ? null : selectedReassignId);
               onOpenChange(false);
             }}
           >
