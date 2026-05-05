@@ -10,7 +10,7 @@ type Street = 'idle' | 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
 const SUITS: Suit[] = ['S', 'H', 'D', 'C'];
 const RANK_LABELS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const SUIT_SYMBOL: Record<Suit, string> = { S: '♠', H: '♥', D: '♦', C: '♣' };
-const APP_VERSION = '0.0.0';
+const APP_VERSION = __APP_VERSION__;
 const APP_REVISION = 'rev-2026.05.05.1';
 
 const buildDeck = (): Card[] => {

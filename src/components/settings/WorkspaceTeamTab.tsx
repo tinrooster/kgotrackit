@@ -101,8 +101,8 @@ export function WorkspaceTeamTab() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Users className="h-4 w-4" aria-hidden />
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Users className="h-5 w-5" aria-hidden />
           Team workspace
         </CardTitle>
         <CardDescription>

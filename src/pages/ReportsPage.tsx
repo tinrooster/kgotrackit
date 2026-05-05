@@ -223,6 +223,10 @@ export default function ReportsPage() {
     });
   }, [items, projectFilter, locationFilter, statusFilter, expenseTypeFilter]);
 
+  useEffect(() => {
+    setAiSummaryText('');
+  }, [selectedReportId, projectFilter, locationFilter, statusFilter, expenseTypeFilter]);
+
   const toReportRows = (columns: string[]) =>
     filteredItems.map((item) =>
       columns.reduce((acc, column) => {
@@ -480,10 +484,11 @@ export default function ReportsPage() {
           ? `Data quality: ${unassignedProjectCount} items missing project and ${unassignedLocationCount} missing location assignment.`
           : 'Data quality: project and location assignments are complete in this scope.',
         highestValueItems.length > 0
-          ? `Top value drivers: ${highestValueItems
+          ? `Top budget drivers: ${highestValueItems
               .map((entry) => `${entry.name} (${entry.value.toLocaleString(undefined, { style: 'currency', currency: 'USD' })})`)
               .join(' · ')}.`
-          : 'Top value drivers: no costed items in this scope.',
+          : 'Top budget drivers: no costed items in this scope.',
+        'Location, project, and coding mismatches require manual reconciliation through Data Management and list maintenance workflows.',
       ];
       setAiSummaryText(executiveBullets.map((line) => `• ${line}`).join('\n'));
       return;
@@ -521,10 +526,11 @@ export default function ReportsPage() {
             .join(' · ')}.`
         : 'Upcoming EOL dates: none currently set.',
       highestValueItems.length > 0
-        ? `Top value concentration: ${highestValueItems
+        ? `Top budget concentration: ${highestValueItems
             .map((entry) => `${entry.name} (${entry.value.toLocaleString(undefined, { style: 'currency', currency: 'USD' })})`)
             .join(' · ')}.`
-        : 'Top value concentration: no costed items in current view.',
+        : 'Top budget concentration: no costed items in current view.',
+      'Location, project, and coding mismatches require manual reconciliation through Data Management and list maintenance workflows.',
     ].join('\n');
 
     setAiSummaryText(operationsNarrative);
@@ -534,7 +540,7 @@ export default function ReportsPage() {
     if (!aiSummaryText.trim()) return;
     try {
       await navigator.clipboard.writeText(aiSummaryText);
-      toast({ title: 'Summary copied', description: 'AI summary copied to clipboard.' });
+      toast({ title: 'Summary copied', description: 'Inventory summary copied to clipboard.' });
     } catch {
       toast({ title: 'Copy failed', description: 'Could not copy summary to clipboard.', variant: 'destructive' });
     }
@@ -745,7 +751,7 @@ export default function ReportsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5" />
-            AI Inventory Summary
+            Inventory Summary
           </CardTitle>
           <CardDescription>Generate a narrative summary from the currently filtered inventory set.</CardDescription>
         </CardHeader>
@@ -772,7 +778,7 @@ export default function ReportsPage() {
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={generateInventoryAiSummary}>
               <Sparkles className="mr-2 h-4 w-4" />
-              Generate AI summary
+              Generate summary
             </Button>
             <Button type="button" size="sm" variant="outline" disabled={!aiSummaryText} onClick={() => void copyAiSummary()}>
               <Copy className="mr-2 h-4 w-4" />

@@ -1772,8 +1772,7 @@ export default function SettingsPage() {
             <Redo2 className="mr-2 h-4 w-4" />
             Redo
           </Button>
-          {((settingsTab === 'userDefined' && panelSupportsListReconcile(userDefinedPanel)) ||
-            (settingsTab === 'libraries' && librariesPanel === 'suppliers')) && (
+          {(settingsTab === 'userDefined' && panelSupportsListReconcile(userDefinedPanel)) && (
             <Button
               type="button"
               variant="outline"

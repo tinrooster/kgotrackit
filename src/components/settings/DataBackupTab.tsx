@@ -777,9 +777,6 @@ export function DataBackupTab({
       </Tabs>
 
       <div className="space-y-4">
-        <div className="px-1">
-          <h3 className="text-sm font-semibold text-foreground">Reconciliation</h3>
-        </div>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
