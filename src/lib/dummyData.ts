@@ -1,15 +1,12 @@
 /**
- * DEPRECATED: This file contains dummy data that was previously used for initializing
- * the application. It is now kept for reference only and is no longer used.
- * 
- * For new installations, use the export/import functionality to seed data from
- * existing exports.
+ * Starter templates used only when a user explicitly opts in.
  */
 
 import { v4 as uuidv4 } from 'uuid';
 import { InventoryItem, OrderStatus } from '@/types/inventory';
 import { subDays, addDays } from 'date-fns';
 import { STORAGE_KEYS } from "./storageService";
+import { getItems, getSettings, saveItems, saveSettings } from './storageService';
 
 const categories = ["Cable", "Connector", "Hardware", "Tool", "Software", "Expendable", "Fiber Optic", "Power", "Networking", "Audio", "Video", "Lighting"];
 const units = ["ft", "each", "box", "spool", "kit", "license", "pair", "meter"];
@@ -130,14 +127,68 @@ export const INITIAL_SETTINGS = {
   [STORAGE_KEYS.PROJECTS]: projects
 };
 
-// Function to initialize settings if they don't exist
-export const initializeSettings = () => {
-  Object.entries(INITIAL_SETTINGS).forEach(([key, values]) => {
-    const existing = localStorage.getItem(key);
-    if (!existing) {
-      localStorage.setItem(key, JSON.stringify(values));
-    }
-  });
+export const DUMMY_INVENTORY_DATA = dummyItems;
+
+export type SetupDefaultsChoice = 'blank' | 'starter';
+
+const SETUP_DEFAULTS_CHOICE_KEY = 'trackit:setup-defaults-choice:v1';
+
+const cloneTemplate = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+export const getSetupDefaultsChoice = (): SetupDefaultsChoice | null => {
+  const rawChoice = localStorage.getItem(SETUP_DEFAULTS_CHOICE_KEY);
+  if (rawChoice === 'blank' || rawChoice === 'starter') {
+    return rawChoice;
+  }
+  return null;
 };
 
-export const DUMMY_INVENTORY_DATA = dummyItems;
+export const clearSetupDefaultsChoice = (): void => {
+  localStorage.removeItem(SETUP_DEFAULTS_CHOICE_KEY);
+};
+
+export const isFreshSetupState = (): boolean => {
+  const settings = getSettings();
+  const hasSettingsData = [
+    settings.categories,
+    settings.units,
+    settings.locations,
+    settings.suppliers,
+    settings.projects,
+    settings.expenseCodes,
+  ].some((list) => list.length > 0);
+  if (hasSettingsData) {
+    return false;
+  }
+
+  const existingItems = getItems();
+  return existingItems.length === 0;
+};
+
+export const applySetupDefaultsChoice = (choice: SetupDefaultsChoice, includeSampleInventory: boolean): void => {
+  if (choice === 'starter') {
+    saveSettings({
+      ...getSettings(),
+      categories: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.CATEGORIES]),
+      units: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.UNITS]),
+      locations: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.LOCATIONS]),
+      suppliers: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.SUPPLIERS]),
+      projects: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.PROJECTS]),
+    });
+
+    if (includeSampleInventory) {
+      const sampleItems = cloneTemplate(DUMMY_INVENTORY_DATA).map((item) => ({
+        ...item,
+        lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated : new Date(item.lastUpdated),
+        expectedDeliveryDate: item.expectedDeliveryDate
+          ? item.expectedDeliveryDate instanceof Date
+            ? item.expectedDeliveryDate
+            : new Date(item.expectedDeliveryDate)
+          : undefined,
+      }));
+      saveItems(sampleItems);
+    }
+  }
+
+  localStorage.setItem(SETUP_DEFAULTS_CHOICE_KEY, choice);
+};

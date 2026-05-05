@@ -7,9 +7,10 @@ import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
 import ReportsPage from './pages/ReportsPage';
 import { Toaster } from './components/ui/toaster';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
-import { initializeSettings } from './lib/dummyData';
+import { InitialDefaultsDialog } from './components/setup/InitialDefaultsDialog';
+import { applySetupDefaultsChoice, getSetupDefaultsChoice, isFreshSetupState } from './lib/dummyData';
 import CheckoutPage from './pages/CheckoutPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsService } from './lib/settingsService';
@@ -31,9 +32,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const location = useLocation();
   const inventoryFullBleed = location.pathname === '/inventory';
+  const { loading: authLoading } = useAuth();
+  const [showInitialDefaultsDialog, setShowInitialDefaultsDialog] = useState(false);
 
   useEffect(() => {
-    initializeSettings();
     void refreshRackLocationsFromServer();
     const uiSettings = SettingsService.loadDefaultSettings();
     const shouldUseDarkTheme = uiSettings.theme === 'dark'
@@ -43,10 +45,30 @@ export default function App() {
     document.body.classList.toggle('mt-compact-ui', uiSettings.mobileTabletUi);
   }, []);
 
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+    const hasRecordedChoice = getSetupDefaultsChoice() !== null;
+    if (!hasRecordedChoice && isFreshSetupState()) {
+      setShowInitialDefaultsDialog(true);
+    }
+  }, [authLoading]);
+
+  const handleApplySetupDefaults = (choice: 'blank' | 'starter', includeSampleInventory: boolean) => {
+    applySetupDefaultsChoice(choice, includeSampleInventory);
+    setShowInitialDefaultsDialog(false);
+    window.location.reload();
+  };
+
   return (
     <>
       <ErrorBoundary>
         <div className="min-h-screen bg-background">
+          <InitialDefaultsDialog
+            open={showInitialDefaultsDialog}
+            onApply={handleApplySetupDefaults}
+          />
           <Navigation />
           <main
             className={cn(
