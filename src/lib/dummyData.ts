@@ -7,6 +7,7 @@ import { InventoryItem, OrderStatus } from '@/types/inventory';
 import { subDays, addDays } from 'date-fns';
 import { STORAGE_KEYS } from "./storageService";
 import { getItems, getSettings, saveItems, saveSettings } from './storageService';
+import { getActiveWorkspaceId } from './supabase/workspaceData';
 
 const categories = ["Cable", "Connector", "Hardware", "Tool", "Software", "Expendable", "Fiber Optic", "Power", "Networking", "Audio", "Video", "Lighting"];
 const units = ["ft", "each", "box", "spool", "kit", "license", "pair", "meter"];
@@ -134,9 +135,30 @@ export type SetupDefaultsChoice = 'blank' | 'starter';
 const SETUP_DEFAULTS_CHOICE_KEY = 'trackit:setup-defaults-choice:v1';
 
 const cloneTemplate = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const setupContextKey = (): string => {
+  const activeWorkspaceId = getActiveWorkspaceId();
+  return activeWorkspaceId ? `workspace:${activeWorkspaceId}` : 'personal';
+};
+
+const readChoiceMap = (): Record<string, SetupDefaultsChoice> => {
+  try {
+    const raw = localStorage.getItem(SETUP_DEFAULTS_CHOICE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as Record<string, SetupDefaultsChoice>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeChoiceMap = (map: Record<string, SetupDefaultsChoice>): void => {
+  localStorage.setItem(SETUP_DEFAULTS_CHOICE_KEY, JSON.stringify(map));
+};
 
 export const getSetupDefaultsChoice = (): SetupDefaultsChoice | null => {
-  const rawChoice = localStorage.getItem(SETUP_DEFAULTS_CHOICE_KEY);
+  const rawChoice = readChoiceMap()[setupContextKey()];
   if (rawChoice === 'blank' || rawChoice === 'starter') {
     return rawChoice;
   }
@@ -144,7 +166,9 @@ export const getSetupDefaultsChoice = (): SetupDefaultsChoice | null => {
 };
 
 export const clearSetupDefaultsChoice = (): void => {
-  localStorage.removeItem(SETUP_DEFAULTS_CHOICE_KEY);
+  const map = readChoiceMap();
+  delete map[setupContextKey()];
+  writeChoiceMap(map);
 };
 
 export const isFreshSetupState = (): boolean => {
@@ -190,5 +214,7 @@ export const applySetupDefaultsChoice = (choice: SetupDefaultsChoice, includeSam
     }
   }
 
-  localStorage.setItem(SETUP_DEFAULTS_CHOICE_KEY, choice);
+  const map = readChoiceMap();
+  map[setupContextKey()] = choice;
+  writeChoiceMap(map);
 };

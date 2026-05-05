@@ -340,18 +340,87 @@ export default function SettingsPage() {
     existing: ItemWithSubcategories[];
     imported: any[];
   } | null>(null);
+  const [importDuplicateReport, setImportDuplicateReport] = useState<
+    Array<{ type: string; existing: Array<{ id?: string; name?: string }>; imported: Array<{ id?: string; name?: string }> }>
+  >([]);
   const [importDuplicateAction, setImportDuplicateAction] = useState<'skip' | 'replace' | 'merge'>('skip');
+  const [importSectionActions, setImportSectionActions] = useState<Record<string, 'skip' | 'replace' | 'merge'>>({});
   const [importInProgress, setImportInProgress] = useState<{
     data: any;
     fileType: 'json' | 'excel';
     file: File;
   } | null>(null);
 
+  useEffect(() => {
+    if (importDuplicateReport.length === 0) {
+      return;
+    }
+    setImportSectionActions((previous) => {
+      const next = { ...previous };
+      importDuplicateReport.forEach((section) => {
+        if (!next[section.type]) {
+          next[section.type] = importDuplicateAction;
+        }
+      });
+      return next;
+    });
+  }, [importDuplicateAction, importDuplicateReport]);
+
   // Add a new state variable for the import success dialog near other state variables
   const [importSuccess, setImportSuccess] = useState<{
     itemCounts: Record<string, number>;
     fileType: 'json' | 'excel';
   } | null>(null);
+
+  const normalizeListEntry = (entry: any): ItemWithSubcategories => {
+    const normalizedChildren = Array.isArray(entry?.children)
+      ? entry.children.map((child: any) => normalizeListEntry(child))
+      : [];
+    const normalizedSubcategories = Array.isArray(entry?.subcategories)
+      ? entry.subcategories.map((subcategory: unknown) => String(subcategory))
+      : [];
+    return {
+      id: entry?.id ? String(entry.id) : uuidv4(),
+      name: entry?.name ? String(entry.name) : 'Unnamed',
+      subcategories: normalizedSubcategories,
+      ...(normalizedChildren.length > 0 ? { children: normalizedChildren } : {}),
+      ...(Array.isArray(entry?.rackSlots) ? { rackSlots: entry.rackSlots.map((rack: unknown) => String(rack)) } : {}),
+    };
+  };
+
+  const normalizeListPayload = (input: unknown): ItemWithSubcategories[] =>
+    Array.isArray(input) ? input.map((entry) => normalizeListEntry(entry)) : [];
+
+  const normalizeImportPayload = (rawInput: unknown) => {
+    const root = (rawInput && typeof rawInput === 'object' ? rawInput : {}) as Record<string, unknown>;
+    const source = (root.data && typeof root.data === 'object' ? root.data : root) as Record<string, unknown>;
+    const sourceSettings =
+      source.settings && typeof source.settings === 'object'
+        ? (source.settings as Record<string, unknown>)
+        : {};
+
+    const inventoryInput = Array.isArray(source.inventory)
+      ? source.inventory
+      : Array.isArray(source.items)
+        ? source.items
+        : [];
+    const inventory = inventoryInput.map((item: any) => ({
+      ...(item || {}),
+      id: item?.id ? String(item.id) : uuidv4(),
+    }));
+
+    const fromRootOrSettings = (key: SettingsKey): unknown => source[key] ?? sourceSettings[key];
+
+    return {
+      inventory,
+      categories: normalizeListPayload(fromRootOrSettings('categories')),
+      units: normalizeListPayload(fromRootOrSettings('units')),
+      locations: normalizeListPayload(fromRootOrSettings('locations')),
+      suppliers: normalizeListPayload(fromRootOrSettings('suppliers')),
+      projects: normalizeListPayload(fromRootOrSettings('projects')),
+      expenseCodes: normalizeListPayload(fromRootOrSettings('expenseCodes')),
+    };
+  };
 
   const listMap: Record<SettingsKey, ListInfo> = {
     categories: { 
@@ -703,12 +772,12 @@ export default function SettingsPage() {
       throw new Error('Snapshot is missing a "lists" object.');
     }
     const nextLists: Settings = {
-      categories: Array.isArray(lists.categories) ? (lists.categories as Settings['categories']) : [],
-      units: Array.isArray(lists.units) ? (lists.units as Settings['units']) : [],
-      locations: Array.isArray(lists.locations) ? (lists.locations as Settings['locations']) : [],
-      suppliers: Array.isArray(lists.suppliers) ? (lists.suppliers as Settings['suppliers']) : [],
-      projects: Array.isArray(lists.projects) ? (lists.projects as Settings['projects']) : [],
-      expenseCodes: Array.isArray(lists.expenseCodes) ? (lists.expenseCodes as Settings['expenseCodes']) : [],
+      categories: normalizeListPayload(lists.categories) as unknown as Settings['categories'],
+      units: normalizeListPayload(lists.units),
+      locations: normalizeListPayload(lists.locations),
+      suppliers: normalizeListPayload(lists.suppliers),
+      projects: normalizeListPayload(lists.projects),
+      expenseCodes: normalizeListPayload(lists.expenseCodes),
     };
     setSettings(nextLists as SettingsState);
     saveSettings(nextLists);
@@ -953,43 +1022,14 @@ export default function SettingsPage() {
       reader.onload = (e) => {
         try {
           console.log("Processing JSON file:", file.name);
-          const data = JSON.parse(e.target?.result as string);
+          const parsedInput = JSON.parse(e.target?.result as string);
           
           // Validate data structure
-          if (!data || typeof data !== 'object') {
+          if (!parsedInput || typeof parsedInput !== 'object') {
             throw new Error('Invalid data format');
           }
-          console.log("JSON data parsed successfully:", Object.keys(data));
-          
-          // Process and ensure all items have IDs
-          if (data.inventory && Array.isArray(data.inventory)) {
-            console.log("Inventory items found in JSON:", data.inventory.length);
-            // Ensure each inventory item has an ID
-            data.inventory = data.inventory.map((item: any) => {
-              if (!item.id) {
-                return { ...item, id: uuidv4() };
-              }
-              return item;
-            });
-          }
-          
-          // Process settings data to ensure IDs
-          ['categories', 'units', 'locations', 'suppliers', 'projects', 'expenseCodes'].forEach(key => {
-            if (data[key] && Array.isArray(data[key])) {
-              console.log(`${key} found in JSON:`, data[key].length);
-              // Ensure each item has an ID
-              data[key] = data[key].map((item: any) => {
-                if (!item.id) {
-                  return { ...item, id: uuidv4() };
-                }
-                return item;
-              });
-            }
-          });
-          
-          if (data.inventory) {
-            console.log("Inventory items found in JSON:", data.inventory.length);
-          }
+          console.log("JSON data parsed successfully:", Object.keys(parsedInput as object));
+          const data = normalizeImportPayload(parsedInput);
 
           setImportInProgress({
             data,
@@ -998,12 +1038,12 @@ export default function SettingsPage() {
           });
           
           // Check for duplicates and potential conflicts
-          checkForDuplicates(data);
-          
-          if (!importDuplicates) {
+          const duplicates = checkForDuplicates(data);
+
+          if (!duplicates || duplicates.length === 0) {
             // No duplicates, proceed with import
             console.log("No duplicates found, proceeding with import");
-            processImport(data);
+            processImport(data, [], {});
             toast.success("Data imported successfully");
             resolve();
           } else {
@@ -1080,31 +1120,30 @@ export default function SettingsPage() {
               const items = XLSX.utils.sheet_to_json(sheet);
               console.log(`${sheetName} found in Excel:`, items.length);
               
-              // Ensure each item has an ID
-              const itemsWithIds = items.map((item: any) => {
-                if (!item.id) {
-                  return { ...item, id: uuidv4() };
-                }
-                return item;
-              });
-              
-              importedData[sheetName.toLowerCase()] = itemsWithIds;
+              importedData[sheetName.toLowerCase()] = normalizeListPayload(items);
             }
           });
+          if (workbook.SheetNames.includes("ExpenseCodes")) {
+            const expenseCodesSheet = workbook.Sheets["ExpenseCodes"];
+            const expenseCodeItems = XLSX.utils.sheet_to_json(expenseCodesSheet);
+            importedData.expenseCodes = normalizeListPayload(expenseCodeItems);
+          }
+
+          const normalizedImportPayload = normalizeImportPayload(importedData);
 
           setImportInProgress({
-            data: importedData,
+            data: normalizedImportPayload,
             fileType: 'excel',
             file
           });
 
           // Check for duplicates
-          checkForDuplicates(importedData);
-          
-          if (!importDuplicates) {
+          const duplicates = checkForDuplicates(normalizedImportPayload);
+
+          if (!duplicates || duplicates.length === 0) {
             // No duplicates, proceed with import
             console.log("No duplicates found, proceeding with import");
-            processImport(importedData);
+            processImport(normalizedImportPayload, [], {});
             toast.success("Data imported from Excel successfully");
             resolve();
           } else {
@@ -1124,6 +1163,11 @@ export default function SettingsPage() {
   const checkForDuplicates = (data: any) => {
     console.log("Checking for duplicates in imported data:", data);
     const settingsKeys: SettingsKey[] = ['categories', 'units', 'locations', 'suppliers', 'projects', 'expenseCodes'];
+    const duplicateReport: Array<{
+      type: string;
+      existing: Array<{ id?: string; name?: string }>;
+      imported: Array<{ id?: string; name?: string }>;
+    }> = [];
 
     // First check inventory items if they exist
     if (data.inventory && Array.isArray(data.inventory)) {
@@ -1138,14 +1182,13 @@ export default function SettingsPage() {
         
         if (duplicateItems.length > 0) {
           console.log("Found duplicate inventory items:", duplicateItems.length);
-          setImportDuplicates({
+          duplicateReport.push({
             type: 'inventory' as any,
             existing: existingItems.filter(existing => 
               duplicateItems.some((dup: any) => dup.id === existing.id)
             ),
             imported: duplicateItems
           });
-          return;
         }
       }
     }
@@ -1174,93 +1217,122 @@ export default function SettingsPage() {
           )
         );
 
-        setImportDuplicates({
+        duplicateReport.push({
           type: key,
           existing: existingDuplicates,
           imported: duplicateItems
         });
-        return; // Stop at first duplicate type found
       }
     }
 
-    console.log("No duplicates found in import data");
-    // No duplicates found
-    setImportDuplicates(null);
+    const firstSettingsConflict = duplicateReport.find((entry) => entry.type !== 'inventory');
+    setImportDuplicates(
+      firstSettingsConflict
+        ? ({
+            type: firstSettingsConflict.type as SettingsKey,
+            existing: firstSettingsConflict.existing as ItemWithSubcategories[],
+            imported: firstSettingsConflict.imported as any[],
+          })
+        : null
+    );
+    setImportDuplicateReport(duplicateReport);
+    setImportSectionActions(
+      Object.fromEntries(duplicateReport.map((section) => [section.type, importDuplicateAction])) as Record<
+        string,
+        'skip' | 'replace' | 'merge'
+      >
+    );
+    console.log("Duplicate report:", duplicateReport);
+    return duplicateReport;
   };
 
   // Process the import based on user's decision
-  const processImport = (data: any) => {
+  const processImport = (
+    data: any,
+    duplicateReport: Array<{ type: string; existing: Array<{ id?: string; name?: string }> }> = [],
+    sectionActions: Record<string, 'skip' | 'replace' | 'merge'> = {},
+  ) => {
     const settingsKeys: SettingsKey[] = ['categories', 'units', 'locations', 'suppliers', 'projects', 'expenseCodes'];
     const importedCounts: Record<string, number> = {};
+    const duplicateTypeSet = new Set(duplicateReport.map((entry) => entry.type));
+    const actionFor = (type: string): 'skip' | 'replace' | 'merge' =>
+      sectionActions[type] ?? importDuplicateAction;
+    const mergeListEntries = (existingItems: any[], importedItems: any[]) => {
+      const nextByKey = new Map<string, any>();
+      const keyFor = (entry: any) => String(entry?.id || '').trim().toLowerCase() || String(entry?.name || '').trim().toLowerCase();
+      existingItems.forEach((entry) => nextByKey.set(keyFor(entry), entry));
+      importedItems.forEach((entry) => {
+        const key = keyFor(entry);
+        const existing = nextByKey.get(key);
+        if (!existing) {
+          nextByKey.set(key, entry);
+          return;
+        }
+        const mergedSubcategories = Array.from(
+          new Set([...(existing.subcategories || []), ...(entry.subcategories || [])])
+        );
+        const mergedChildren = Array.isArray(existing.children) || Array.isArray(entry.children)
+          ? mergeListEntries(existing.children || [], entry.children || [])
+          : undefined;
+        nextByKey.set(key, {
+          ...existing,
+          ...entry,
+          subcategories: mergedSubcategories,
+          ...(mergedChildren ? { children: mergedChildren } : {}),
+        });
+      });
+      return Array.from(nextByKey.values());
+    };
     
     // Handle inventory separately if it exists
     if (data.inventory && Array.isArray(data.inventory)) {
-      console.log(`Processing ${data.inventory.length} inventory items with action: ${importDuplicateAction}`);
+      const inventoryAction = actionFor('inventory');
+      console.log(`Processing ${data.inventory.length} inventory items with action: ${inventoryAction}`);
+      const existingItems = getItems();
+      const existingById = new Map(existingItems.map((item) => [item.id, item]));
+      const importedById = new Map(data.inventory.map((item: any) => [String(item.id), item]));
       // Handle based on reconciliation choice
-      if (importDuplicateAction === 'replace') {
-        console.log("Replacing all inventory items");
-        saveItems(data.inventory);
+      if (inventoryAction === 'replace') {
+        saveItems(data.inventory.map(parseItemDates));
         importedCounts.inventory = data.inventory.length;
-      } else if (importDuplicateAction === 'merge') {
-        const existingItems = getItems();
-        console.log("Merging inventory: existing:", existingItems.length);
-        const newItems = data.inventory.filter((imported: any) => 
-          !existingItems.some(existing => existing.id === imported.id)
+      } else if (inventoryAction === 'merge') {
+        const mergedItems = existingItems.map((existing) =>
+          importedById.has(existing.id) ? parseItemDates(importedById.get(existing.id)) : existing
         );
-        console.log("New items to add:", newItems.length);
+        const newItems = data.inventory
+          .filter((imported: any) => !existingById.has(String(imported.id)))
+          .map(parseItemDates);
+        saveItems([...mergedItems, ...newItems]);
+        importedCounts.inventory = newItems.length;
+      } else {
+        const newItems = data.inventory
+          .filter((imported: any) => !existingById.has(String(imported.id)))
+          .map(parseItemDates);
         saveItems([...existingItems, ...newItems]);
         importedCounts.inventory = newItems.length;
-      } else if (importDuplicateAction === 'skip') {
-        // For 'skip', we should still import items that don't exist yet
-        const existingItems = getItems();
-        console.log("Skipping duplicates: existing:", existingItems.length);
-        const newItems = data.inventory.filter((imported: any) => 
-          !existingItems.some(existing => existing.id === imported.id)
-        );
-        
-        console.log("New non-duplicate items to add:", newItems.length);
-        if (newItems.length > 0) {
-          saveItems([...existingItems, ...newItems]);
-          importedCounts.inventory = newItems.length;
-        }
       }
     }
     
     // Process other settings data
     for (const key of settingsKeys) {
       if (!data[key] || !Array.isArray(data[key])) continue;
+      const existingItems = settings[key];
+      const sectionHasConflicts = duplicateTypeSet.has(key);
+      const sectionAction = sectionHasConflicts ? actionFor(key) : 'skip';
       
-      if (importDuplicateAction === 'replace' || !importDuplicates) {
-        // Replace all or no duplicates found
+      if (sectionAction === 'replace') {
         updateSettingsList(key, data[key]);
         importedCounts[key] = data[key].length;
-      } else if (importDuplicateAction === 'merge') {
-        // Merge with existing, keeping existing when duplicates
-        const existingItems = settings[key];
-        const newItems = data[key].filter((imported: any) => 
-          !existingItems.some(existing => 
-            existing.id === imported.id || existing.name === imported.name
-          )
+      } else if (sectionAction === 'merge') {
+        const mergedItems = mergeListEntries(existingItems, data[key]);
+        updateSettingsList(key, mergedItems);
+        importedCounts[key] = Math.max(0, mergedItems.length - existingItems.length);
+      } else {
+        const importedWithoutDuplicates = data[key].filter((imported: any) =>
+          !existingItems.some((existing) => existing.id === imported.id || existing.name === imported.name)
         );
-        updateSettingsList(key, [...existingItems, ...newItems]);
-        importedCounts[key] = newItems.length;
-      } else if (importDuplicateAction === 'skip') {
-        // Skip importing any duplicates
-        if (importDuplicates && importDuplicates.type === key) {
-          // Remove duplicates from import data
-          const importedWithoutDuplicates = data[key].filter((imported: any) => 
-            !importDuplicates.existing.some(existing => 
-              existing.id === imported.id || existing.name === imported.name
-            )
-          );
-          // Merge non-duplicates with existing
-          updateSettingsList(key, [...settings[key], ...importedWithoutDuplicates]);
-          importedCounts[key] = importedWithoutDuplicates.length;
-        } else {
-          // This category doesn't have duplicates, import all
-          updateSettingsList(key, [...settings[key], ...data[key]]);
-          importedCounts[key] = data[key].length;
-        }
+        updateSettingsList(key, [...existingItems, ...importedWithoutDuplicates]);
+        importedCounts[key] = importedWithoutDuplicates.length;
       }
     }
     
@@ -1273,6 +1345,8 @@ export default function SettingsPage() {
     // Reset import state
     setImportDuplicates(null);
     setImportInProgress(null);
+    setImportDuplicateReport([]);
+    setImportSectionActions({});
     setImportDuplicateAction('skip');
   };
 
@@ -1280,7 +1354,7 @@ export default function SettingsPage() {
   const handleImportConfirm = () => {
     if (!importInProgress) return;
     
-    processImport(importInProgress.data);
+    processImport(importInProgress.data, importDuplicateReport, importSectionActions);
     toast.success(`Import complete. Check the summary for details.`);
   };
 
@@ -2022,10 +2096,12 @@ export default function SettingsPage() {
 
       {/* Import Reconciliation Dialog */}
       <Dialog 
-        open={!!importDuplicates} 
+        open={importDuplicateReport.length > 0} 
         onOpenChange={(open) => {
           if (!open) {
             setImportDuplicates(null);
+            setImportDuplicateReport([]);
+            setImportSectionActions({});
             setImportInProgress(null);
           }
         }}
@@ -2034,8 +2110,9 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle>Duplicate Items Found</DialogTitle>
             <DialogDescription>
-              {importDuplicates && `Found ${importDuplicates.imported.length} duplicate ${importDuplicates.type} 
-              in the import file that conflict with existing items. How would you like to handle these?`}
+              {`Found ${importDuplicateReport.reduce((sum, section) => sum + section.imported.length, 0)} overlapping entries across ${
+                importDuplicateReport.length
+              } section(s). Review diffs below and choose how to reconcile.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -2090,34 +2167,65 @@ export default function SettingsPage() {
                 </p>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Global choice above is the default. You can override action per section below.
+            </p>
 
-            {importDuplicates && (
+            {importDuplicateReport.length > 0 && (
               <div className="mt-6">
-                <h4 className="mb-2 font-medium text-foreground">Duplicate {importDuplicates.type}:</h4>
-                <div className="border rounded overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-4 py-2 text-left">Name</th>
-                        <th className="px-4 py-2 text-left">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {importDuplicates.imported.slice(0, 10).map((item, index) => (
-                        <tr key={index} className="border-t">
-                          <td className="px-4 py-2">{item.name}</td>
-                          <td className="px-4 py-2 text-amber-600">Duplicate</td>
-                        </tr>
-                      ))}
-                      {importDuplicates.imported.length > 10 && (
-                        <tr className="border-t">
-                          <td colSpan={2} className="px-4 py-2 text-muted-foreground italic">
-                            And {importDuplicates.imported.length - 10} more...
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <h4 className="mb-2 font-medium text-foreground">Conflict diff preview</h4>
+                <div className="space-y-3">
+                  {importDuplicateReport.map((section) => (
+                    <div key={section.type} className="rounded border border-border/60">
+                      <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+                        <div className="text-sm font-medium capitalize">
+                          {section.type} ({section.imported.length} conflict{section.imported.length === 1 ? '' : 's'})
+                        </div>
+                        <Select
+                          value={importSectionActions[section.type] || importDuplicateAction}
+                          onValueChange={(value: 'skip' | 'replace' | 'merge') =>
+                            setImportSectionActions((previous) => ({ ...previous, [section.type]: value }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-[160px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="skip">Skip duplicates</SelectItem>
+                            <SelectItem value="merge">Merge</SelectItem>
+                            <SelectItem value="replace">Replace existing</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="max-h-44 overflow-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/20">
+                            <tr>
+                              <th className="px-3 py-2 text-left">Existing</th>
+                              <th className="px-3 py-2 text-left">Imported</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {section.imported.slice(0, 12).map((entry, index) => (
+                              <tr key={`${section.type}-${index}`} className="border-t">
+                                <td className="px-3 py-2 text-muted-foreground">
+                                  {section.existing[index]?.name || section.existing[index]?.id || '(match by id/name)'}
+                                </td>
+                                <td className="px-3 py-2">{entry.name || entry.id || '(unnamed)'}</td>
+                              </tr>
+                            ))}
+                            {section.imported.length > 12 ? (
+                              <tr className="border-t">
+                                <td colSpan={2} className="px-3 py-2 text-xs text-muted-foreground italic">
+                                  +{section.imported.length - 12} more conflicts
+                                </td>
+                              </tr>
+                            ) : null}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -2128,6 +2236,8 @@ export default function SettingsPage() {
               variant="outline" 
               onClick={() => {
                 setImportDuplicates(null);
+                setImportDuplicateReport([]);
+                setImportSectionActions({});
                 setImportInProgress(null);
               }}
             >
