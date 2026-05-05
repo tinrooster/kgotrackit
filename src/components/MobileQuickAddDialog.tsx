@@ -881,14 +881,14 @@ export function MobileQuickAddDialog({
           </DialogHeader>
 
           <div
-            className="shrink-0 border-b border-border/50 bg-muted/35 px-4 py-2.5 backdrop-blur-sm sm:px-6"
+            className="shrink-0 border-b border-border/50 bg-muted/35 px-4 py-3 backdrop-blur-sm sm:px-6"
             aria-label="Current selection and quick navigation"
           >
             <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Current</p>
-            <div className="mt-1 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4 md:gap-2.5">
+            <div className="mt-2 grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-4 md:gap-3">
               <button
                 type="button"
-                className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
+                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-2.5 py-2 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
                   setOpenSection("location");
                   jumpTo("location", sectionAllLocRef);
@@ -899,7 +899,7 @@ export function MobileQuickAddDialog({
               </button>
               <button
                 type="button"
-                className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
+                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-2.5 py-2 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
                   setOpenSection("category");
                   jumpTo("category", sectionAllCatRef);
@@ -910,7 +910,7 @@ export function MobileQuickAddDialog({
               </button>
               <button
                 type="button"
-                className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
+                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-2.5 py-2 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
                   setOpenSection("unit");
                   jumpTo("unit", sectionUnitRef);
@@ -921,7 +921,7 @@ export function MobileQuickAddDialog({
               </button>
               <button
                 type="button"
-                className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
+                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-2.5 py-2 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
                   setOpenSection("project");
                   jumpTo("project", sectionProjectRef);
@@ -932,13 +932,13 @@ export function MobileQuickAddDialog({
               </button>
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-1">
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               <span className="mr-0.5 self-center text-[10px] text-muted-foreground">Go to</span>
               <Button
                 type="button"
                 variant={jumpHighlight === "name" ? "secondary" : "outline"}
                 size="sm"
-                className="h-7 touch-manipulation px-2 text-[11px]"
+                className="h-8 touch-manipulation px-2.5 text-xs"
                 onClick={() => jumpTo("name", sectionNameRef)}
               >
                 Name
@@ -948,7 +948,7 @@ export function MobileQuickAddDialog({
                   type="button"
                   variant={jumpHighlight === "location" ? "secondary" : "outline"}
                   size="sm"
-                  className="h-7 touch-manipulation px-2 text-[11px]"
+                  className="h-8 touch-manipulation px-2.5 text-xs"
                   onClick={() => goToRack()}
                 >
                   Rack
@@ -958,7 +958,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 variant={jumpHighlight === "details" ? "secondary" : "outline"}
                 size="sm"
-                className="h-7 touch-manipulation px-2 text-[11px]"
+                className="h-8 touch-manipulation px-2.5 text-xs"
                 onClick={() => {
                   setOpenSection("details");
                   jumpTo("details", sectionMetaRef);
@@ -970,7 +970,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 variant={jumpHighlight === "location" ? "secondary" : "outline"}
                 size="sm"
-                className="h-7 touch-manipulation px-2 text-[11px]"
+                className="h-8 touch-manipulation px-2.5 text-xs"
                 onClick={() => {
                   setOpenSection("location");
                   jumpTo("location", sectionAllLocRef);
@@ -982,7 +982,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 variant={jumpHighlight === "category" ? "secondary" : "outline"}
                 size="sm"
-                className="h-7 touch-manipulation px-2 text-[11px]"
+                className="h-8 touch-manipulation px-2.5 text-xs"
                 onClick={() => {
                   setOpenSection("category");
                   jumpTo("category", sectionAllCatRef);
@@ -994,7 +994,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 variant={jumpHighlight === "unit" ? "secondary" : "outline"}
                 size="sm"
-                className="h-7 touch-manipulation px-2 text-[11px]"
+                className="h-8 touch-manipulation px-2.5 text-xs"
                 onClick={() => {
                   setOpenSection("unit");
                   jumpTo("unit", sectionUnitRef);
@@ -1006,7 +1006,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 variant={jumpHighlight === "project" ? "secondary" : "outline"}
                 size="sm"
-                className="h-7 touch-manipulation px-2 text-[11px]"
+                className="h-8 touch-manipulation px-2.5 text-xs"
                 onClick={() => {
                   setOpenSection("project");
                   jumpTo("project", sectionProjectRef);
@@ -1148,8 +1148,8 @@ export function MobileQuickAddDialog({
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <LayoutList className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-xs font-semibold">Details</span>
-                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">{detailsIndicator}</span>
+                  <span className="text-sm font-semibold">Details</span>
+                    <span className="truncate text-xs font-normal text-muted-foreground/80">{detailsIndicator}</span>
                   </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", detailsOpen && "rotate-180")}
@@ -1329,11 +1329,7 @@ export function MobileQuickAddDialog({
                   </div>
                 </div>
                   </div>
-                ) : (
-                  <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    Tap header to expand.
-                  </p>
-                )}
+                ) : null}
               </div>
 
               <div ref={sectionAllLocRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "location")}>
@@ -1345,8 +1341,8 @@ export function MobileQuickAddDialog({
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-xs font-semibold">All locations</span>
-                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">
+                    <span className="text-sm font-semibold">All locations</span>
+                    <span className="truncate text-xs font-normal text-muted-foreground/80">
                       {locationStripLabel || "Not set"}
                     </span>
                   </span>
@@ -1439,11 +1435,7 @@ export function MobileQuickAddDialog({
                       </div>
                     ) : null}
                   </div>
-                ) : (
-                  <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    Tap header to expand.
-                  </p>
-                )}
+                ) : null}
               </div>
 
               <div ref={sectionAllCatRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "category")}>
@@ -1455,8 +1447,8 @@ export function MobileQuickAddDialog({
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <Tag className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-xs font-semibold">All categories</span>
-                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">
+                    <span className="text-sm font-semibold">All categories</span>
+                    <span className="truncate text-xs font-normal text-muted-foreground/80">
                       {category || "Not set"}
                     </span>
                   </span>
@@ -1491,11 +1483,7 @@ export function MobileQuickAddDialog({
                       )}
                     </div>
                   </div>
-                ) : (
-                  <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    Tap header to expand.
-                  </p>
-                )}
+                ) : null}
               </div>
 
               <div ref={sectionUnitRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "unit")}>
@@ -1507,8 +1495,8 @@ export function MobileQuickAddDialog({
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <Layers className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-xs font-semibold">Unit</span>
-                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">
+                    <span className="text-sm font-semibold">Unit</span>
+                    <span className="truncate text-xs font-normal text-muted-foreground/80">
                       {unitStripLabel || "Not set"}
                     </span>
                   </span>
@@ -1574,11 +1562,7 @@ export function MobileQuickAddDialog({
                       </div>
                     )}
                   </div>
-                ) : (
-                  <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    Tap header to expand.
-                  </p>
-                )}
+                ) : null}
               </div>
 
               <div ref={sectionProjectRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "project")}>
@@ -1590,8 +1574,8 @@ export function MobileQuickAddDialog({
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <Briefcase className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-xs font-semibold">Project</span>
-                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">
+                    <span className="text-sm font-semibold">Project</span>
+                    <span className="truncate text-xs font-normal text-muted-foreground/80">
                       {projectStripLabel || "None"}
                     </span>
                   </span>
@@ -1642,11 +1626,7 @@ export function MobileQuickAddDialog({
                       </div>
                     ) : null}
                   </div>
-                ) : (
-                  <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    Tap header to expand.
-                  </p>
-                )}
+                ) : null}
               </div>
             </div>
           </div>

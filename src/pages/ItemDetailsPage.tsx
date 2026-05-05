@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
 
 export default function ItemDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -122,6 +123,9 @@ export default function ItemDetailsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Last modified by:</p>
                 <p className="font-medium">{item.lastModifiedBy || 'Unknown'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {item.lastUpdated ? format(new Date(item.lastUpdated), 'MMM d, yyyy · h:mm a') : 'No timestamp'}
+                </p>
               </div>
             </div>
           </div>

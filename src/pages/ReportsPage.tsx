@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, Download, FileSpreadsheet, Save, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Download, FileSpreadsheet, Save, Sparkles, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -104,6 +104,8 @@ export default function ReportsPage() {
   const [customName, setCustomName] = useState('Custom Production Report');
   const [customColumns, setCustomColumns] = useState<string[]>(['recordId', 'assetId', 'name', 'project', 'location', 'expenseTypeCode', 'costCenterCode', 'quantity']);
   const [defineCustomReportOpen, setDefineCustomReportOpen] = useState(false);
+  const [aiSummaryText, setAiSummaryText] = useState('');
+  const [aiSummaryMode, setAiSummaryMode] = useState<'executive' | 'operations'>('operations');
   const defineCustomReportCardRef = useRef<HTMLDivElement>(null);
 
   const allReports = useMemo(() => [...BUILT_IN_REPORTS, ...customReports], [customReports]);
@@ -389,6 +391,155 @@ export default function ReportsPage() {
     setCustomColumns((prev) => (prev.includes(column) ? prev.filter((entry) => entry !== column) : [...prev, column]));
   };
 
+  const generateInventoryAiSummary = () => {
+    if (filteredItems.length === 0) {
+      setAiSummaryText('No inventory items match the current filters, so there is nothing to summarize.');
+      return;
+    }
+
+    const totalItems = filteredItems.length;
+    const totalQuantity = filteredItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const totalValue = filteredItems.reduce(
+      (sum, item) => sum + Number(item.quantity || 0) * Number(item.costPerUnit || 0),
+      0
+    );
+    const decommissioning = filteredItems.filter((item) =>
+      ['ready_decommission', 'slated_removal', 'cut_over_pending', 'ewaste'].includes(String(item.assetStatus || ''))
+    );
+    const unassignedProjectCount = filteredItems.filter((item) => !String(item.project || '').trim()).length;
+    const unassignedLocationCount = filteredItems.filter((item) => !String(item.location || '').trim()).length;
+
+    const byCategory = filteredItems.reduce((acc, item) => {
+      const key = item.category || 'Uncategorized';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const byLocation = filteredItems.reduce((acc, item) => {
+      const key = item.location || 'Unassigned';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const byProjectValue = filteredItems.reduce((acc, item) => {
+      const key = item.project || 'Unassigned';
+      const value = Number(item.quantity || 0) * Number(item.costPerUnit || 0);
+      acc[key] = (acc[key] || 0) + value;
+      return acc;
+    }, {} as Record<string, number>);
+    const byExpenseTypeValue = filteredItems.reduce((acc, item) => {
+      const key = item.expenseTypeCode || 'N/A';
+      const value = Number(item.quantity || 0) * Number(item.costPerUnit || 0);
+      acc[key] = (acc[key] || 0) + value;
+      return acc;
+    }, {} as Record<string, number>);
+    const byCostCenterValue = filteredItems.reduce((acc, item) => {
+      const key = item.costCenterCode || 'N/A';
+      const value = Number(item.quantity || 0) * Number(item.costPerUnit || 0);
+      acc[key] = (acc[key] || 0) + value;
+      return acc;
+    }, {} as Record<string, number>);
+    const upcomingCutover = filteredItems
+      .filter((item) => !!item.decomCutoverDate)
+      .sort((a, b) => String(a.decomCutoverDate || '').localeCompare(String(b.decomCutoverDate || '')))
+      .slice(0, 3);
+    const upcomingEol = filteredItems
+      .filter((item) => !!item.decomEOLDate)
+      .sort((a, b) => String(a.decomEOLDate || '').localeCompare(String(b.decomEOLDate || '')))
+      .slice(0, 3);
+    const topCategory = Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0];
+    const topLocation = Object.entries(byLocation).sort((a, b) => b[1] - a[1])[0];
+    const topProjectValue = Object.entries(byProjectValue).sort((a, b) => b[1] - a[1])[0];
+    const topExpenseTypeValue = Object.entries(byExpenseTypeValue).sort((a, b) => b[1] - a[1])[0];
+    const topCostCenterValue = Object.entries(byCostCenterValue).sort((a, b) => b[1] - a[1])[0];
+
+    const highestValueItems = [...filteredItems]
+      .map((item) => ({
+        name: item.name || 'Unnamed item',
+        value: Number(item.quantity || 0) * Number(item.costPerUnit || 0),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3)
+      .filter((entry) => entry.value > 0);
+
+    const filtersApplied = [
+      projectFilter !== 'all' ? `Project: ${projectFilter}` : null,
+      locationFilter !== 'all' ? `Location: ${locationFilter}` : null,
+      statusFilter !== 'all' ? `Status: ${statusFilter}` : null,
+      expenseTypeFilter !== 'all' ? `Expense type: ${expenseTypeFilter}` : null,
+    ].filter(Boolean) as string[];
+
+    if (aiSummaryMode === 'executive') {
+      const executiveBullets = [
+        `Scope: ${totalItems} line items, ${totalQuantity.toLocaleString()} units, ${totalValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })} estimated value${filtersApplied.length > 0 ? ` (${filtersApplied.join(' | ')})` : ''}.`,
+        topProjectValue
+          ? `Budget focus: highest project concentration is ${topProjectValue[0]} at ${topProjectValue[1].toLocaleString(undefined, { style: 'currency', currency: 'USD' })}; top expense type is ${topExpenseTypeValue?.[0] ?? 'N/A'} and top cost center is ${topCostCenterValue?.[0] ?? 'N/A'}.`
+          : 'Budget focus: value concentration by project/expense/cost center is not available.',
+        decommissioning.length > 0 || upcomingCutover.length > 0 || upcomingEol.length > 0
+          ? `Lifecycle watch: ${decommissioning.length} decommissioning-status items; next cutovers ${upcomingCutover.map((item) => `${item.name} (${item.decomCutoverDate})`).join(' · ') || 'none'}; next EOL ${upcomingEol.map((item) => `${item.name} (${item.decomEOLDate})`).join(' · ') || 'none'}.`
+          : 'Lifecycle watch: no decommissioning/cutover/EOL schedule pressure in current scope.',
+        unassignedProjectCount > 0 || unassignedLocationCount > 0
+          ? `Data quality: ${unassignedProjectCount} items missing project and ${unassignedLocationCount} missing location assignment.`
+          : 'Data quality: project and location assignments are complete in this scope.',
+        highestValueItems.length > 0
+          ? `Top value drivers: ${highestValueItems
+              .map((entry) => `${entry.name} (${entry.value.toLocaleString(undefined, { style: 'currency', currency: 'USD' })})`)
+              .join(' · ')}.`
+          : 'Top value drivers: no costed items in this scope.',
+      ];
+      setAiSummaryText(executiveBullets.map((line) => `• ${line}`).join('\n'));
+      return;
+    }
+
+    const operationsNarrative = [
+      `Inventory summary (${new Date().toLocaleString()}):`,
+      filtersApplied.length > 0 ? `Filters applied: ${filtersApplied.join(' | ')}` : 'Filters applied: none (full inventory scope).',
+      `This view contains ${totalItems} line items totaling ${totalQuantity.toLocaleString()} units and an estimated value of ${totalValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}.`,
+      topCategory ? `Largest category concentration: ${topCategory[0]} (${topCategory[1]} items).` : 'Largest category concentration: not available.',
+      topLocation ? `Highest location concentration: ${topLocation[0]} (${topLocation[1]} items).` : 'Highest location concentration: not available.',
+      topProjectValue
+        ? `Highest project value concentration: ${topProjectValue[0]} (${topProjectValue[1].toLocaleString(undefined, { style: 'currency', currency: 'USD' })}).`
+        : 'Project value concentration: not available.',
+      topExpenseTypeValue
+        ? `Top expense type allocation: ${topExpenseTypeValue[0]} (${topExpenseTypeValue[1].toLocaleString(undefined, { style: 'currency', currency: 'USD' })}).`
+        : 'Expense type allocation: not available.',
+      topCostCenterValue
+        ? `Top cost center allocation: ${topCostCenterValue[0]} (${topCostCenterValue[1].toLocaleString(undefined, { style: 'currency', currency: 'USD' })}).`
+        : 'Cost center allocation: not available.',
+      unassignedProjectCount > 0 || unassignedLocationCount > 0
+        ? `Data completeness watch: ${unassignedProjectCount} item(s) without project and ${unassignedLocationCount} item(s) without location assignment.`
+        : 'Data completeness watch: all items include project and location assignment.',
+      decommissioning.length > 0
+        ? `${decommissioning.length} items are in decommissioning-related states and should be reviewed for cut-over/removal planning.`
+        : 'No items are currently flagged in decommissioning-related states.',
+      upcomingCutover.length > 0
+        ? `Upcoming cutover dates: ${upcomingCutover
+            .map((item) => `${item.name} (${item.decomCutoverDate})`)
+            .join(' · ')}.`
+        : 'Upcoming cutover dates: none currently scheduled.',
+      upcomingEol.length > 0
+        ? `Upcoming EOL dates: ${upcomingEol
+            .map((item) => `${item.name} (${item.decomEOLDate})`)
+            .join(' · ')}.`
+        : 'Upcoming EOL dates: none currently set.',
+      highestValueItems.length > 0
+        ? `Top value concentration: ${highestValueItems
+            .map((entry) => `${entry.name} (${entry.value.toLocaleString(undefined, { style: 'currency', currency: 'USD' })})`)
+            .join(' · ')}.`
+        : 'Top value concentration: no costed items in current view.',
+    ].join('\n');
+
+    setAiSummaryText(operationsNarrative);
+  };
+
+  const copyAiSummary = async () => {
+    if (!aiSummaryText.trim()) return;
+    try {
+      await navigator.clipboard.writeText(aiSummaryText);
+      toast({ title: 'Summary copied', description: 'AI summary copied to clipboard.' });
+    } catch {
+      toast({ title: 'Copy failed', description: 'Could not copy summary to clipboard.', variant: 'destructive' });
+    }
+  };
+
   const saveCustomReport = () => {
     const trimmedName = customName.trim();
     if (!trimmedName) {
@@ -587,6 +738,52 @@ export default function ReportsPage() {
               </table>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            AI Inventory Summary
+          </CardTitle>
+          <CardDescription>Generate a narrative summary from the currently filtered inventory set.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Label className="mr-1 text-xs text-muted-foreground">Mode</Label>
+            <Button
+              type="button"
+              size="sm"
+              variant={aiSummaryMode === 'executive' ? 'default' : 'outline'}
+              onClick={() => setAiSummaryMode('executive')}
+            >
+              Executive
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={aiSummaryMode === 'operations' ? 'default' : 'outline'}
+              onClick={() => setAiSummaryMode('operations')}
+            >
+              Operations
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={generateInventoryAiSummary}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate AI summary
+            </Button>
+            <Button type="button" size="sm" variant="outline" disabled={!aiSummaryText} onClick={() => void copyAiSummary()}>
+              <Copy className="mr-2 h-4 w-4" />
+              Copy summary
+            </Button>
+          </div>
+          {aiSummaryText ? (
+            <pre className="whitespace-pre-wrap rounded-md border border-border bg-muted/25 p-3 text-sm">{aiSummaryText}</pre>
+          ) : (
+            <p className="text-sm text-muted-foreground">No summary generated yet.</p>
+          )}
         </CardContent>
       </Card>
 

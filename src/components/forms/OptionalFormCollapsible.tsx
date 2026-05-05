@@ -37,17 +37,17 @@ export function OptionalFormCollapsible({ title, children, className, defaultOpe
     >
       <summary
         className={cn(
-          'flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground',
+          'flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3.5 text-left text-base font-medium text-foreground',
           'marker:content-none [&::-webkit-details-marker]:hidden',
         )}
       >
         <span>{title}</span>
         <ChevronDown
-          className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+          className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
           aria-hidden
         />
       </summary>
-      <div className="space-y-3 border-t border-border/50 px-3 pb-3 pt-3">{children}</div>
+      <div className="space-y-4 border-t border-border/50 px-3 pb-4 pt-4">{children}</div>
     </details>
   );
 }

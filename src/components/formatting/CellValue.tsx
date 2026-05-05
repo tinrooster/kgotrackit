@@ -59,12 +59,31 @@ export function FormatCellValue({ item, column }: { item: InventoryItem; column:
     const dateValue = item[column] instanceof Date ? item[column] : new Date(item[column]);
     return (
       <div className="flex flex-col">
-        <span>{format(dateValue, 'MMM d, yyyy')}</span>
+        <span>{format(dateValue, 'MMM d, yyyy · h:mm a')}</span>
         {item.lastModifiedBy && (
           <span className="text-xs text-muted-foreground">
             by {item.lastModifiedBy}
           </span>
         )}
+      </div>
+    );
+  }
+  if (column === 'lastModifiedBy') {
+    const hasDate = !!item.lastUpdated;
+    const dateValue = hasDate
+      ? item.lastUpdated instanceof Date
+        ? item.lastUpdated
+        : new Date(item.lastUpdated)
+      : null;
+    const validDate = dateValue && !Number.isNaN(dateValue.getTime()) ? dateValue : null;
+    return (
+      <div className="flex flex-col">
+        <span>{item.lastModifiedBy || '-'}</span>
+        {validDate ? (
+          <span className="text-xs text-muted-foreground">
+            {format(validDate, 'MMM d, yyyy · h:mm a')}
+          </span>
+        ) : null}
       </div>
     );
   }

@@ -1194,10 +1194,10 @@ export default function InventoryPage() {
                 placeholder="Search inventory..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 w-full"
+                className={cn("w-full", mobileTabletUi ? "h-11 text-sm" : "h-9")}
               />
               <Select value={selectedCategory || 'all'} onValueChange={(value) => handleFilterChange('category', value)}>
-                <SelectTrigger className="h-9 w-full">
+                <SelectTrigger className={cn("w-full", mobileTabletUi ? "h-11 text-sm" : "h-9")}>
                   <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
@@ -1210,7 +1210,7 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
               <Select value={selectedLocation || "all"} onValueChange={(value) => handleFilterChange('location', value === "all" ? "" : value)}>
-                <SelectTrigger className="h-9 w-full">
+                <SelectTrigger className={cn("w-full", mobileTabletUi ? "h-11 text-sm" : "h-9")}>
                   <SelectValue placeholder="All Locations" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
@@ -1233,7 +1233,7 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
               <Select value={selectedProject || "all"} onValueChange={(value) => handleFilterChange('project', value === "all" ? "" : value)}>
-                <SelectTrigger className="h-9 w-full">
+                <SelectTrigger className={cn("w-full", mobileTabletUi ? "h-11 text-sm" : "h-9")}>
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
@@ -1252,6 +1252,7 @@ export default function InventoryPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className={cn(mobileTabletUi && "h-11 w-11 touch-manipulation")}
                     onClick={() => {
                       handleFilterChange('category', 'all');
                       handleFilterChange('location', 'all');
@@ -1310,17 +1311,15 @@ export default function InventoryPage() {
               <Plus className="mr-2 h-4 w-4" />
               Add Item
             </Button>
-            {mobileTabletUi && (
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-11 w-full touch-manipulation sm:w-auto"
-                onClick={() => setIsQuickAddOpen(true)}
-              >
-                <Zap className="mr-2 h-4 w-4" />
-                Quick add
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="secondary"
+              className={cn("w-full sm:w-auto", mobileTabletUi ? "h-11 touch-manipulation" : "h-10")}
+              onClick={() => setIsQuickAddOpen(true)}
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              Quick add
+            </Button>
           </div>
         </div>
         </div>
@@ -1377,6 +1376,7 @@ export default function InventoryPage() {
                 <Checkbox
                   checked={isAllSelected}
                   onCheckedChange={toggleSelectAll}
+                  className={cn(mobileTabletUi && "h-5 w-5")}
                 />
               </TableHead>
               {activeColumns.map((column) => (
@@ -1429,7 +1429,10 @@ export default function InventoryPage() {
                   <span
                     role="separator"
                     aria-label={`Resize ${column} column`}
-                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none bg-transparent hover:bg-border"
+                    className={cn(
+                      "absolute right-0 top-0 h-full cursor-col-resize select-none bg-transparent hover:bg-border",
+                      mobileTabletUi ? "w-2 touch-none" : "w-1"
+                    )}
                     onMouseDown={(event) => handleColumnResizeStart(event, column)}
                   />
                 </TableHead>
@@ -1448,6 +1451,7 @@ export default function InventoryPage() {
                   <Checkbox
                     checked={selectedItems.includes(item.id)}
                     onCheckedChange={() => toggleItemSelection(item.id)}
+                    className={cn(mobileTabletUi && "h-5 w-5")}
                   />
                 </TableCell>
                 {activeColumns.map((column) => (
@@ -1457,19 +1461,40 @@ export default function InventoryPage() {
                 ))}
                 <TableCell>
                   <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleEditItem(item)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(mobileTabletUi && "h-10 w-10 touch-manipulation")}
+                      onClick={() => handleEditItem(item)}
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(item)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(mobileTabletUi && "h-10 w-10 touch-manipulation")}
+                      onClick={() => handleDelete(item)}
+                    >
                       <Trash className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => {
-                      setSelectedItem(item);
-                      setIsDuplicateDialogOpen(true);
-                    }}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(mobileTabletUi && "h-10 w-10 touch-manipulation")}
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setIsDuplicateDialogOpen(true);
+                      }}
+                    >
                       <Copy className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => openPrintDialog(item)} title="Print asset sticker">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(mobileTabletUi && "h-10 w-10 touch-manipulation")}
+                      onClick={() => openPrintDialog(item)}
+                      title="Print asset sticker"
+                    >
                       <Printer className="h-4 w-4" />
                     </Button>
                   </div>

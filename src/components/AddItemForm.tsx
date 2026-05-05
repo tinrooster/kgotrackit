@@ -246,20 +246,20 @@ export function AddItemForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmitForm, onInvalid)} className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4 sm:gap-0">
-            <TabsTrigger value="details" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+          <TabsList className="grid w-full grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1">
+            <TabsTrigger value="details" className="min-h-10 px-2 text-sm sm:px-3">
               <span className="hidden sm:inline">Item Details</span>
               <span className="sm:hidden">Details</span>
             </TabsTrigger>
-            <TabsTrigger value="inventory" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+            <TabsTrigger value="inventory" className="min-h-10 px-2 text-sm sm:px-3">
               <span className="hidden sm:inline">Inventory &amp; Supply</span>
               <span className="sm:hidden">Supply</span>
             </TabsTrigger>
-            <TabsTrigger value="additional" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+            <TabsTrigger value="additional" className="min-h-10 px-2 text-sm sm:px-3">
               <span className="hidden sm:inline">Additional Info</span>
               <span className="sm:hidden">More</span>
             </TabsTrigger>
-            <TabsTrigger value="decommissioning" className="px-1.5 text-xs sm:px-3 sm:text-sm" title="EOL / decommissioning">
+            <TabsTrigger value="decommissioning" className="min-h-10 px-2 text-sm sm:px-3" title="EOL / decommissioning">
               <span className="sm:hidden">EOL</span>
               <span className="hidden sm:inline">EOL · Decommissioning</span>
               <span className="sm:hidden">EOL</span>
@@ -302,11 +302,11 @@ export function AddItemForm({
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end space-x-2 mt-6">
-          <Button variant="outline" onClick={onCancel} type="button">
+        <div className="mt-6 flex justify-end space-x-2">
+          <Button variant="outline" onClick={onCancel} type="button" className="min-h-11 px-4 text-sm">
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting} className="min-h-11 px-4 text-sm">
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Add Item
           </Button>

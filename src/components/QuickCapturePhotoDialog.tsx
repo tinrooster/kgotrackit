@@ -13,6 +13,7 @@ import { Camera } from "lucide-react";
 import { toast } from "sonner";
 
 const MAX_DATA_URL_CHARS = 2_400_000;
+const CAMERA_DEVICE_ID_KEY = "selectedCameraDeviceId";
 
 interface QuickCapturePhotoDialogProps {
   open: boolean;
@@ -60,10 +61,25 @@ export function QuickCapturePhotoDialog({
           }
           return;
         }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-          audio: false,
-        });
+        const preferredDeviceId = localStorage.getItem(CAMERA_DEVICE_ID_KEY);
+        const preferredConstraints: MediaStreamConstraints = preferredDeviceId
+          ? {
+              video: { deviceId: { exact: preferredDeviceId } },
+              audio: false,
+            }
+          : {
+              video: { facingMode: { ideal: "environment" } },
+              audio: false,
+            };
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(preferredConstraints);
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        }
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -78,7 +94,19 @@ export function QuickCapturePhotoDialog({
       } catch (err) {
         console.error(err);
         if (!cancelled) {
-          setError("No usable camera or permission denied.");
+          const errorName =
+            err instanceof DOMException
+              ? err.name
+              : typeof err === "object" && err && "name" in err
+                ? String((err as { name?: unknown }).name || "")
+                : "";
+          if (errorName === "NotAllowedError" || errorName === "SecurityError") {
+            setError("Camera permission denied for this site. Allow camera access in browser settings.");
+          } else if (errorName === "NotReadableError" || errorName === "TrackStartError") {
+            setError("Camera is busy or blocked by another app. Close other camera apps and retry.");
+          } else {
+            setError("No usable camera in this context. You can choose an image file instead.");
+          }
         }
       }
     };
