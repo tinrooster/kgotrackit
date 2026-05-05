@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
+import { bootstrapCloudData } from '@/lib/supabase/cloudData';
 import {
   inviteWorkspaceMember,
   listWorkspaceMembers,
@@ -111,7 +112,8 @@ export function WorkspaceTeamTab() {
     window.location.reload();
   };
 
-  const activeTeamAdmin = !!activeWorkspaceId && activeWorkspaceRole === 'admin';
+  const isWorkspaceOwner = !!activeWorkspaceId && !!currentUser?.id && activeWorkspaceRow?.ownerUserId === currentUser.id;
+  const canManageMembers = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
 
   const loadMembers = React.useCallback(async () => {
     if (!activeWorkspaceId || activeWorkspaceRole !== 'admin') {
@@ -160,6 +162,33 @@ export function WorkspaceTeamTab() {
               <>Personal cloud snapshot (per-user row)</>
             )}
           </p>
+          {currentUser?.id ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await bootstrapCloudData(currentUser.id);
+                    toast.success('Pulled latest cloud data');
+                    window.location.reload();
+                  } catch (error) {
+                    toast.error('Could not pull cloud data', { description: formatWorkspaceError(error) });
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                disabled={busy}
+              >
+                {busy ? 'Syncing…' : 'Pull latest cloud data'}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Use after edits on another computer to refresh this device.
+              </span>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
@@ -239,7 +268,7 @@ export function WorkspaceTeamTab() {
           </div>
         </div>
 
-        {activeTeamAdmin ? (
+        {canManageMembers ? (
           <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium text-foreground">Team member management</p>
@@ -374,6 +403,10 @@ export function WorkspaceTeamTab() {
                 })
               )}
             </div>
+          </div>
+        ) : activeWorkspaceId ? (
+          <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
+            Member management is available to workspace admins.
           </div>
         ) : null}
       </CardContent>
