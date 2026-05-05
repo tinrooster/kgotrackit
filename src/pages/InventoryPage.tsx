@@ -1046,6 +1046,8 @@ export default function InventoryPage() {
   }, [location.state, navigate, location.pathname]);
 
   const [isDetailedView, setIsDetailedView] = useState(false);
+  const [isTinyScreen, setIsTinyScreen] = useState(false);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
 
   useEffect(() => {
     try {
@@ -1182,13 +1184,53 @@ export default function InventoryPage() {
     }
   }, [location.state?.forceRefresh, navigate]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 520px)');
+    const syncTinyScreen = () => {
+      const tiny = mediaQuery.matches;
+      setIsTinyScreen(tiny);
+      if (!tiny) {
+        setFiltersCollapsed(false);
+      }
+    };
+    syncTinyScreen();
+    mediaQuery.addEventListener('change', syncTinyScreen);
+    return () => mediaQuery.removeEventListener('change', syncTinyScreen);
+  }, []);
+
   return (
     <div className="inventory-page w-full min-w-0 max-w-full space-y-4">
       <div className="inventory-toolbar sticky top-16 z-30 space-y-4 bg-background/95 pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
             <h1 className="shrink-0 text-2xl font-bold">Inventory</h1>
-            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="min-w-0 flex-1">
+              {isTinyScreen ? (
+                <div className="mb-2 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 touch-manipulation"
+                    onClick={() => setFiltersCollapsed((previousValue) => !previousValue)}
+                    title={filtersCollapsed ? 'Show filters' : 'Hide filters'}
+                    aria-label={filtersCollapsed ? 'Show filters' : 'Hide filters'}
+                  >
+                    <Filter className="h-4 w-4" />
+                  </Button>
+                  {(selectedCategory || selectedLocation || selectedProject || searchQuery) ? (
+                    <span className="text-xs text-muted-foreground">Filters active</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Filters hidden</span>
+                  )}
+                </div>
+              ) : null}
+              <div
+                className={cn(
+                  "grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4",
+                  isTinyScreen && filtersCollapsed && "hidden"
+                )}
+              >
               <Input
                 type="text"
                 placeholder="Search inventory..."
@@ -1245,6 +1287,7 @@ export default function InventoryPage() {
                   ))}
                 </SelectContent>
               </Select>
+              </div>
             </div>
             <TooltipProvider>
               <Tooltip>

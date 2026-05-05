@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, List, FileText, Settings, ShoppingCart } from 'lucide-react'
 import { cn } from "@/lib/utils"
@@ -13,6 +13,7 @@ export function Navigation() {
   const { authBackend } = useAuth()
   const { activeWorkspaceId, workspaces } = useWorkspace()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const navContainerRef = useRef<HTMLDivElement | null>(null)
   const [mobileTabletUi, setMobileTabletUi] = useState(
     () => SettingsService.loadDefaultSettings().mobileTabletUi
   )
@@ -24,6 +25,34 @@ export function Navigation() {
     window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileTablet)
     return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileTablet)
   }, [])
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!mobileMenuOpen) return
+      const target = event.target as Node | null
+      if (!target) return
+      if (navContainerRef.current && !navContainerRef.current.contains(target)) {
+        setMobileMenuOpen(false)
+      }
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [mobileMenuOpen])
+
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [location.pathname])
 
   const showDataContextChip =
     isSupabaseConfigured() && authBackend === 'supabase'
@@ -41,7 +70,7 @@ export function Navigation() {
 
   return (
     <nav className="bg-background border-b sticky top-0 z-50">
-      <div className="mx-auto flex w-full max-w-full px-3 sm:px-4 lg:px-6">
+      <div ref={navContainerRef} className="mx-auto flex w-full max-w-full px-3 sm:px-4 lg:px-6">
         <div className="flex h-16 w-full min-w-0 items-center justify-between gap-2">
           <div className="flex min-w-0 max-w-[min(100%,220px)] flex-col gap-0.5 sm:max-w-none sm:flex-row sm:items-center sm:gap-2">
             <Link
