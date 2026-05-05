@@ -29,6 +29,7 @@ import type { Cabinet } from '@/types/cabinets'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from '@/contexts/AuthContext'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Label } from "@/components/ui/label"
 import { getPasswordError } from '@/utils/passwordUtils'
 import { v4 as uuidv4 } from 'uuid'
@@ -269,6 +270,7 @@ function AdminResetPasswordDialog({
 
 export default function SettingsPage() {
   const { currentUser, authBackend } = useAuth();
+  const { activeWorkspaceId, activeWorkspaceRole } = useWorkspace();
   
   // Initialize states from URL parameters
   const [mainTab, setMainTab] = useState(() => {
@@ -322,6 +324,9 @@ export default function SettingsPage() {
   const [settingsTab, setSettingsTab] = useState('general');
   const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>('categories');
   const [librariesPanel, setLibrariesPanel] = useState<LibrariesPanel>('suppliers');
+  const canManageSharedConfig = activeWorkspaceId
+    ? activeWorkspaceRole === 'admin'
+    : currentUser?.role === 'admin';
 
   const listUndoStackRef = useRef<ListUndoSnapshot[]>([]);
   const listRedoStackRef = useRef<ListUndoSnapshot[]>([]);
@@ -461,6 +466,21 @@ export default function SettingsPage() {
           },
           'SettingsPage'
         );
+        if ((currentUser?.role === 'admin' || activeWorkspaceRole === 'admin') && defaultSettings.adminNotificationEmail) {
+          logger.info(
+            'system',
+            'ADMIN_SETTINGS_CHANGE_NOTIFICATION_TARGET',
+            {
+              listKey: key,
+              notifyEmail: defaultSettings.adminNotificationEmail,
+              addedCount: addedEntries.length,
+              removedCount: removedEntries.length,
+              renamedCount: renamedEntries.length,
+              performedBy: currentUser?.username || 'Unknown',
+            },
+            'SettingsPage'
+          );
+        }
       }
 
       saveSettings(updatedSettings);
@@ -506,17 +526,26 @@ export default function SettingsPage() {
   const handleGeneralSettingsChange = (updates: Partial<DefaultSettings>) => {
     if (
       Object.prototype.hasOwnProperty.call(updates, 'assetIdPrefix') &&
-      currentUser?.role !== 'admin'
+      !canManageSharedConfig
     ) {
       toast.error('Only administrators can change the global asset tag prefix.');
       return;
     }
+    if (
+      Object.prototype.hasOwnProperty.call(updates, 'adminNotificationEmail') &&
+      !canManageSharedConfig
+    ) {
+      toast.error('Only administrators can change the admin notification email.');
+      return;
+    }
 
     const nextAssetIdPrefix = updates.assetIdPrefix?.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+    const nextAdminNotificationEmail = updates.adminNotificationEmail?.trim().toLowerCase();
     const nextSettings = {
       ...defaultSettings,
       ...updates,
       ...(nextAssetIdPrefix !== undefined ? { assetIdPrefix: nextAssetIdPrefix } : {}),
+      ...(nextAdminNotificationEmail !== undefined ? { adminNotificationEmail: nextAdminNotificationEmail } : {}),
     };
     setDefaultSettings(nextSettings);
     SettingsService.saveDefaultSettings(nextSettings);
@@ -527,6 +556,16 @@ export default function SettingsPage() {
       nextAssetIdPrefix !== defaultSettings.assetIdPrefix
     ) {
       toast.success(`Global asset tag prefix updated to ${nextAssetIdPrefix}.`);
+    }
+    if (
+      nextAdminNotificationEmail !== undefined &&
+      nextAdminNotificationEmail !== defaultSettings.adminNotificationEmail
+    ) {
+      toast.success(
+        nextAdminNotificationEmail
+          ? `Admin notification email updated to ${nextAdminNotificationEmail}.`
+          : 'Admin notification email cleared.'
+      );
     }
   };
 
@@ -1745,7 +1784,8 @@ export default function SettingsPage() {
             settings={defaultSettings}
             onSettingsChange={handleGeneralSettingsChange}
             currentUsername={currentUser?.username ?? 'admin'}
-            canEditAssetTagPrefix={currentUser?.role === 'admin'}
+            canEditAssetTagPrefix={canManageSharedConfig}
+            canEditAdminNotificationEmail={canManageSharedConfig}
           />
         </TabsContent>
 
@@ -1760,6 +1800,7 @@ export default function SettingsPage() {
             currentUsername={currentUser?.username ?? 'admin'}
             onRequestDeleteReconcile={requestListDeleteReconcile}
             onNormalizeRackIds={handleNormalizeRackIds}
+            canDeleteItems={canManageSharedConfig}
           />
         </TabsContent>
 
@@ -1770,6 +1811,7 @@ export default function SettingsPage() {
             settings={settings}
             updateSettingsList={updateSettingsList}
             onRequestDeleteReconcile={requestListDeleteReconcile}
+            canDeleteItems={canManageSharedConfig}
           />
         </TabsContent>
 

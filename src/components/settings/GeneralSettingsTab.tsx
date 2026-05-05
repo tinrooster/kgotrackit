@@ -15,6 +15,7 @@ interface GeneralSettingsTabProps {
   onSettingsChange: (updates: Partial<DefaultSettings>) => void;
   currentUsername: string;
   canEditAssetTagPrefix: boolean;
+  canEditAdminNotificationEmail: boolean;
 }
 
 export function GeneralSettingsTab({
@@ -23,6 +24,7 @@ export function GeneralSettingsTab({
   onSettingsChange,
   currentUsername,
   canEditAssetTagPrefix,
+  canEditAdminNotificationEmail,
 }: GeneralSettingsTabProps) {
   const confirmDeletesEnabled = settings.deleteConfirmationByUser?.[currentUsername] ?? true;
   const undoEnabled = settings.undoByUser?.[currentUsername] ?? true;
@@ -213,6 +215,28 @@ export function GeneralSettingsTab({
               {canEditAssetTagPrefix
                 ? 'Admin setting. Updates affect shared asset tag generation rules.'
                 : 'Admin only. Contact an administrator to change global asset tag prefix rules.'}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="admin-notification-email">Admin notification email</Label>
+            <Input
+              id="admin-notification-email"
+              type="email"
+              value={settings.adminNotificationEmail || ''}
+              onChange={(event) =>
+                onSettingsChange({
+                  adminNotificationEmail: event.target.value.trim().toLowerCase(),
+                })
+              }
+              className="w-full md:w-80"
+              placeholder="admin-notify@example.com"
+              disabled={!canEditAdminNotificationEmail}
+            />
+            <p className="text-xs text-muted-foreground">
+              {canEditAdminNotificationEmail
+                ? 'Used for admin-change notification target metadata.'
+                : 'Admin only. You can view this value but cannot edit it.'}
             </p>
           </div>
         </CardContent>

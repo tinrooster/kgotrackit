@@ -25,6 +25,7 @@ export interface LibrariesSectionProps {
   settings: SettingsListsState;
   updateSettingsList: (key: SettingsKey, newValue: ItemWithSubcategories[]) => void;
   onRequestDeleteReconcile: (payload: { type: string; value: string; affectedCount: number }) => void;
+  canDeleteItems?: boolean;
 }
 
 const LIB_NAV: { id: LibrariesPanel; label: string }[] = [
@@ -39,6 +40,7 @@ export function LibrariesSection({
   settings,
   updateSettingsList,
   onRequestDeleteReconcile,
+  canDeleteItems = true,
 }: LibrariesSectionProps) {
   const requestReconcile = (type: string, value: string, affectedCount: number) => {
     onRequestDeleteReconcile({ type, value, affectedCount });
@@ -91,6 +93,7 @@ export function LibrariesSection({
                       onSafeToDelete();
                     }
                   }}
+                  canDeleteItems={canDeleteItems}
                 />
               </CardContent>
             </Card>

@@ -50,6 +50,7 @@ export interface UserDefinedListsSectionProps {
   currentUsername: string;
   onRequestDeleteReconcile: (payload: { type: string; value: string; affectedCount: number }) => void;
   onNormalizeRackIds?: () => void;
+  canDeleteItems?: boolean;
 }
 
 export function UserDefinedListsSection({
@@ -62,6 +63,7 @@ export function UserDefinedListsSection({
   currentUsername,
   onRequestDeleteReconcile,
   onNormalizeRackIds,
+  canDeleteItems = true,
 }: UserDefinedListsSectionProps) {
   const requestReconcile = (type: string, value: string, affectedCount: number) => {
     onRequestDeleteReconcile({ type, value, affectedCount });
@@ -111,6 +113,7 @@ export function UserDefinedListsSection({
                       onSafeToDelete();
                     }
                   }}
+                  canDeleteItems={canDeleteItems}
                 />
               </CardContent>
             </Card>
@@ -136,6 +139,7 @@ export function UserDefinedListsSection({
                       onSafeToDelete();
                     }
                   }}
+                  canDeleteItems={canDeleteItems}
                 />
               </CardContent>
             </Card>
@@ -169,6 +173,7 @@ export function UserDefinedListsSection({
                       onSafeToDelete();
                     }
                   }}
+                  canDeleteItems={canDeleteItems}
                 />
               </CardContent>
             </Card>
@@ -196,6 +201,7 @@ export function UserDefinedListsSection({
                       onSafeToDelete();
                     }
                   }}
+                  canDeleteItems={canDeleteItems}
                 />
               </CardContent>
             </Card>

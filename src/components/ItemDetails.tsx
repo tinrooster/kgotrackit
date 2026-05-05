@@ -227,15 +227,15 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                   Supplier
                 </p>
                 <p className="text-muted-foreground">
-                  <span className="text-foreground">Name:</span>{" "}
-                  <span className="font-semibold text-foreground">{item.supplier || "Not specified"}</span>
+                  <span className="font-medium text-muted-foreground">Name:</span>{" "}
+                  <span className="text-foreground">{item.supplier || "Not specified"}</span>
                 </p>
                 <p className="text-muted-foreground">
-                  <span className="text-foreground">Website:</span>{" "}
+                  <span className="font-medium text-muted-foreground">Website:</span>{" "}
                   {(supplierProfile?.website || item.supplierWebsite) ? (
                     <Button
                       variant="link"
-                      className="h-auto p-0 align-baseline font-semibold text-primary"
+                      className="h-auto p-0 align-baseline text-primary"
                       onClick={openSupplierWebsite}
                       title={supplierProfile?.website || item.supplierWebsite}
                     >
@@ -249,50 +249,50 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                   )}
                 </p>
                 {(supplierProfile?.website || item.supplierWebsite) ? (
-                  <p className="mt-1 break-all font-mono text-xs font-semibold text-foreground">
+                  <p className="mt-1 break-all font-mono text-xs text-foreground">
                     {supplierProfile?.website || item.supplierWebsite}
                   </p>
                 ) : null}
                 {supplierProfile?.contactName ? (
                   <p className="text-muted-foreground">
-                    <span className="text-foreground">Contact:</span>{' '}
-                    <span className="font-semibold text-foreground">{supplierProfile.contactName}</span>
+                    <span className="font-medium text-muted-foreground">Contact:</span>{' '}
+                    <span className="text-foreground">{supplierProfile.contactName}</span>
                   </p>
                 ) : null}
                 {supplierProfile?.contactEmail ? (
                   <p className="text-muted-foreground">
-                    <span className="text-foreground">Contact email:</span>{' '}
-                    <span className="font-semibold text-foreground">{supplierProfile.contactEmail}</span>
+                    <span className="font-medium text-muted-foreground">Contact email:</span>{' '}
+                    <span className="text-foreground">{supplierProfile.contactEmail}</span>
                   </p>
                 ) : null}
                 {supplierProfile?.contactPhone ? (
                   <p className="text-muted-foreground">
-                    <span className="text-foreground">Contact phone:</span>{' '}
-                    <span className="font-semibold text-foreground">{supplierProfile.contactPhone}</span>
+                    <span className="font-medium text-muted-foreground">Contact phone:</span>{' '}
+                    <span className="text-foreground">{supplierProfile.contactPhone}</span>
                   </p>
                 ) : null}
                 {supplierProfile?.supportEmail ? (
                   <p className="text-muted-foreground">
-                    <span className="text-foreground">Support email:</span>{' '}
-                    <span className="font-semibold text-foreground">{supplierProfile.supportEmail}</span>
+                    <span className="font-medium text-muted-foreground">Support email:</span>{' '}
+                    <span className="text-foreground">{supplierProfile.supportEmail}</span>
                   </p>
                 ) : null}
                 {supplierProfile?.supportPhone ? (
                   <p className="text-muted-foreground">
-                    <span className="text-foreground">Support phone:</span>{' '}
-                    <span className="font-semibold text-foreground">{supplierProfile.supportPhone}</span>
+                    <span className="font-medium text-muted-foreground">Support phone:</span>{' '}
+                    <span className="text-foreground">{supplierProfile.supportPhone}</span>
                   </p>
                 ) : null}
                 {supplierProfile?.accountReference ? (
                   <p className="text-muted-foreground">
-                    <span className="text-foreground">Account ref:</span>{' '}
-                    <span className="font-semibold text-foreground">{supplierProfile.accountReference}</span>
+                    <span className="font-medium text-muted-foreground">Account ref:</span>{' '}
+                    <span className="text-foreground">{supplierProfile.accountReference}</span>
                   </p>
                 ) : null}
                 {supplierProfile?.supplierNotes ? (
                   <p className="whitespace-pre-wrap text-muted-foreground">
-                    <span className="text-foreground">Vendor notes:</span>{' '}
-                    <span className="font-semibold text-foreground">{supplierProfile.supplierNotes}</span>
+                    <span className="font-medium text-muted-foreground">Vendor notes:</span>{' '}
+                    <span className="text-foreground">{supplierProfile.supplierNotes}</span>
                   </p>
                 ) : null}
               </div>

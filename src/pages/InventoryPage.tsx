@@ -131,24 +131,22 @@ const getUniqueValues = (items: InventoryItem[], field: keyof InventoryItem): st
 
 const SIMPLE_COLUMNS_DEFAULT = ['name', 'category', 'location', 'project', 'quantity', 'photoUrl', 'lastUpdated'];
 const DETAILED_COLUMNS_DEFAULT = [
-  'name',
-  'category',
-  'location',
-  'project',
-  'quantity',
-  'unit',
   'photoUrl',
   'recordId',
   'assetId',
+  'name',
+  'category',
+  'location',
   'rackLocation',
-  'lastUpdated',
+  'project',
+  'quantity',
+  'unit',
   'expenseTypeCode',
   'costCenterCode',
   'costPerUnit',
   'totalValue',
+  'lastUpdated',
 ];
-const DETAILED_FINANCIAL_COLUMNS = ['expenseTypeCode', 'costCenterCode', 'costPerUnit', 'totalValue'];
-const PINNED_PRIMARY_COLUMNS = ['name', 'category', 'location'];
 
 interface InventoryTablePreferencePayload {
   isDetailedView: boolean;
@@ -161,21 +159,11 @@ function getInventoryPreferenceKey(userKey: string): string {
   return `inventory-table-preferences:${userKey}`;
 }
 
-function normalizeColumnOrder(input: string[] | undefined, defaults: string[], enforceFinancialLast: boolean): string[] {
+function normalizeColumnOrder(input: string[] | undefined, defaults: string[]): string[] {
   const source = Array.isArray(input) ? input : defaults;
   const unique = Array.from(new Set(source)).filter((column) => defaults.includes(column));
   const missing = defaults.filter((column) => !unique.includes(column));
-  const merged = [...unique, ...missing];
-
-  const primaryColumns = PINNED_PRIMARY_COLUMNS.filter((column) => merged.includes(column));
-  const withoutPrimaryColumns = merged.filter((column) => !primaryColumns.includes(column));
-  if (!enforceFinancialLast) {
-    return [...primaryColumns, ...withoutPrimaryColumns];
-  }
-
-  const financialColumns = DETAILED_FINANCIAL_COLUMNS.filter((column) => withoutPrimaryColumns.includes(column));
-  const withoutFinancialColumns = withoutPrimaryColumns.filter((column) => !financialColumns.includes(column));
-  return [...primaryColumns, ...withoutFinancialColumns, ...financialColumns];
+  return [...unique, ...missing];
 }
 
 // Helper function to convert ItemWithSubcategories to CategoryNode
@@ -301,6 +289,7 @@ export default function InventoryPage() {
     simple: SIMPLE_COLUMNS_DEFAULT,
     detailed: DETAILED_COLUMNS_DEFAULT,
   });
+  const [draggingColumn, setDraggingColumn] = useState<string | null>(null);
   const resizeStateRef = React.useRef<{ column: string; startX: number; startWidth: number } | null>(null);
   const [invUndoAvail, setInvUndoAvail] = useState(false);
   const [invRedoAvail, setInvRedoAvail] = useState(false);
@@ -1052,8 +1041,8 @@ export default function InventoryPage() {
         setIsDetailedView(false);
         setColumnWidths({});
         setColumnOrderByView({
-          simple: normalizeColumnOrder(undefined, SIMPLE_COLUMNS_DEFAULT, false),
-          detailed: normalizeColumnOrder(undefined, DETAILED_COLUMNS_DEFAULT, true),
+          simple: normalizeColumnOrder(undefined, SIMPLE_COLUMNS_DEFAULT),
+          detailed: normalizeColumnOrder(undefined, DETAILED_COLUMNS_DEFAULT),
         });
         return;
       }
@@ -1066,15 +1055,15 @@ export default function InventoryPage() {
           : {}
       );
       setColumnOrderByView({
-        simple: normalizeColumnOrder(parsedPreference.simpleColumns, SIMPLE_COLUMNS_DEFAULT, false),
-        detailed: normalizeColumnOrder(parsedPreference.detailedColumns, DETAILED_COLUMNS_DEFAULT, true),
+        simple: normalizeColumnOrder(parsedPreference.simpleColumns, SIMPLE_COLUMNS_DEFAULT),
+        detailed: normalizeColumnOrder(parsedPreference.detailedColumns, DETAILED_COLUMNS_DEFAULT),
       });
     } catch {
       setIsDetailedView(false);
       setColumnWidths({});
       setColumnOrderByView({
-        simple: normalizeColumnOrder(undefined, SIMPLE_COLUMNS_DEFAULT, false),
-        detailed: normalizeColumnOrder(undefined, DETAILED_COLUMNS_DEFAULT, true),
+        simple: normalizeColumnOrder(undefined, SIMPLE_COLUMNS_DEFAULT),
+        detailed: normalizeColumnOrder(undefined, DETAILED_COLUMNS_DEFAULT),
       });
     }
   }, [inventoryPreferenceUserKey]);
@@ -1083,15 +1072,15 @@ export default function InventoryPage() {
     const preferencePayload: InventoryTablePreferencePayload = {
       isDetailedView,
       columnWidths,
-      simpleColumns: normalizeColumnOrder(columnOrderByView.simple, SIMPLE_COLUMNS_DEFAULT, false),
-      detailedColumns: normalizeColumnOrder(columnOrderByView.detailed, DETAILED_COLUMNS_DEFAULT, true),
+      simpleColumns: normalizeColumnOrder(columnOrderByView.simple, SIMPLE_COLUMNS_DEFAULT),
+      detailedColumns: normalizeColumnOrder(columnOrderByView.detailed, DETAILED_COLUMNS_DEFAULT),
     };
     localStorage.setItem(getInventoryPreferenceKey(inventoryPreferenceUserKey), JSON.stringify(preferencePayload));
   }, [inventoryPreferenceUserKey, isDetailedView, columnWidths, columnOrderByView]);
 
   const activeColumns = isDetailedView
-    ? normalizeColumnOrder(columnOrderByView.detailed, DETAILED_COLUMNS_DEFAULT, true)
-    : normalizeColumnOrder(columnOrderByView.simple, SIMPLE_COLUMNS_DEFAULT, false);
+    ? normalizeColumnOrder(columnOrderByView.detailed, DETAILED_COLUMNS_DEFAULT)
+    : normalizeColumnOrder(columnOrderByView.simple, SIMPLE_COLUMNS_DEFAULT);
 
   const handleColumnResizeStart = (event: React.MouseEvent, column: string) => {
     event.preventDefault();
@@ -1118,6 +1107,29 @@ export default function InventoryPage() {
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleColumnDrop = (targetColumn: string) => {
+    if (!draggingColumn || draggingColumn === targetColumn) {
+      setDraggingColumn(null);
+      return;
+    }
+    const viewKey: 'simple' | 'detailed' = isDetailedView ? 'detailed' : 'simple';
+    const defaults = isDetailedView ? DETAILED_COLUMNS_DEFAULT : SIMPLE_COLUMNS_DEFAULT;
+    setColumnOrderByView((previous) => {
+      const current = normalizeColumnOrder(previous[viewKey], defaults);
+      const fromIndex = current.indexOf(draggingColumn);
+      const toIndex = current.indexOf(targetColumn);
+      if (fromIndex < 0 || toIndex < 0) {
+        return previous;
+      }
+      const reordered = arrayMove(current, fromIndex, toIndex);
+      return {
+        ...previous,
+        [viewKey]: reordered,
+      };
+    });
+    setDraggingColumn(null);
   };
 
   const onItemsUpdated = () => {
@@ -1363,16 +1375,34 @@ export default function InventoryPage() {
                 >
                   {column === 'photoUrl' ? (
                     <div
-                      className="flex cursor-pointer items-center space-x-1 pr-3"
+                      className={cn(
+                        'flex cursor-pointer items-center space-x-1 pr-3',
+                        draggingColumn === column && 'opacity-60'
+                      )}
                       onClick={() => handleSort('photoUrl')}
+                      draggable
+                      onDragStart={() => setDraggingColumn(column)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => handleColumnDrop(column)}
+                      onDragEnd={() => setDraggingColumn(null)}
+                      title="Drag to reorder column"
                     >
                       <span>Photo</span>
                       <ArrowUpDown className="h-4 w-4" />
                     </div>
                   ) : (
                     <div
-                      className="flex cursor-pointer items-center space-x-1 pr-3"
+                      className={cn(
+                        'flex cursor-pointer items-center space-x-1 pr-3',
+                        draggingColumn === column && 'opacity-60'
+                      )}
                       onClick={() => handleSort(column as keyof InventoryItem)}
+                      draggable
+                      onDragStart={() => setDraggingColumn(column)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => handleColumnDrop(column)}
+                      onDragEnd={() => setDraggingColumn(null)}
+                      title="Drag to reorder column"
                     >
                       <span>
                         {column === 'recordId'

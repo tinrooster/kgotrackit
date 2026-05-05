@@ -41,6 +41,8 @@ export const defaultSettingsSchema = z.object({
   recordIdSequence: z.number().int().min(0).default(0),
   /** Prefix embedded in asset tags: `{prefix}_{YYMMDD}_{seq}` using in-service date. */
   assetIdPrefix: z.string().default('AST'),
+  /** Email target for admin configuration change notifications. */
+  adminNotificationEmail: z.string().email().optional().or(z.literal('')),
   /** Monotonic counter for asset tag sequence (shared across dates). */
   assetIdSequence: z.number().int().min(0).default(0),
   deleteConfirmationByUser: z.record(z.string(), z.boolean()).default({}),
@@ -107,6 +109,7 @@ export class SettingsService {
       recordIdPrefix: 'REC',
       recordIdSequence: 0,
       assetIdPrefix: 'AST',
+      adminNotificationEmail: '',
       assetIdSequence: 0,
       deleteConfirmationByUser: {},
       undoByUser: {},

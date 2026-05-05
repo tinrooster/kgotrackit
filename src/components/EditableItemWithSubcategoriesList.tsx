@@ -249,6 +249,7 @@ interface SortableItemProps {
   perItemWebsiteField?: boolean;
   perItemSupplierProfileFields?: boolean;
   locationRackExtension?: boolean;
+  canDeleteItems?: boolean;
 }
 
 const DEFAULT_CATEGORY_COLORS = [
@@ -276,6 +277,7 @@ function SortableItem({
   perItemWebsiteField = false,
   perItemSupplierProfileFields = false,
   locationRackExtension = false,
+  canDeleteItems = true,
   showColorPicker = false,
   enableSubcategories = true,
   colorPickerLabel = 'Category color',
@@ -407,8 +409,10 @@ function SortableItem({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onRequestDeleteParent(item.id)}
+            onClick={() => canDeleteItems && onRequestDeleteParent(item.id)}
             className="text-muted-foreground hover:text-foreground"
+            disabled={!canDeleteItems}
+            title={canDeleteItems ? 'Delete item' : 'Only admins can delete list entries'}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -675,8 +679,10 @@ function SortableItem({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onRequestDeleteSubcategory(item.id, child.name)}
+                      onClick={() => canDeleteItems && onRequestDeleteSubcategory(item.id, child.name)}
                       className="text-muted-foreground hover:text-foreground"
+                      disabled={!canDeleteItems}
+                      title={canDeleteItems ? 'Delete subcategory' : 'Only admins can delete list entries'}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -711,6 +717,8 @@ interface EditableItemWithSubcategoriesListProps {
   perItemSupplierProfileFields?: boolean;
   /** Location list: rack checkbox and named rack positions per parent or sub-location row. */
   locationRackExtension?: boolean;
+  /** When false, hide/disable delete actions but keep create/edit available. */
+  canDeleteItems?: boolean;
 }
 
 type DeleteTarget =
@@ -731,6 +739,7 @@ export function EditableItemWithSubcategoriesList({
   perItemWebsiteField = false,
   perItemSupplierProfileFields = false,
   locationRackExtension = false,
+  canDeleteItems = true,
 }: EditableItemWithSubcategoriesListProps) {
   const addInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
@@ -965,6 +974,7 @@ export function EditableItemWithSubcategoriesList({
                 enableSubcategories={enableSubcategories}
                 showColorPicker={showColorPicker}
                 colorPickerLabel={colorPickerLabel}
+                canDeleteItems={canDeleteItems}
               />
             ))}
           </div>
@@ -981,7 +991,7 @@ export function EditableItemWithSubcategoriesList({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={confirmDelete}>
+            <AlertDialogAction type="button" onClick={confirmDelete} disabled={!canDeleteItems}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
