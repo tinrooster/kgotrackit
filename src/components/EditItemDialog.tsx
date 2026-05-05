@@ -132,10 +132,6 @@ export function EditItemDialog({
           typeof values.decomCutoverDate === "string"
             ? values.decomCutoverDate.trim() || undefined
             : item.decomCutoverDate,
-        decomLastAuditAt:
-          typeof values.decomLastAuditAt === "string"
-            ? values.decomLastAuditAt.trim() || undefined
-            : item.decomLastAuditAt,
         decomNotes:
           typeof values.decomNotes === "string" ? values.decomNotes.trim() || undefined : item.decomNotes,
         cableColor:

@@ -64,7 +64,6 @@ const templateFormSchema = z
     cableLotNumber: z.string().optional(),
     decomEOLDate: z.string().optional(),
     decomCutoverDate: z.string().optional(),
-    decomLastAuditAt: z.string().optional(),
     decomNotes: z.string().optional(),
   })
   .superRefine((data, ctx) => {
@@ -162,7 +161,6 @@ export function TemplateForm({
       cableLotNumber: template?.cableLotNumber || "",
       decomEOLDate: template?.decomEOLDate || "",
       decomCutoverDate: template?.decomCutoverDate || "",
-      decomLastAuditAt: template?.decomLastAuditAt || "",
       decomNotes: template?.decomNotes || "",
     },
   });
@@ -245,7 +243,6 @@ export function TemplateForm({
       cableLotNumber: data.cableLotNumber?.trim() || undefined,
       decomEOLDate: data.decomEOLDate?.trim() || undefined,
       decomCutoverDate: data.decomCutoverDate?.trim() || undefined,
-      decomLastAuditAt: data.decomLastAuditAt?.trim() || undefined,
       decomNotes: data.decomNotes?.trim() || undefined,
       qrCode: template?.qrCode,
       customFields: template?.customFields,

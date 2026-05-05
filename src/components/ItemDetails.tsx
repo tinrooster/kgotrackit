@@ -179,7 +179,6 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
               ) : null}
               {(item.decomEOLDate ||
                 item.decomCutoverDate ||
-                item.decomLastAuditAt ||
                 item.decomNotes ||
                 item.assetStatus === "ready_decommission" ||
                 item.assetStatus === "slated_removal" ||
@@ -195,11 +194,6 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                   {item.decomCutoverDate ? (
                     <p className="text-muted-foreground">
                       <span className="font-medium text-foreground">Cut-over:</span> {item.decomCutoverDate}
-                    </p>
-                  ) : null}
-                  {item.decomLastAuditAt ? (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium text-foreground">Last audit:</span> {item.decomLastAuditAt}
                     </p>
                   ) : null}
                   {item.decomNotes ? (

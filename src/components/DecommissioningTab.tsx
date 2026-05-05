@@ -80,19 +80,6 @@ export function DecommissioningTab({ form }: DecommissioningTabProps) {
             <FormItem>
               <FormLabel>Cut-over scheduled</FormLabel>
               <FormControl>
-                <Input type="date" {...field} value={field.value || ''} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="decomLastAuditAt"
-          render={({ field }) => (
-            <FormItem className="md:col-span-2">
-              <FormLabel>Last lifecycle audit</FormLabel>
-              <FormControl>
                 <Input type="datetime-local" {...field} value={field.value || ''} />
               </FormControl>
               <FormMessage />

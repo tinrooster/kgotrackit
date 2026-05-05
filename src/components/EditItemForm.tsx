@@ -73,7 +73,6 @@ const formSchema = z.object({
   rackLocation: z.string().optional(),
   decomEOLDate: z.string().optional(),
   decomCutoverDate: z.string().optional(),
-  decomLastAuditAt: z.string().optional(),
   decomNotes: z.string().optional(),
   cableColor: z.string().optional(),
   fiberMode: z.enum(['sm', 'mm', 'na', 'mtp_mpo']).default('na'),
@@ -473,7 +472,6 @@ export function EditItemForm({
       rackLocation: item.rackLocation || '',
       decomEOLDate: item.decomEOLDate || '',
       decomCutoverDate: item.decomCutoverDate || '',
-      decomLastAuditAt: item.decomLastAuditAt || '',
       decomNotes: item.decomNotes || '',
       cableColor: item.cableColor || '',
       fiberMode:

@@ -26,8 +26,6 @@ export interface InventoryItem {
   decomEOLDate?: string;
   /** Scheduled cut-over date (YYYY-MM-DD). */
   decomCutoverDate?: string;
-  /** Last lifecycle / decommissioning audit timestamp (ISO). */
-  decomLastAuditAt?: string;
   /** Notes for audit, EOL, or cut-over planning. */
   decomNotes?: string;
   expenseCode?: string;

@@ -61,7 +61,6 @@ const USER_REPORT_COLUMN_OPTIONS = [
   'cableLotNumber',
   'decomEOLDate',
   'decomCutoverDate',
-  'decomLastAuditAt',
   'decomNotes',
 ];
 
@@ -80,7 +79,6 @@ const BUILT_IN_REPORTS: ReportDefinition[] = [
       'rackLocation',
       'decomEOLDate',
       'decomCutoverDate',
-      'decomLastAuditAt',
       'decomNotes',
       'project',
     ],

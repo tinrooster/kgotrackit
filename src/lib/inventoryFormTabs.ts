@@ -48,7 +48,6 @@ const FIELD_TO_TAB: Record<string, InventoryFormTabId> = {
   photoUrl: "additional",
   decomEOLDate: "decommissioning",
   decomCutoverDate: "decommissioning",
-  decomLastAuditAt: "decommissioning",
   decomNotes: "decommissioning",
   cableColor: "additional",
   fiberMode: "additional",

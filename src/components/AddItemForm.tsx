@@ -64,7 +64,6 @@ const formSchema = z.object({
   rackLocation: z.string().optional(),
   decomEOLDate: z.string().optional(),
   decomCutoverDate: z.string().optional(),
-  decomLastAuditAt: z.string().optional(),
   decomNotes: z.string().optional(),
   cableColor: z.string().optional(),
   fiberMode: z.enum(['sm', 'mm', 'na', 'mtp_mpo']).default('na'),
@@ -170,7 +169,6 @@ export function AddItemForm({
       rackLocation: initialValues?.rackLocation || "",
       decomEOLDate: initialValues?.decomEOLDate || "",
       decomCutoverDate: initialValues?.decomCutoverDate || "",
-      decomLastAuditAt: initialValues?.decomLastAuditAt || "",
       decomNotes: initialValues?.decomNotes || "",
       cableColor: initialValues?.cableColor || "",
       fiberMode:
@@ -218,7 +216,6 @@ export function AddItemForm({
         rackLocation: values.rackLocation?.trim() || undefined,
         decomEOLDate: values.decomEOLDate?.trim() || undefined,
         decomCutoverDate: values.decomCutoverDate?.trim() || undefined,
-        decomLastAuditAt: values.decomLastAuditAt?.trim() || undefined,
         decomNotes: values.decomNotes?.trim() || undefined,
         cableColor: values.cableColor?.trim() || undefined,
         fiberMode: values.fiberMode !== 'na' ? values.fiberMode : undefined,

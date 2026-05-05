@@ -24,7 +24,30 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
   return (
     <div className="mx-auto w-full max-w-[56rem] space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Unit fields with subcategories */}
+        {/* Quantity on left, unit on right */}
+        <FormField
+          control={form.control}
+          name="quantity"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                Quantity
+                <ReqAsterisk />
+              </FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1"
+                  {...field}
+                  onChange={(e) => field.onChange(Number(e.target.value))}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="unit"
@@ -63,6 +86,7 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
           )}
         />
 
+        {/* Unit subcategory and minimum quantity */}
         {unitSubcategories.length > 0 && (
           <FormField
             control={form.control}
@@ -92,30 +116,6 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
             )}
           />
         )}
-
-        {/* Quantity fields */}
-        <FormField
-          control={form.control}
-          name="quantity"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Quantity
-                <ReqAsterisk />
-              </FormLabel>
-              <FormControl>
-                <Input 
-                  type="number" 
-                  min="0"
-                  step="1"
-                  {...field}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <FormField
           control={form.control}

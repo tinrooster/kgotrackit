@@ -1175,16 +1175,16 @@ export default function InventoryPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
             <h1 className="shrink-0 text-2xl font-bold">Inventory</h1>
-            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <Input
                 type="text"
                 placeholder="Search inventory..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 min-w-[10rem] max-w-md shrink-0 flex-1 basis-[min(100%,18rem)]"
+                className="h-9 w-full"
               />
               <Select value={selectedCategory || 'all'} onValueChange={(value) => handleFilterChange('category', value)}>
-                <SelectTrigger className="h-9 w-[11.5rem] shrink-0">
+                <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
@@ -1197,7 +1197,7 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
               <Select value={selectedLocation || "all"} onValueChange={(value) => handleFilterChange('location', value === "all" ? "" : value)}>
-                <SelectTrigger className="h-9 w-[11.5rem] shrink-0">
+                <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder="All Locations" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
@@ -1220,7 +1220,7 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
               <Select value={selectedProject || "all"} onValueChange={(value) => handleFilterChange('project', value === "all" ? "" : value)}>
-                <SelectTrigger className="h-9 w-[11.5rem] shrink-0">
+                <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
                 <SelectContent className="min-w-[200px]">
@@ -1232,31 +1232,30 @@ export default function InventoryPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        handleFilterChange('category', 'all');
-                        handleFilterChange('location', 'all');
-                        handleFilterChange('project', 'all');
-                      }}
-                      className="ml-1"
-                      disabled={!selectedCategory && !selectedLocation && !selectedProject}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {selectedCategory || selectedLocation || selectedProject 
-                      ? "Clear all filters" 
-                      : "No active filters"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      handleFilterChange('category', 'all');
+                      handleFilterChange('location', 'all');
+                      handleFilterChange('project', 'all');
+                    }}
+                    disabled={!selectedCategory && !selectedLocation && !selectedProject}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {selectedCategory || selectedLocation || selectedProject 
+                    ? "Clear all filters" 
+                    : "No active filters"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div className="flex items-center gap-2 sm:mr-2">
