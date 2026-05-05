@@ -6,6 +6,7 @@ import { logger as durableLogger } from '../lib/logging';
 import { isSupabaseConfigured, getSupabase } from '@/lib/supabase/client';
 import { bootstrapCloudData, mapSupabaseUserToAppUser } from '@/lib/supabase/cloudData';
 import type { AuthBackend } from '@/lib/supabase/cloudData';
+import { setActiveWorkspaceId } from '@/lib/supabase/workspaceData';
 
 export interface User {
   id: string;
@@ -345,6 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(null);
     bootstrappedUserIdRef.current = null;
     await store.delete('rememberedUser');
+    setActiveWorkspaceId(null);
     if (isSupabaseConfigured()) {
       const client = getSupabase();
       await client?.auth.signOut();

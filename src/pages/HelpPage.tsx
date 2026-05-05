@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import {
@@ -17,6 +18,54 @@ const navLinkClass =
   'block rounded-md px-2 py-1.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted/40 hover:underline';
 
 export default function HelpPage() {
+  const sectionItems = useMemo(
+    () => [
+      { id: 'lookup-lists', label: 'Lookup lists' },
+      { id: 'settings-saving', label: 'Settings & saving' },
+      { id: 'team-workspace', label: 'Team workspace data' },
+      { id: 'financial-codes', label: 'Financial codes' },
+      { id: 'reconciliation', label: 'Reconciliation' },
+      { id: 'overview', label: 'Overview' },
+      { id: 'inventory', label: 'Inventory' },
+      { id: 'quick-add', label: 'Quick add' },
+      { id: 'reports', label: 'Reports' },
+      { id: 'logging', label: 'Logging' },
+      { id: 'backup', label: 'Backup & restore' },
+    ],
+    [],
+  );
+  const [activeSectionId, setActiveSectionId] = useState(sectionItems[0].id);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio);
+        if (visible.length === 0) return;
+        setActiveSectionId(visible[0].target.id);
+      },
+      {
+        root: null,
+        threshold: [0.2, 0.4, 0.6],
+        rootMargin: '-15% 0px -55% 0px',
+      },
+    );
+
+    sectionItems.forEach((section) => {
+      const node = document.getElementById(section.id);
+      if (node) observer.observe(node);
+    });
+
+    return () => observer.disconnect();
+  }, [sectionItems]);
+
+  const sectionClass = (sectionId: string) =>
+    cn(
+      'scroll-mt-24 rounded-md border border-transparent p-3 transition-colors',
+      activeSectionId === sectionId ? 'border-border/70 bg-muted/35' : 'bg-transparent',
+    );
+
   return (
     <div className="container max-w-5xl py-8 space-y-6">
       <div className="flex items-center gap-4">
@@ -42,22 +91,25 @@ export default function HelpPage() {
               <CardTitle className="text-base">In this page</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1 pt-0 text-sm">
-              <a className={navLinkClass} href="#lookup-lists">Lookup lists</a>
-              <a className={navLinkClass} href="#settings-saving">Settings & saving</a>
-              <a className={navLinkClass} href="#financial-codes">Financial codes</a>
-              <a className={navLinkClass} href="#reconciliation">Reconciliation</a>
-              <a className={navLinkClass} href="#overview">Overview</a>
-              <a className={navLinkClass} href="#inventory">Inventory</a>
-              <a className={navLinkClass} href="#quick-add">Quick add</a>
-              <a className={navLinkClass} href="#reports">Reports</a>
-              <a className={navLinkClass} href="#logging">Logging</a>
-              <a className={navLinkClass} href="#backup">Backup & restore</a>
+              {sectionItems.map((section) => (
+                <a
+                  key={section.id}
+                  className={cn(
+                    navLinkClass,
+                    activeSectionId === section.id && 'bg-muted text-foreground no-underline',
+                  )}
+                  href={`#${section.id}`}
+                  onClick={() => setActiveSectionId(section.id)}
+                >
+                  {section.label}
+                </a>
+              ))}
             </CardContent>
           </Card>
         </aside>
 
         <main className="space-y-6">
-      <section id="lookup-lists" className={cn('scroll-mt-24 space-y-3')}>
+      <section id="lookup-lists" className={cn(sectionClass('lookup-lists'), 'space-y-3')}>
         <h2 className="text-lg font-semibold text-foreground">Lookup lists</h2>
         <p className="text-sm text-muted-foreground">
           Values used in inventory fields (categories, units, locations, suppliers, projects, and more) are edited under
@@ -66,7 +118,7 @@ export default function HelpPage() {
         </p>
       </section>
 
-      <section id="settings-saving" className="scroll-mt-24 space-y-3">
+      <section id="settings-saving" className={cn(sectionClass('settings-saving'), 'space-y-3')}>
         <h2 className="text-lg font-semibold text-foreground">Settings & saving</h2>
         <p className="text-sm text-muted-foreground">
           Edits to lookup lists and General preferences usually save as you make them. You can download a portable settings snapshot
@@ -74,7 +126,19 @@ export default function HelpPage() {
         </p>
       </section>
 
-      <section id="financial-codes" className="scroll-mt-24 space-y-3">
+      <section id="team-workspace" className={cn(sectionClass('team-workspace'), 'space-y-3')}>
+        <h2 className="text-lg font-semibold text-foreground">Team workspace data</h2>
+        <p className="text-sm text-muted-foreground">
+          Personal mode stores data in your user row. Team mode uses a shared workspace row, and access is controlled by
+          workspace membership roles (admin, editor, viewer).
+        </p>
+        <p className="text-sm text-muted-foreground">
+          If team switching fails, refresh the workspace list in Settings → Data Management and verify your membership in
+          that workspace.
+        </p>
+      </section>
+
+      <section id="financial-codes" className={cn(sectionClass('financial-codes'), 'space-y-3')}>
         <h2 className="text-lg font-semibold text-foreground">Financial codes (expense types &amp; cost centers)</h2>
         <p className="text-sm text-muted-foreground">
           Code and description are stored separately. Use the Expense Codes area under Lookup Lists to maintain expense
@@ -82,7 +146,7 @@ export default function HelpPage() {
         </p>
       </section>
 
-      <section id="reconciliation" className="scroll-mt-24 space-y-3">
+      <section id="reconciliation" className={cn(sectionClass('reconciliation'), 'space-y-3')}>
         <h2 className="text-lg font-semibold text-foreground">Reconciliation</h2>
         <p className="text-sm text-muted-foreground">
           If inventory rows still reference lookup values that no longer exist (for example after list cleanup), use{' '}
@@ -92,7 +156,7 @@ export default function HelpPage() {
         </p>
       </section>
 
-      <Card id="overview" className="scroll-mt-24">
+      <Card id="overview" className={sectionClass('overview')}>
         <CardHeader>
           <CardTitle className="text-lg">Quick navigation</CardTitle>
         </CardHeader>
@@ -126,7 +190,7 @@ export default function HelpPage() {
         </CardContent>
       </Card>
 
-      <Card id="inventory" className="scroll-mt-24">
+      <Card id="inventory" className={sectionClass('inventory')}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <ListChecks className="h-5 w-5" />
@@ -147,7 +211,7 @@ export default function HelpPage() {
         </CardContent>
       </Card>
 
-      <Card id="quick-add" className="scroll-mt-24">
+      <Card id="quick-add" className={sectionClass('quick-add')}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Zap className="h-5 w-5" />
@@ -191,7 +255,7 @@ export default function HelpPage() {
         </CardContent>
       </Card>
 
-      <Card id="reports" className="scroll-mt-24">
+      <Card id="reports" className={sectionClass('reports')}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <FileSpreadsheet className="h-5 w-5" />
@@ -205,7 +269,7 @@ export default function HelpPage() {
         </CardContent>
       </Card>
 
-      <Card id="logging" className="scroll-mt-24">
+      <Card id="logging" className={sectionClass('logging')}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <ShieldCheck className="h-5 w-5" />
@@ -220,7 +284,7 @@ export default function HelpPage() {
         </CardContent>
       </Card>
 
-      <Card id="backup" className="scroll-mt-24">
+      <Card id="backup" className={sectionClass('backup')}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Database className="h-5 w-5" />

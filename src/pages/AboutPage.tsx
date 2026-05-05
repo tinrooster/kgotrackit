@@ -10,6 +10,8 @@ type Street = 'idle' | 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
 const SUITS: Suit[] = ['S', 'H', 'D', 'C'];
 const RANK_LABELS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const SUIT_SYMBOL: Record<Suit, string> = { S: '♠', H: '♥', D: '♦', C: '♣' };
+const APP_VERSION = '0.0.0';
+const APP_REVISION = 'rev-2026.05.05.1';
 
 const buildDeck = (): Card[] => {
   const deck: Card[] = [];
@@ -375,7 +377,11 @@ export default function AboutPage() {
           About TEd_trackIT
         </h1>
         <p className="text-muted-foreground">
-          Production-focused inventory and asset tracking for broadcast, engineering, and remote operations.
+          Inventory and asset operations for production teams, with personal/team workspaces, role-aware settings, and
+          operational reporting.
+        </p>
+        <p className="text-xs text-muted-foreground/70">
+          Version {APP_VERSION} · {APP_REVISION}
         </p>
       </div>
 
@@ -385,9 +391,9 @@ export default function AboutPage() {
           <CardDescription>Purpose, scope, and operating focus.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>TEd_trackIT is built to track technical assets, consumables, and storage movement in production and engineering environments.</p>
-          <p>Core workflows include inventory maintenance, secure cabinet check-in/out, reporting, user-defined taxonomy management, and durable auditing.</p>
-          <p>The application supports both operational day-to-day usage and periodic review tasks such as budget allocation and lifecycle planning.</p>
+          <p>TEd_trackIT tracks technical inventory, consumables, and movement across production, engineering, and field operations.</p>
+          <p>Current core workflows include inventory + templates, secure cabinet check-in/out, workspace-aware settings, device profile reuse, reports, and durable logs.</p>
+          <p>The app is tuned for both daily transactions and periodic planning tasks such as cost review, reconciliation, and decommissioning windows.</p>
         </CardContent>
       </Card>
 
@@ -398,13 +404,41 @@ export default function AboutPage() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>Desktop runtime: Electron with renderer powered by Vite/React/TypeScript.</p>
-          <p>Theme support: dark mode and compact UI available through General Settings.</p>
-          <p>Persistence: local storage and Electron store with synchronization fallbacks.</p>
+          <p>Data modes: personal and team workspace context with role-aware editing behavior.</p>
+          <p>Theme support: softened light/dark palettes and compact UI controls in General Settings.</p>
+          <p>Persistence: local storage + Electron store, with Supabase cloud sync when enabled.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Poker helper (novice mode)</CardTitle>
+          <CardDescription>Short practical guidance while playing stronger opponents.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p><strong>1) Preflop baseline:</strong> fold weak offsuit hands, play pairs/strong broadways, and avoid calling big raises out of position.</p>
+          <p><strong>2) Pot control:</strong> when unsure, check/call small and avoid large river hero calls with one pair.</p>
+          <p><strong>3) Value first:</strong> if you think you are ahead, bet for value; do not slow-play by default.</p>
+          <p><strong>4) Bluff less, choose spots:</strong> bluff more often on scare cards where your line can represent strong hands.</p>
+          <p><strong>5) Simple table rule:</strong> if to-call is large and your hand is marginal, fold and wait for a clearer edge.</p>
+          <p><strong>6) Session habit:</strong> note one mistake and one good fold each hand block to improve quickly.</p>
         </CardContent>
       </Card>
 
       {microTableOpen && (
         <div className="space-y-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Micro-table trainer controls</CardTitle>
+                  <CardDescription>How to use the demo hand-by-hand.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p><strong>Deal Hand</strong> starts a new hand and posts blinds.</p>
+                  <p><strong>Check/Call/Raise/Fold</strong> records your action on the current street.</p>
+                  <p><strong>Next Street</strong> unlocks after an action so you can advance flow correctly.</p>
+                  <p><strong>Hand History</strong> chips show the sequence so you can review decisions after each hand.</p>
+                </CardContent>
+              </Card>
               <div className="relative overflow-hidden rounded-xl border border-emerald-900/60 bg-[radial-gradient(circle_at_top,_#14532d,_#052e16_55%,_#03160c)] p-4 space-y-3 text-sm shadow-lg">
                 <div className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_0%,_rgba(16,185,129,0.5),_transparent_45%)]" />
                 <div className="relative">

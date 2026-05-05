@@ -21,7 +21,7 @@ export function UserMenu() {
   const handleLogout = async () => {
     try {
       await logout()
-      navigate('/login')
+      window.location.href = '/login'
     } catch (error) {
       console.error('Failed to logout:', error)
     }

@@ -62,6 +62,7 @@ import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 import { FormatCellValue } from '@/components/formatting/CellValue';
 import * as React from 'react';
+import { arrayMove } from '@dnd-kit/sortable';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import { FinancialCodeEntry, getFinancialSettings } from '@/lib/financialSettingsService';
@@ -146,6 +147,7 @@ const DETAILED_COLUMNS_DEFAULT = [
   'costPerUnit',
   'totalValue',
   'lastUpdated',
+  'lastModifiedBy',
 ];
 
 interface InventoryTablePreferencePayload {
@@ -163,7 +165,11 @@ function normalizeColumnOrder(input: string[] | undefined, defaults: string[]): 
   const source = Array.isArray(input) ? input : defaults;
   const unique = Array.from(new Set(source)).filter((column) => defaults.includes(column));
   const missing = defaults.filter((column) => !unique.includes(column));
-  return [...unique, ...missing];
+  const normalized = [...unique, ...missing];
+  if (normalized.includes('lastModifiedBy')) {
+    return [...normalized.filter((column) => column !== 'lastModifiedBy'), 'lastModifiedBy'];
+  }
+  return normalized;
 }
 
 // Helper function to convert ItemWithSubcategories to CategoryNode

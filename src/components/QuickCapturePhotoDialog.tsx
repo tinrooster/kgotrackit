@@ -79,7 +79,6 @@ export function QuickCapturePhotoDialog({
         console.error(err);
         if (!cancelled) {
           setError("No usable camera or permission denied.");
-          toast.error("Could not open camera. Use “Choose image” to pick a file.");
         }
       }
     };

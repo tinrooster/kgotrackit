@@ -39,8 +39,15 @@ export function InventorySupplyTab({ form, units, suppliers }: InventorySupplyTa
                   type="number"
                   min="0"
                   step="1"
-                  {...field}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
+                  value={field.value ?? 0}
+                  onFocus={(event) => {
+                    // Prevent leading-zero editing (0 + typed digits -> 015) by replacing current value.
+                    event.currentTarget.select();
+                  }}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    field.onChange(raw === '' ? 0 : Number(raw));
+                  }}
                 />
               </FormControl>
               <FormMessage />

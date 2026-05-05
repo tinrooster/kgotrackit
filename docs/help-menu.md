@@ -48,6 +48,12 @@ The in-app Help page provides operational guidance for end users and administrat
 - Backup timing recommendations
 - Operational rollback hygiene
 
+### Team Workspace Data Model
+
+- Personal mode reads/writes the per-user cloud row
+- Team mode reads/writes shared workspace data based on membership role
+- If switching context fails, refresh workspace membership/context in Settings → Data Management
+
 ## Maintenance Guidance
 
 - Keep Help content aligned with actual UI labels and menu structure.

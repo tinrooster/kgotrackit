@@ -17,8 +17,9 @@ export function DeviceLibraryTab() {
           Device library
         </CardTitle>
         <CardDescription>
-          Cable rows can carry default unit, jacket color, and a restock increment; media converters can record a
-          signal path (e.g. SDI to HDMI). Included in full backups when the file contains a deviceLibrary block.
+          Define reusable device profiles (for example, a specific model under a template category) so item and
+          template forms can fill known details faster. Included in full backups when the file contains a
+          deviceLibrary block.
         </CardDescription>
       </CardHeader>
       <CardContent>

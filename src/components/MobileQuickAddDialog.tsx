@@ -32,7 +32,6 @@ import {
   Sparkles,
   Tag,
   Trash2,
-  Type,
   Warehouse,
   X,
   Zap,
@@ -242,11 +241,7 @@ export function MobileQuickAddDialog({
   const [listening, setListening] = React.useState(false);
   const recognitionRef = React.useRef<SpeechRecognition | null>(null);
   const [usageTick, setUsageTick] = React.useState(0);
-  const [allLocOpen, setAllLocOpen] = React.useState(false);
-  const [allCatOpen, setAllCatOpen] = React.useState(false);
-  const [allUnitOpen, setAllUnitOpen] = React.useState(false);
-  const [allProjOpen, setAllProjOpen] = React.useState(false);
-  const [detailsOpen, setDetailsOpen] = React.useState(false);
+  const [openSection, setOpenSection] = React.useState<"details" | "location" | "category" | "unit" | "project" | null>(null);
   const [locFilter, setLocFilter] = React.useState("");
   const [catFilter, setCatFilter] = React.useState("");
   const [unitFilter, setUnitFilter] = React.useState("");
@@ -296,7 +291,7 @@ export function MobileQuickAddDialog({
   };
 
   const goToRack = React.useCallback(() => {
-    setAllLocOpen(true);
+    setOpenSection("location");
     flashJump("location");
     requestAnimationFrame(() => {
       sectionAllLocRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -422,6 +417,13 @@ export function MobileQuickAddDialog({
     }
     return unit;
   }, [unit, unitSubcategory, units]);
+  const detailsIndicator = React.useMemo(() => {
+    const tags: string[] = [`Qty ${quantity}`];
+    if (rackLocation) tags.push("Rack");
+    if (barcode) tags.push("Barcode");
+    if (photoUrl) tags.push("Photo");
+    return tags.join(" · ");
+  }, [quantity, rackLocation, barcode, photoUrl]);
 
   const filteredLocationsForPicker = React.useMemo(() => {
     const q = locFilter.trim().toLowerCase();
@@ -533,11 +535,17 @@ export function MobileQuickAddDialog({
     setCatFilter("");
     setUnitFilter("");
     setProjFilter("");
-    setAllLocOpen(!loc);
-    setAllCatOpen(!cat);
-    setAllUnitOpen(!u);
-    setAllProjOpen(!proj);
-    setDetailsOpen(false);
+    if (!loc) {
+      setOpenSection("location");
+    } else if (!cat) {
+      setOpenSection("category");
+    } else if (!u) {
+      setOpenSection("unit");
+    } else if (!proj) {
+      setOpenSection("project");
+    } else {
+      setOpenSection(null);
+    }
   }, [categories, locations, projects, defaultUnitName, units, applyLocationId]);
 
   React.useEffect(() => {
@@ -828,6 +836,11 @@ export function MobileQuickAddDialog({
   };
 
   const lastSnapshot = loadLast();
+  const detailsOpen = openSection === "details";
+  const allLocOpen = openSection === "location";
+  const allCatOpen = openSection === "category";
+  const allUnitOpen = openSection === "unit";
+  const allProjOpen = openSection === "project";
 
   return (
     <>
@@ -876,7 +889,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
-                  setAllLocOpen(true);
+                  setOpenSection("location");
                   jumpTo("location", sectionAllLocRef);
                 }}
               >
@@ -887,7 +900,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
-                  setAllCatOpen(true);
+                  setOpenSection("category");
                   jumpTo("category", sectionAllCatRef);
                 }}
               >
@@ -898,7 +911,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
-                  setAllUnitOpen(true);
+                  setOpenSection("unit");
                   jumpTo("unit", sectionUnitRef);
                 }}
               >
@@ -909,7 +922,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 className="flex min-h-9 min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2 py-1.5 text-left font-medium shadow-sm hover:bg-accent"
                 onClick={() => {
-                  setAllProjOpen(true);
+                  setOpenSection("project");
                   jumpTo("project", sectionProjectRef);
                 }}
               >
@@ -955,7 +968,7 @@ export function MobileQuickAddDialog({
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
                 onClick={() => {
-                  setDetailsOpen(true);
+                  setOpenSection("details");
                   jumpTo("details", sectionMetaRef);
                 }}
               >
@@ -967,7 +980,7 @@ export function MobileQuickAddDialog({
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
                 onClick={() => {
-                  setAllLocOpen(true);
+                  setOpenSection("location");
                   jumpTo("location", sectionAllLocRef);
                 }}
               >
@@ -979,7 +992,7 @@ export function MobileQuickAddDialog({
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
                 onClick={() => {
-                  setAllCatOpen(true);
+                  setOpenSection("category");
                   jumpTo("category", sectionAllCatRef);
                 }}
               >
@@ -991,7 +1004,7 @@ export function MobileQuickAddDialog({
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
                 onClick={() => {
-                  setAllUnitOpen(true);
+                  setOpenSection("unit");
                   jumpTo("unit", sectionUnitRef);
                 }}
               >
@@ -1003,7 +1016,7 @@ export function MobileQuickAddDialog({
                 size="sm"
                 className="h-7 touch-manipulation px-2 text-[11px]"
                 onClick={() => {
-                  setAllProjOpen(true);
+                  setOpenSection("project");
                   jumpTo("project", sectionProjectRef);
                 }}
               >
@@ -1015,29 +1028,10 @@ export function MobileQuickAddDialog({
           <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 [-webkit-overflow-scrolling:touch] sm:px-6">
             <div className="space-y-3 py-3 pr-0 pb-6 sm:space-y-4 sm:py-4">
               <div ref={sectionNameRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "name")}>
-                <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
-                  <Type className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="text-xs font-semibold text-foreground">Name</span>
-                </div>
                 <div className="p-3">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <Label htmlFor="quick-name" className="sr-only">
                     Item name
                   </Label>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {lastSnapshot?.name ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] text-muted-foreground"
-                        onClick={applyLastName}
-                      >
-                        Last name
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
                 <div className="flex gap-1.5">
                   <Input
                     id="quick-name"
@@ -1060,6 +1054,19 @@ export function MobileQuickAddDialog({
                   >
                     <Mic className="h-4 w-4" />
                   </Button>
+                  {lastSnapshot?.name ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 shrink-0 touch-manipulation"
+                      onClick={applyLastName}
+                      title="Use last item name"
+                      aria-label="Use last item name"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                 </div>
                 {listening ? (
                   <p className="mt-1 text-[10px] leading-tight text-muted-foreground">Listening…</p>
@@ -1083,12 +1090,13 @@ export function MobileQuickAddDialog({
                     <Button
                       type="button"
                       variant="secondary"
-                      size="sm"
-                      className="h-8 shrink-0 touch-manipulation px-2.5 text-xs"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 touch-manipulation"
                       onClick={applySameAsLast}
-                      aria-label="Apply last selections"
+                      aria-label="Apply same as last selections"
+                      title="Apply same as last"
                     >
-                      Apply
+                      <Copy className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ) : null}
@@ -1164,12 +1172,13 @@ export function MobileQuickAddDialog({
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setDetailsOpen((o) => !o)}
+                  onClick={() => setOpenSection((o) => (o === "details" ? null : "details"))}
                   aria-expanded={detailsOpen}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <LayoutList className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <span className="text-xs font-semibold">Details</span>
+                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">{detailsIndicator}</span>
                   </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", detailsOpen && "rotate-180")}
@@ -1351,11 +1360,7 @@ export function MobileQuickAddDialog({
                   </div>
                 ) : (
                   <p className="border-t border-border/40 px-2.5 pb-2 text-[10px] text-muted-foreground">
-                    {`Qty ${quantity}`}
-                    {rackLocation ? " · Rack" : ""}
-                    {barcode ? " · Barcode" : ""}
-                    {photoUrl ? " · Photo" : ""}
-                    {" — tap header to expand."}
+                    {detailsIndicator} — tap header to expand.
                   </p>
                 )}
               </div>
@@ -1364,12 +1369,15 @@ export function MobileQuickAddDialog({
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setAllLocOpen((o) => !o)}
+                  onClick={() => setOpenSection((o) => (o === "location" ? null : "location"))}
                   aria-expanded={allLocOpen}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <span className="text-xs font-semibold">All locations</span>
+                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">
+                      {locationStripLabel || "Not set"}
+                    </span>
                   </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allLocOpen && "rotate-180")}
@@ -1473,12 +1481,15 @@ export function MobileQuickAddDialog({
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setAllCatOpen((o) => !o)}
+                  onClick={() => setOpenSection((o) => (o === "category" ? null : "category"))}
                   aria-expanded={allCatOpen}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <Tag className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <span className="text-xs font-semibold">All categories</span>
+                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">
+                      {category || "Not set"}
+                    </span>
                   </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allCatOpen && "rotate-180")}
@@ -1522,12 +1533,15 @@ export function MobileQuickAddDialog({
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setAllUnitOpen((o) => !o)}
+                  onClick={() => setOpenSection((o) => (o === "unit" ? null : "unit"))}
                   aria-expanded={allUnitOpen}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <Layers className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <span className="text-xs font-semibold">Unit</span>
+                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">
+                      {unitStripLabel || "Not set"}
+                    </span>
                   </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allUnitOpen && "rotate-180")}
@@ -1604,12 +1618,15 @@ export function MobileQuickAddDialog({
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setAllProjOpen((o) => !o)}
+                  onClick={() => setOpenSection((o) => (o === "project" ? null : "project"))}
                   aria-expanded={allProjOpen}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <Briefcase className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <span className="text-xs font-semibold">Project</span>
+                    <span className="truncate text-[10px] font-normal text-muted-foreground/80">
+                      {projectStripLabel || "None"}
+                    </span>
                   </span>
                   <ChevronDown
                     className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allProjOpen && "rotate-180")}

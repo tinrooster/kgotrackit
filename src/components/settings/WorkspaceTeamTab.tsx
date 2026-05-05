@@ -106,10 +106,7 @@ export function WorkspaceTeamTab() {
           Team workspace
         </CardTitle>
         <CardDescription>
-          Personal data lives in your <code className="rounded bg-muted px-1 text-xs">user_app_data</code> row. A team workspace uses a
-          shared <code className="rounded bg-muted px-1 text-xs">workspace_app_data</code> row; members need rows in{' '}
-          <code className="rounded bg-muted px-1 text-xs">workspace_members</code> (admins can add editors/viewers in the Supabase SQL
-          editor — see docs).
+          Create a shared workspace, switch between personal and team context, and refresh the available team list.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

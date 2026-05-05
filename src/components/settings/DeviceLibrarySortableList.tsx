@@ -45,10 +45,10 @@ import { getDeviceLibrary, newDeviceLibraryDraft, saveDeviceLibrary } from '@/li
 import { entryLabel } from '@/lib/deviceLibraryFormApply';
 
 const KIND_COMBO_OPTIONS: { value: string; label: string }[] = [
-  { value: 'generic', label: 'Generic part' },
-  { value: 'cable', label: 'Cable / bulk wire' },
-  { value: 'media_converter', label: 'Media converter' },
-  { value: 'display', label: 'Display / TV' },
+  { value: 'generic', label: 'General device' },
+  { value: 'cable', label: 'Cable / wire profile' },
+  { value: 'media_converter', label: 'Converter profile' },
+  { value: 'display', label: 'Display profile' },
 ];
 
 const KIND_LABELS: Record<string, string> = {
@@ -206,7 +206,7 @@ export function DeviceLibrarySortableList({ entries, onEntriesChange }: DeviceLi
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          Drag the handle to reorder. Order is saved and used in pick lists.
+          Drag to reorder. Order is saved and used in device pick lists.
         </p>
         <Button type="button" size="sm" className="shrink-0 gap-1" onClick={openCreate}>
           <Plus className="h-4 w-4" />
@@ -252,7 +252,7 @@ export function DeviceLibrarySortableList({ entries, onEntriesChange }: DeviceLi
                 allowCustomValue
               />
               <p className="text-xs text-muted-foreground">
-                Presets unlock cable jacket color and converter signal-path fields when kind matches exactly.
+                Kind is optional but helps keep profiles organized in picker results.
               </p>
             </div>
             <div className="space-y-2">
