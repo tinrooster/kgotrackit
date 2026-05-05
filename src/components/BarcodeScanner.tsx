@@ -60,7 +60,13 @@ export function BarcodeScanner({
           <div className="bg-background rounded-lg shadow-lg max-w-md w-full p-4 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Scan Barcode</h3>
-              <Button variant="ghost" size="icon" onClick={stopScanning}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={stopScanning}
+                title="Close scanner"
+                aria-label="Close scanner"
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>

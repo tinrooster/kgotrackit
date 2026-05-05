@@ -110,11 +110,16 @@ export function QRCodeManager({
             </div>
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline" size="icon">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  title="Show cabinet QR code"
+                  aria-label="Show cabinet QR code"
+                >
                   <QrCode className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle>Cabinet QR Code</DialogTitle>
                   <DialogDescription>Print or download QR code for {cabinetName}</DialogDescription>

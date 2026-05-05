@@ -54,6 +54,7 @@ import {
   panelSupportsListReconcile,
 } from '@/lib/listReconcileFixes'
 import { parseDeviceLibraryFromBackup, saveDeviceLibrary } from '@/lib/deviceLibraryStorage'
+import { sendAdminSettingsNotification } from '@/lib/supabase/adminNotifications'
 
 interface SettingsState {
   categories: ItemWithSubcategories[];
@@ -480,6 +481,27 @@ export default function SettingsPage() {
             },
             'SettingsPage'
           );
+          void sendAdminSettingsNotification({
+            notifyEmail: defaultSettings.adminNotificationEmail,
+            changeType: 'lookup-list-update',
+            listKey: key,
+            addedCount: addedEntries.length,
+            removedCount: removedEntries.length,
+            renamedCount: renamedEntries.length,
+            performedBy: currentUser?.username || 'Unknown',
+            workspaceId: activeWorkspaceId,
+          }).catch((error) => {
+            logger.warn(
+              'system',
+              'ADMIN_SETTINGS_EMAIL_NOTIFY_FAILED',
+              {
+                listKey: key,
+                notifyEmail: defaultSettings.adminNotificationEmail,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              'SettingsPage'
+            );
+          });
         }
       }
 
@@ -556,6 +578,28 @@ export default function SettingsPage() {
       nextAssetIdPrefix !== defaultSettings.assetIdPrefix
     ) {
       toast.success(`Global asset tag prefix updated to ${nextAssetIdPrefix}.`);
+      if (nextSettings.adminNotificationEmail) {
+        void sendAdminSettingsNotification({
+          notifyEmail: nextSettings.adminNotificationEmail,
+          changeType: 'global-setting-update',
+          settingKey: 'assetIdPrefix',
+          previousValue: defaultSettings.assetIdPrefix || '',
+          nextValue: nextAssetIdPrefix,
+          performedBy: currentUser?.username || 'Unknown',
+          workspaceId: activeWorkspaceId,
+        }).catch((error) => {
+          logger.warn(
+            'system',
+            'ADMIN_SETTINGS_EMAIL_NOTIFY_FAILED',
+            {
+              settingKey: 'assetIdPrefix',
+              notifyEmail: nextSettings.adminNotificationEmail,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'SettingsPage'
+          );
+        });
+      }
     }
     if (
       nextAdminNotificationEmail !== undefined &&

@@ -17,7 +17,6 @@ export function DeviceLibraryTab() {
           Device library
         </CardTitle>
         <CardDescription>
-          Same interaction model as lookup lists: reorder with the handle, edit with the pencil, add with the button.
           Cable rows can carry default unit, jacket color, and a restock increment; media converters can record a
           signal path (e.g. SDI to HDMI). Included in full backups when the file contains a deviceLibrary block.
         </CardDescription>

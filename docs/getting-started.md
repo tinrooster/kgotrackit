@@ -5,6 +5,7 @@ This guide will help you set up and run the Inventory Tracking System on your lo
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
+
 - [Node.js](https://nodejs.org/) (v16 or later)
 - [npm](https://www.npmjs.com/) (v7 or later) or [pnpm](https://pnpm.io/) (v7 or later)
 - A modern web browser (Chrome, Firefox, Edge, or Safari)
@@ -12,29 +13,26 @@ Before you begin, ensure you have the following installed:
 ## Installation
 
 1. Clone the repository:
-   ```bash
+  ```bash
    git clone https://github.com/yourusername/inventory-tracker.git
    cd inventory-tracker
-   ```
-
+  ```
 2. Install dependencies:
-   ```bash
+  ```bash
    npm install
    # or
    pnpm install
-   ```
-
+  ```
 3. Start the development server:
-   ```bash
+  ```bash
    npm run dev
    # or
    pnpm dev
-   ```
-
+  ```
 4. Open your browser and navigate to:
-   ```
+  ```
    http://localhost:5173
-   ```
+  ```
 
 ## Building for Production
 

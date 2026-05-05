@@ -29,7 +29,7 @@ export interface LibrariesSectionProps {
 }
 
 const LIB_NAV: { id: LibrariesPanel; label: string }[] = [
-  { id: 'suppliers', label: 'Suppliers' },
+  { id: 'suppliers', label: 'Vendors' },
   { id: 'templates', label: 'Templates' },
   { id: 'deviceLibrary', label: 'Device library' },
 ];
@@ -54,7 +54,7 @@ export function LibrariesSection({
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Supplier names, portal URLs, saved templates, and the device catalog. Lookup Lists keeps categories,
+            Vendor names, portal URLs, saved templates, and the device catalog. Lookup Lists keeps categories,
             units, locations, and projects.
           </p>
           <nav className="flex flex-wrap gap-2" aria-label="Library section">
@@ -74,21 +74,21 @@ export function LibrariesSection({
           {panel === 'suppliers' && (
             <Card>
               <CardHeader>
-                <CardTitle>Suppliers</CardTitle>
+                <CardTitle>Vendors</CardTitle>
               </CardHeader>
               <CardContent>
                 <EditableItemWithSubcategoriesList
                   hideListTitle
                   items={settings.suppliers}
                   setItems={(newItems) => updateSettingsList('suppliers', newItems)}
-                  title="Suppliers"
+                  title="Vendors"
                   enableSubcategories={false}
                   perItemSupplierProfileFields
                   onCheckBeforeDelete={(value, onSafeToDelete) => {
                     const items = getItems();
                     const affectedItems = items.filter((item) => item.supplier === value);
                     if (affectedItems.length > 0) {
-                      requestReconcile('Suppliers', value, affectedItems.length);
+                      requestReconcile('Vendors', value, affectedItems.length);
                     } else {
                       onSafeToDelete();
                     }

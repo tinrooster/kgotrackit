@@ -18,6 +18,7 @@ import {
   Trash2,
   GripVertical,
   Plus,
+  Settings2,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -44,7 +45,6 @@ import { ItemWithSubcategories } from '@/types/inventory';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { getRackOptionsForFlatLocationLabel, getRackOptionsForSubLocationKey } from '@/lib/rackLocationsConfig';
-import { ListDetailCollapsible } from '@/components/ui/list-detail-collapsible';
 
 function supplierProfileHasContent(row: ItemWithSubcategories): boolean {
   const t = (v: string | undefined) => (v ?? '').trim();
@@ -290,6 +290,7 @@ function SortableItem({
   const [editValue, setEditValue] = useState(item.name);
   const [newSubcategory, setNewSubcategory] = useState('');
   const [subAddOpen, setSubAddOpen] = useState(false);
+  const [supplierDetailsOpen, setSupplierDetailsOpen] = useState(false);
   const [editingSubcategory, setEditingSubcategory] = useState<string | null>(null);
   const [subsExpanded, setSubsExpanded] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
@@ -338,7 +339,13 @@ function SortableItem({
     <div ref={setNodeRef} style={style} className="space-y-2">
       <div className="flex justify-between items-center gap-2 rounded-md border border-border/80 bg-muted/30 p-2 font-medium text-foreground shadow-sm">
         <div className="flex min-w-0 flex-1 items-center">
-          <button {...attributes} {...listeners} className="mr-2 shrink-0 cursor-grab p-1 active:cursor-grabbing">
+          <button
+            {...attributes}
+            {...listeners}
+            className="mr-2 shrink-0 cursor-grab p-1 active:cursor-grabbing"
+            title={`Reorder ${item.name}`}
+            aria-label={`Reorder ${item.name}`}
+          >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </button>
           {enableSubcategories && (item.children?.length ?? 0) > 0 ? (
@@ -365,7 +372,7 @@ function SortableItem({
                 onChange={(e) => setEditValue(e.target.value)}
                 onBlur={handleSave}
                 onKeyDown={handleKeyDown}
-                className="h-8 min-w-0 flex-1 basis-[8rem]"
+                className="h-8 min-w-0 flex-1 basis-[8rem] placeholder:text-muted-foreground/40"
                 autoFocus
               />
               {showColorPicker && onEditColor && (
@@ -393,7 +400,13 @@ function SortableItem({
           )}
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsEditing(true)}
+            title={`Edit ${item.name}`}
+            aria-label={`Edit ${item.name}`}
+          >
             <Pencil className="h-4 w-4" />
           </Button>
           {locationRackExtension && onPatchItem && !(item.children && item.children.length > 0) ? (
@@ -443,6 +456,7 @@ function SortableItem({
                     placeholder="Subcategory name"
                     value={newSubcategory}
                     onChange={(e) => setNewSubcategory(e.target.value)}
+                    className="placeholder:text-muted-foreground/40"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -463,6 +477,133 @@ function SortableItem({
               </PopoverContent>
             </Popover>
           )}
+          {perItemSupplierProfileFields && onPatchItem && (
+            <Popover open={supplierDetailsOpen} onOpenChange={setSupplierDetailsOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  title="Vendor details"
+                  aria-label={`Vendor details for ${item.name}`}
+                >
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[min(100vw-2rem,34rem)] p-3" align="end">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">Website</span>
+                    <Input
+                      type="url"
+                      className="h-8 text-sm placeholder:text-muted-foreground/40"
+                      placeholder="https://..."
+                      value={item.website ?? ''}
+                      onChange={(e) =>
+                        onPatchItem(item.id, {
+                          website: e.target.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">Contact name</span>
+                    <Input
+                      className="h-8 text-sm placeholder:text-muted-foreground/40"
+                      placeholder="Primary contact"
+                      value={item.contactName ?? ''}
+                      onChange={(e) =>
+                        onPatchItem(item.id, {
+                          contactName: e.target.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">Contact email</span>
+                    <Input
+                      type="email"
+                      className="h-8 text-sm placeholder:text-muted-foreground/40"
+                      placeholder="name@company.com"
+                      value={item.contactEmail ?? ''}
+                      onChange={(e) =>
+                        onPatchItem(item.id, {
+                          contactEmail: e.target.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">Contact phone</span>
+                    <Input
+                      className="h-8 text-sm placeholder:text-muted-foreground/40"
+                      placeholder="+1 ..."
+                      value={item.contactPhone ?? ''}
+                      onChange={(e) =>
+                        onPatchItem(item.id, {
+                          contactPhone: e.target.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">Support email</span>
+                    <Input
+                      type="email"
+                      className="h-8 text-sm placeholder:text-muted-foreground/40"
+                      placeholder="support@company.com"
+                      value={item.supportEmail ?? ''}
+                      onChange={(e) =>
+                        onPatchItem(item.id, {
+                          supportEmail: e.target.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">Support phone</span>
+                    <Input
+                      className="h-8 text-sm placeholder:text-muted-foreground/40"
+                      placeholder="+1 ..."
+                      value={item.supportPhone ?? ''}
+                      onChange={(e) =>
+                        onPatchItem(item.id, {
+                          supportPhone: e.target.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">Account reference</span>
+                    <Input
+                      className="h-8 text-sm placeholder:text-muted-foreground/40"
+                      placeholder="Customer/account number"
+                      value={item.accountReference ?? ''}
+                      onChange={(e) =>
+                        onPatchItem(item.id, {
+                          accountReference: e.target.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <span className="text-xs font-medium text-muted-foreground">Notes</span>
+                    <Textarea
+                      className="min-h-[72px] text-sm placeholder:text-muted-foreground/40"
+                      placeholder="SLA, procurement notes, escalation details..."
+                      value={item.supplierNotes ?? ''}
+                      onChange={(e) =>
+                        onPatchItem(item.id, {
+                          supplierNotes: e.target.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </div>
 
@@ -471,7 +612,7 @@ function SortableItem({
           <span className="text-xs font-medium text-muted-foreground">Supplier website</span>
           <Input
             type="url"
-            className="h-8 text-sm"
+            className="h-8 text-sm placeholder:text-muted-foreground/40"
             placeholder="https://…"
             value={item.website ?? ''}
             onChange={(e) =>
@@ -481,120 +622,6 @@ function SortableItem({
             }
           />
         </div>
-      )}
-
-      {perItemSupplierProfileFields && onPatchItem && (
-        <ListDetailCollapsible title="Supplier profile details" defaultOpen={supplierProfileHasContent(item)}>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Website</span>
-            <Input
-              type="url"
-              className="h-8 text-sm"
-              placeholder="https://..."
-              value={item.website ?? ''}
-              onChange={(e) =>
-                onPatchItem(item.id, {
-                  website: e.target.value.trim() || undefined,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Contact name</span>
-            <Input
-              className="h-8 text-sm"
-              placeholder="Primary contact"
-              value={item.contactName ?? ''}
-              onChange={(e) =>
-                onPatchItem(item.id, {
-                  contactName: e.target.value.trim() || undefined,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Contact email</span>
-            <Input
-              type="email"
-              className="h-8 text-sm"
-              placeholder="name@company.com"
-              value={item.contactEmail ?? ''}
-              onChange={(e) =>
-                onPatchItem(item.id, {
-                  contactEmail: e.target.value.trim() || undefined,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Contact phone</span>
-            <Input
-              className="h-8 text-sm"
-              placeholder="+1 ..."
-              value={item.contactPhone ?? ''}
-              onChange={(e) =>
-                onPatchItem(item.id, {
-                  contactPhone: e.target.value.trim() || undefined,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Support email</span>
-            <Input
-              type="email"
-              className="h-8 text-sm"
-              placeholder="support@company.com"
-              value={item.supportEmail ?? ''}
-              onChange={(e) =>
-                onPatchItem(item.id, {
-                  supportEmail: e.target.value.trim() || undefined,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Support phone</span>
-            <Input
-              className="h-8 text-sm"
-              placeholder="+1 ..."
-              value={item.supportPhone ?? ''}
-              onChange={(e) =>
-                onPatchItem(item.id, {
-                  supportPhone: e.target.value.trim() || undefined,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Account reference</span>
-            <Input
-              className="h-8 text-sm"
-              placeholder="Customer/account number"
-              value={item.accountReference ?? ''}
-              onChange={(e) =>
-                onPatchItem(item.id, {
-                  accountReference: e.target.value.trim() || undefined,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <span className="text-xs font-medium text-muted-foreground">Notes</span>
-            <Textarea
-              className="min-h-[72px] text-sm"
-              placeholder="SLA, procurement notes, escalation details..."
-              value={item.supplierNotes ?? ''}
-              onChange={(e) =>
-                onPatchItem(item.id, {
-                  supplierNotes: e.target.value.trim() || undefined,
-                })
-              }
-            />
-          </div>
-          </div>
-        </ListDetailCollapsible>
       )}
 
       {enableSubcategories && subsExpanded && (item.children?.length ?? 0) > 0 && (
@@ -663,6 +690,8 @@ function SortableItem({
                         setEditingSubcategory(child.name);
                       }}
                       className="text-muted-foreground hover:text-foreground"
+                      title={`Edit subcategory ${child.name}`}
+                      aria-label={`Edit subcategory ${child.name}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -932,7 +961,7 @@ export function EditableItemWithSubcategoriesList({
         <Input
           ref={addInputRef}
           type="text"
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 placeholder:text-muted-foreground/40"
           placeholder={addPlaceholder}
           onKeyDown={handleKeyDown}
           aria-label={addPlaceholder}

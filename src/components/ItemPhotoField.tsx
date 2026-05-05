@@ -4,8 +4,9 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { normalizeImageFileToDataUrl, estimateDataUrlBytes } from "@/lib/imageNormalization";
 
-const MAX_FILE_BYTES = 1_800_000;
+const TARGET_PHOTO_BYTES = 1_800_000;
 
 interface ItemPhotoFieldProps {
   form: UseFormReturn<any>;
@@ -31,16 +32,20 @@ export function ItemPhotoField({ form, name = "photoUrl", className }: ItemPhoto
                   const file = event.target.files?.[0];
                   event.target.value = "";
                   if (!file) return;
-                  if (file.size > MAX_FILE_BYTES) {
-                    toast.error("Image is too large (max ~1.7 MB).");
-                    return;
-                  }
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const result = reader.result;
-                    field.onChange(typeof result === "string" ? result : "");
-                  };
-                  reader.readAsDataURL(file);
+                  void normalizeImageFileToDataUrl(file, {
+                    targetBytes: TARGET_PHOTO_BYTES,
+                  })
+                    .then((normalizedDataUrl) => {
+                      const finalBytes = estimateDataUrlBytes(normalizedDataUrl);
+                      if (finalBytes > TARGET_PHOTO_BYTES) {
+                        toast.error("Image is still too large after compression. Try a smaller photo.");
+                        return;
+                      }
+                      field.onChange(normalizedDataUrl);
+                    })
+                    .catch(() => {
+                      toast.error("Could not process the selected image.");
+                    });
                 }}
               />
             </FormControl>

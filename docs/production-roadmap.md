@@ -158,6 +158,14 @@ So logs are **per-browser, not cloud** unless extended. New device, cleared site
 
 **Shipped (MVP):** Settings → Data Management → **Local restore points** (`DataBackupTab` + `[src/lib/localRestorePoints.ts](../src/lib/localRestorePoints.ts)`): up to 8 named full-payload snapshots in **IndexedDB**, list with restore/delete, validation summary before apply, `logger` entries for create / delete / restore start+outcome. **Not shipped:** cloud `user_app_snapshots` table, File System Access folder wizard, pruning policy beyond fixed ring size.
 
+**Current shared-workspace restore behavior (explicit):**
+
+- Restore points are **local-browser snapshots** (IndexedDB), not shared cloud snapshots.
+- Applying a restore updates local runtime payload first; after that, the active sync path writes to the active target (`user_app_data` in personal mode, `workspace_app_data` in team mode).
+- In team mode this acts as an **overwrite of the shared payload** from the restoring admin/member’s local snapshot, not a merge.
+- There is no automatic per-field reconcile during restore; reconcile tools are separate/manual.
+- Audit coverage: restore create/delete/start/success/failure are logged; team members should treat restore as a coordinated admin action.
+
 ### Settings UX — Backup & Restore tab and Lookup Lists
 
 **Backup & Restore tab** (`[src/components/settings/DataBackupTab.tsx](../src/components/settings/DataBackupTab.tsx)`, tab `backup-restore`)
@@ -369,4 +377,24 @@ flowchart LR
 4. **Desktop filter overflow**
   - Prevent horizontal overflow from wide filter controls on larger screens; adapt spacing and stack filter inputs into two rows when needed.
   - Remove/highly minimize distracting white scrollbar artifacts in main inventory/filter regions.
+
+## Execution checklist (completed)
+
+1. [x] **Default to Team context when available**  
+   - If Supabase is active and the user belongs to one or more workspaces, auto-select the first valid team workspace when no active workspace is set.
+2. [x] **Transparent hint/placeholder treatment (settings list editors)**  
+   - Normalize settings editor placeholders to subtle transparent-muted styling for consistency.
+3. [x] **Tooltip/label coverage for icon-only controls (settings list editors)**  
+   - Add explicit `title` + `aria-label` on icon-only reorder/edit controls for discoverability and accessibility.
+4. [x] Suppress canceled/no-op false-positive update logging in remaining edit/batch-edit flows.
+5. [x] Continue mobile container width pass across non-inventory dialogs/pages.
+6. [x] Expand icon tooltip coverage to remaining app surfaces beyond settings editors.
+
+## Finish checklist (next)
+
+1. [x] Theme pass: soften light mode palette + lighten dark mode grays.
+2. [x] Team/workspace docs pass: restore-point behavior and overwrite/merge rules in shared mode.
+3. [x] Camera behavior polish: explicit "no camera detected" state before file-pick fallback.
+4. [x] Transparent hint treatment pass outside settings editors (forms/reports/login where applicable).
+5. [x] System-log quality pass: suppress remaining non-actionable validation noise while preserving real failures.
 

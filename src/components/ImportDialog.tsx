@@ -285,7 +285,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete }: ImportDi
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { resetState(); onClose(); } }}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Import Inventory</DialogTitle>
           <DialogDescription>

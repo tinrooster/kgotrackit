@@ -47,11 +47,12 @@ import {
   RACK_LOCATIONS_UPDATED_EVENT,
 } from "@/lib/rackLocationsConfig";
 import { findLocationByFlatId } from "@/lib/locationOptions";
+import { estimateDataUrlBytes, normalizeImageFileToDataUrl } from "@/lib/imageNormalization";
 
 const PREFS_KEY = "trackit:quickAddPrefs";
 const LAST_KEY = "trackit:quickAddLast";
 const USAGE_KEY = "trackit:quickAddUsage";
-const MAX_PHOTO_BYTES = 1_800_000;
+const TARGET_PHOTO_BYTES = 1_800_000;
 const FAVORITES_TOP = 5;
 
 interface QuickPrefs {
@@ -810,16 +811,20 @@ export function MobileQuickAddDialog({
   };
 
   const readPhotoFile = (file: File) => {
-    if (file.size > MAX_PHOTO_BYTES) {
-      toast.error("Photo is too large (max ~1.7 MB).");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      setPhotoUrl(typeof result === "string" ? result : "");
-    };
-    reader.readAsDataURL(file);
+    void normalizeImageFileToDataUrl(file, {
+      targetBytes: TARGET_PHOTO_BYTES,
+    })
+      .then((normalizedDataUrl) => {
+        const finalBytes = estimateDataUrlBytes(normalizedDataUrl);
+        if (finalBytes > TARGET_PHOTO_BYTES) {
+          toast.error("Photo is still too large after compression. Try a smaller image.");
+          return;
+        }
+        setPhotoUrl(normalizedDataUrl);
+      })
+      .catch(() => {
+        toast.error("Could not process the selected photo.");
+      });
   };
 
   const lastSnapshot = loadLast();
@@ -847,7 +852,7 @@ export function MobileQuickAddDialog({
         <DialogContent
           nonModalBackdrop
           className={cn(
-            "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-3xl md:max-w-4xl lg:max-w-5xl",
+            "flex w-[calc(100vw-0.75rem)] max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:w-auto sm:max-w-3xl md:max-w-4xl lg:max-w-5xl",
             "sm:rounded-xl",
             "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
             "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"

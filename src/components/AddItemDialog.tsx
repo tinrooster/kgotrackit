@@ -192,7 +192,7 @@ export function AddItemDialog({
       <DialogContent
         nonModalBackdrop
         className={cn(
-          "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-3xl md:max-w-4xl lg:max-w-5xl",
+          "flex w-[calc(100vw-0.75rem)] max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:w-auto sm:max-w-3xl md:max-w-4xl lg:max-w-5xl",
           // Top-anchored: tab/content height changes must not re-center the dialog vertically
           "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
           "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"

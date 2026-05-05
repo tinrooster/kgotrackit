@@ -395,6 +395,8 @@ export function InventoryTable({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => onEdit(item)}
+                                title={`Edit ${item.name}`}
+                                aria-label={`Edit ${item.name}`}
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>

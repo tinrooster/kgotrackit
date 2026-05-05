@@ -51,6 +51,28 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setActiveWorkspaceIdState(getActiveWorkspaceId());
   }, [workspaces, currentUser?.id]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured() || authBackend !== 'supabase' || !currentUser?.id || loading) {
+      return;
+    }
+    if (workspaces.length === 0) {
+      return;
+    }
+    const hasActiveWorkspace = activeWorkspaceId
+      ? workspaces.some((workspace) => workspace.workspaceId === activeWorkspaceId)
+      : false;
+    if (hasActiveWorkspace) {
+      return;
+    }
+
+    const defaultWorkspaceId = workspaces[0]?.workspaceId ?? null;
+    if (!defaultWorkspaceId) {
+      return;
+    }
+    persistActiveWorkspaceId(defaultWorkspaceId);
+    setActiveWorkspaceIdState(defaultWorkspaceId);
+  }, [activeWorkspaceId, authBackend, currentUser?.id, loading, workspaces]);
+
   const activeWorkspaceRole = useMemo(() => {
     if (!activeWorkspaceId) return null;
     const row = workspaces.find((w) => w.workspaceId === activeWorkspaceId);

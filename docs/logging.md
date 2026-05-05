@@ -1,4 +1,4 @@
-﻿# Logging System Implementation Guide
+# Logging System Implementation Guide
 
 ## Overview
 
@@ -9,9 +9,11 @@ This project uses a **centralized, extensible logging system** for all applicati
 ## 1. Logger API
 
 ### Location
+
 - **Source:** `src/lib/logging.ts`
 
 ### Main Export
+
 - `logger`: Singleton instance of the `Logger` class.
 
 ### Log Entry Type
@@ -28,9 +30,11 @@ export interface LogEntry {
 ```
 
 ### Log Levels
+
 - `debug`, `info`, `warn`, `error`
 
 ### Log Types
+
 - `system`, `audit`, `performance`, `security`
 
 ---
@@ -70,10 +74,12 @@ logger.debug('performance', 'Render time', { ms: 123 }, 'InventoryTable');
 ## 4. Log Viewing UI
 
 ### Component
+
 - **Location:** `src/components/settings/SystemLogs.tsx`
 - **Usage:** `<SystemLogs />`
 
 #### Features
+
 - Search/filter logs by keyword, level, and type.
 - Color-coded badges for log level/type.
 - Scrollable, modern UI.
@@ -102,6 +108,7 @@ logger.debug('performance', 'Render time', { ms: 123 }, 'InventoryTable');
 ## 7. Example Migration
 
 **Old:**
+
 ```ts
 await logAction({
   action: 'ITEM_CHECKOUT',
@@ -111,6 +118,7 @@ await logAction({
 ```
 
 **New:**
+
 ```ts
 logger.info('audit', 'ITEM_CHECKOUT', { itemId, userId }, 'CheckoutPage');
 ```

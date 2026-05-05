@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, LogIn, Key, Mail } from 'lucide-react';
+import { Eye, EyeOff, Loader2, LogIn, Key, Mail } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -61,6 +61,8 @@ export function LoginForm() {
   const [isResetting, setIsResetting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isResetPasswordVisible, setIsResetPasswordVisible] = useState(false);
 
   const resetSchema = useMemo(
     () => buildResetPasswordSchema(authBackend === 'supabase'),
@@ -283,14 +285,28 @@ export function LoginForm() {
 
         <div className="space-y-2">
           <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            placeholder="Enter your password"
-            {...register('password')}
-            disabled={isLoading}
-            className={`h-10 ${loginError ? 'border-destructive' : ''}`}
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              type={isPasswordVisible ? 'text' : 'password'}
+              placeholder="Enter your password"
+              {...register('password')}
+              disabled={isLoading}
+              className={`h-10 pr-10 ${loginError ? 'border-destructive' : ''}`}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1 h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsPasswordVisible((value) => !value)}
+              aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+              title={isPasswordVisible ? 'Hide password' : 'Show password'}
+              disabled={isLoading}
+            >
+              {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          </div>
           {errors.password && (
             <p className="text-sm font-medium text-destructive mt-1">{errors.password.message}</p>
           )}
@@ -342,9 +358,6 @@ export function LoginForm() {
         {authBackend === 'supabase' ? (
           <div className="rounded-md border border-border/50 bg-muted/15 p-3 space-y-2">
             <p className="text-xs font-medium text-foreground">Email magic link</p>
-            <p className="text-xs text-muted-foreground leading-snug">
-              Sends a one-time sign-in link to the email field above. In Supabase Dashboard → Authentication → URL configuration, add your site URL and redirect URLs. For TOTP / MFA, use the same dashboard (User → MFA) or enroll factors via the Auth API after sign-in.
-            </p>
             <Button
               type="button"
               variant="secondary"
@@ -436,13 +449,28 @@ export function LoginForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="Enter new password (minimum 4 characters)"
-                    {...registerReset('newPassword')}
-                    disabled={isResetting}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="new-password"
+                      type={isResetPasswordVisible ? 'text' : 'password'}
+                      placeholder="Enter new password (minimum 4 characters)"
+                      {...registerReset('newPassword')}
+                      disabled={isResetting}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1 h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => setIsResetPasswordVisible((value) => !value)}
+                      aria-label={isResetPasswordVisible ? 'Hide password' : 'Show password'}
+                      title={isResetPasswordVisible ? 'Hide password' : 'Show password'}
+                      disabled={isResetting}
+                    >
+                      {isResetPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                   {resetErrors.newPassword && (
                     <p className="text-sm font-medium text-destructive">{resetErrors.newPassword.message}</p>
                   )}

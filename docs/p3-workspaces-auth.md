@@ -1,6 +1,6 @@
 # P3: Shared workspaces, RBAC, auth, device catalog reference
 
-This document matches the **P3** slice in [`production-roadmap.md`](production-roadmap.md) (org, security, clients).
+This document matches the **P3** slice in `[production-roadmap.md](production-roadmap.md)` (org, security, clients).
 
 ## 1. Database (Supabase)
 

@@ -98,7 +98,7 @@ export function CameraSettingsDialog({ isOpen, onClose }: CameraSettingsDialogPr
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Camera Settings</DialogTitle>
           <DialogDescription>

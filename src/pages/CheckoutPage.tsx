@@ -234,19 +234,15 @@ export default function CheckoutPage() {
     return grouped;
   }, {} as Record<string, Record<string, { checkedIn: number; checkedOut: number }>>);
 
-  // Add logging for selection changes
   const handleCabinetChange = async (cabinetId: string) => {
-    console.log('[INFO] Cabinet selected', { cabinetId });
     setSelectedCabinetId(cabinetId);
   };
 
   const handleItemChange = async (itemId: string) => {
-    console.log('[INFO] Item selected', { itemId });
     setSelectedItemId(itemId);
   };
 
   const handleQuantityChange = async (value: string) => {
-    console.log('[INFO] Quantity changed', { value });
     setQuantity(value);
   };
 

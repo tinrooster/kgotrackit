@@ -152,12 +152,9 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
     if (batchEditValues.location && batchEditValues.location !== 'nochange' && cabinets) {
       // Get the base location name (last part of the path)
       const locationName = batchEditValues.location.split('/').pop() || '';
-      logger.info('system', 'Looking for cabinets for location', { locationName });
-      logger.info('system', 'Available cabinets', { cabinets });
       
       // Filter cabinets directly by locationId matching the location name
       const locationCabinets = cabinets.filter(cabinet => cabinet.locationId === locationName);
-      logger.info('system', 'Found cabinets for location', { locationCabinets });
       setAvailableCabinets(locationCabinets);
     } else {
       setAvailableCabinets([]);
@@ -249,6 +246,19 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
   const handleBatchEdit = async () => {
     if (!canBatchEdit) {
       toast.error('You do not have permission to batch-edit items.');
+      return;
+    }
+    const hasRequestedChanges =
+      (batchEditValues.quantity !== undefined && batchEditValues.quantity !== '') ||
+      !!batchEditValues.category ||
+      !!batchEditValues.subcategory ||
+      !!batchEditValues.location ||
+      !!batchEditValues.cabinet ||
+      !!batchEditValues.project ||
+      !!batchEditValues.unitSubcategory;
+    if (!hasRequestedChanges) {
+      toast.info('No changes selected.');
+      setIsBatchEditOpen(false);
       return;
     }
     setIsUpdating(true);
@@ -437,7 +447,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
             Delete Selected
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Delete Items</DialogTitle>
             <DialogDescription>
@@ -467,7 +477,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
             Batch Edit ({selectedItems.length})
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[625px]">
+        <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-[625px]">
           <DialogHeader>
             <DialogTitle>Batch Edit Items</DialogTitle>
           </DialogHeader>

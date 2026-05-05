@@ -892,19 +892,26 @@ export default function InventoryPage() {
 
   const handleSaveEdit = async (updatedItem: InventoryItem) => {
     try {
-      recordInventorySnapshotBeforeChange(items);
       const previousItem = originalEditItem || items.find((item) => item.id === updatedItem.id) || null;
-      const updatedItems = items.map((item) =>
-        item.id === updatedItem.id
-          ? {
-              ...updatedItem,
-              location: normalizeLocationValue(updatedItem.location, locations) || undefined,
-              project: normalizeProjectValue(updatedItem.project, projects) || undefined,
-              lastUpdated: new Date(),
-              lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown',
-            }
-          : item,
-      );
+      const normalizedUpdatedItem: InventoryItem = {
+        ...updatedItem,
+        location: normalizeLocationValue(updatedItem.location, locations) || undefined,
+        project: normalizeProjectValue(updatedItem.project, projects) || undefined,
+        lastUpdated: new Date(),
+        lastModifiedBy: currentUser?.username || currentUser?.displayName || 'Unknown',
+      };
+      const fieldChanges = previousItem ? getUpdatedFieldChanges(previousItem, normalizedUpdatedItem) : [];
+
+      // Treat "Save" with no actual changes as a no-op to avoid noisy audit/system log entries.
+      if (previousItem && fieldChanges.length === 0) {
+        setIsEditDialogOpen(false);
+        setSelectedItem(null);
+        setOriginalEditItem(null);
+        return;
+      }
+
+      recordInventorySnapshotBeforeChange(items);
+      const updatedItems = items.map((item) => (item.id === updatedItem.id ? normalizedUpdatedItem : item));
       if (!saveItems(updatedItems)) {
         toast.error('Could not save changes.', {
           description: 'Browser storage may be full. Export a backup or free space, then try again.',
@@ -914,7 +921,7 @@ export default function InventoryPage() {
       setItems(updatedItems);
       setInvUndoAvail(canUndoInventory());
       setInvRedoAvail(canRedoInventory());
-      appendAuditLog('UPDATE', updatedItem, previousItem ? getUpdatedFieldChanges(previousItem, updatedItem) : []);
+      appendAuditLog('UPDATE', normalizedUpdatedItem, fieldChanges);
       toast.success(`Updated "${updatedItem.name}"`);
       setIsEditDialogOpen(false);
       setSelectedItem(null);

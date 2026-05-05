@@ -177,7 +177,14 @@ export function AdditionalInfoTab({
                     <Input {...field} placeholder="Enter barcode" />
                   </FormControl>
                   {onScanBarcode && (
-                    <Button type="button" variant="outline" size="icon" onClick={onScanBarcode}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={onScanBarcode}
+                      title="Scan barcode"
+                      aria-label="Scan barcode"
+                    >
                       <ScanLine className="h-4 w-4" />
                     </Button>
                   )}

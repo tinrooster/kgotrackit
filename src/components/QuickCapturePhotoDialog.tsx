@@ -45,13 +45,21 @@ export function QuickCapturePhotoDialog({
     setReady(false);
 
     const start = async () => {
-      if (!navigator.mediaDevices?.getUserMedia) {
+      if (!navigator.mediaDevices?.getUserMedia || !navigator.mediaDevices?.enumerateDevices) {
         if (!cancelled) {
           setError("Camera API not available in this browser.");
         }
         return;
       }
       try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasVideoInput = devices.some((device) => device.kind === "videoinput");
+        if (!hasVideoInput) {
+          if (!cancelled) {
+            setError("No camera detected on this device.");
+          }
+          return;
+        }
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" } },
           audio: false,
@@ -125,7 +133,10 @@ export function QuickCapturePhotoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent dismissOnOutsidePointer className="max-w-md gap-3 p-4 sm:max-w-md">
+      <DialogContent
+        dismissOnOutsidePointer
+        className="w-[calc(100vw-0.75rem)] gap-3 p-4 sm:w-auto sm:max-w-md"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Camera className="h-5 w-5" />
@@ -168,7 +179,7 @@ export function QuickCapturePhotoDialog({
               onFallbackToFiles?.();
             }}
           >
-            Pick from files instead
+            {error ? "Choose image instead" : "Pick from files instead"}
           </Button>
           <Button type="button" variant="ghost" className="w-full" onClick={() => onOpenChange(false)}>
             Cancel
