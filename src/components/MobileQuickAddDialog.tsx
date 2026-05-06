@@ -20,7 +20,6 @@ import {
   Briefcase,
   Camera,
   ChevronDown,
-  Copy,
   History,
   ImagePlus,
   Layers,
@@ -33,7 +32,6 @@ import {
   Sparkles,
   Tag,
   Trash2,
-  Type,
   Warehouse,
   X,
   Zap,
@@ -41,7 +39,6 @@ import {
 import { toast } from "sonner";
 import { SimpleBarcodeScanner } from "@/components/SimpleBarcodeScanner";
 import { QuickCapturePhotoDialog } from "@/components/QuickCapturePhotoDialog";
-import { Combobox } from "@/components/ui/combobox";
 import {
   getRackOptionsForFlatLocationLabel,
   getRackOptionsForSubLocationKey,
@@ -56,120 +53,79 @@ const USAGE_KEY = "trackit:quickAddUsage";
 const TARGET_PHOTO_BYTES = 1_800_000;
 const FAVORITES_TOP = 5;
 
+// ─── persistence helpers ──────────────────────────────────────────────────────
+
 interface QuickPrefs {
   location?: string;
   category?: string;
   unit?: string;
-  /** When the unit has sub-sizes (e.g. Spools → roll width). */
   unitSubcategory?: string;
   project?: string;
-  /** Rack preset or custom value when the chosen location has rack rules. */
   rackLocation?: string;
 }
-
 interface LastSnapshot {
   location: string;
   category: string;
   unit: string;
   project: string;
-  /** When `unit` has configured children (e.g. Spools sizes). */
   unitSubcategory?: string;
-  /** Last rack / bay (optional). */
   rackLocation?: string;
-  /** Last successfully submitted item name (optional for older stored rows). */
   name?: string;
 }
-
 interface UsageCounts {
   cat: Record<string, number>;
   loc: Record<string, number>;
 }
 
 function loadPrefs(): QuickPrefs {
-  try {
-    const raw = sessionStorage.getItem(PREFS_KEY);
-    return raw ? (JSON.parse(raw) as QuickPrefs) : {};
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(sessionStorage.getItem(PREFS_KEY) ?? "{}") as QuickPrefs; }
+  catch { return {}; }
 }
-
 function savePrefs(p: QuickPrefs) {
-  try {
-    sessionStorage.setItem(PREFS_KEY, JSON.stringify(p));
-  } catch {
-    /* ignore */
-  }
+  try { sessionStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch { /* ignore */ }
 }
-
 function loadLast(): LastSnapshot | null {
   try {
     const raw = localStorage.getItem(LAST_KEY);
     if (!raw) return null;
     const o = JSON.parse(raw) as LastSnapshot;
-    if (o.location && o.category && o.unit) return o;
-    return null;
-  } catch {
-    return null;
-  }
+    return (o.location && o.category && o.unit) ? o : null;
+  } catch { return null; }
 }
-
 function saveLast(s: LastSnapshot) {
-  try {
-    localStorage.setItem(LAST_KEY, JSON.stringify(s));
-  } catch {
-    /* ignore */
-  }
+  try { localStorage.setItem(LAST_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
-
 function loadUsage(): UsageCounts {
   try {
     const raw = localStorage.getItem(USAGE_KEY);
     if (!raw) return { cat: {}, loc: {} };
     const o = JSON.parse(raw) as UsageCounts;
-    return {
-      cat: o.cat && typeof o.cat === "object" ? o.cat : {},
-      loc: o.loc && typeof o.loc === "object" ? o.loc : {},
-    };
-  } catch {
-    return { cat: {}, loc: {} };
-  }
+    return { cat: o.cat ?? {}, loc: o.loc ?? {} };
+  } catch { return { cat: {}, loc: {} }; }
 }
-
 function bumpUsage(category: string, locationId: string) {
   const u = loadUsage();
   u.cat[category] = (u.cat[category] || 0) + 1;
   u.loc[locationId] = (u.loc[locationId] || 0) + 1;
-  try {
-    localStorage.setItem(USAGE_KEY, JSON.stringify(u));
-  } catch {
-    /* ignore */
-  }
+  try { localStorage.setItem(USAGE_KEY, JSON.stringify(u)); } catch { /* ignore */ }
+}
+function topKeys(counts: Record<string, number>, limit: number): string[] {
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, limit);
 }
 
-function topKeys(counts: Record<string, number>, limit: number): string[] {
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k]) => k)
-    .slice(0, limit);
-}
+// ─── utility ─────────────────────────────────────────────────────────────────
 
 function flattenCategoryPaths(nodes: CategoryNode[], parentPath = ""): string[] {
   const out: string[] = [];
   for (const n of nodes) {
     const path = parentPath ? `${parentPath}/${n.name}` : n.name;
     out.push(path);
-    if (n.children?.length) {
-      out.push(...flattenCategoryPaths(n.children, path));
-    }
+    if (n.children?.length) out.push(...flattenCategoryPaths(n.children, path));
   }
   return out.sort();
 }
 
-function findParentForLocationValue(
-  value: string,
-  locations: ItemWithSubcategories[]
-): ItemWithSubcategories | null {
+function findParentForLocationValue(value: string, locations: ItemWithSubcategories[]): ItemWithSubcategories | null {
   if (!value) return null;
   const parentId = value.includes("/") ? value.split("/")[0]! : value;
   return locations.find((l) => l.id === parentId) ?? null;
@@ -195,6 +151,20 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognition) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+const ASSET_STATUSES: { value: string; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "hot_spare", label: "Hot Spare" },
+  { value: "cold_spare", label: "Cold Spare" },
+  { value: "in_service", label: "In Service" },
+  { value: "ready_decommission", label: "Decommission" },
+  { value: "slated_removal", label: "Slated Removal" },
+  { value: "cut_over_pending", label: "Cut-over" },
+  { value: "ewaste", label: "E-Waste" },
+  { value: "other", label: "Other" },
+];
+
+// ─── props ────────────────────────────────────────────────────────────────────
+
 export interface MobileQuickAddDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -209,6 +179,8 @@ export interface MobileQuickAddDialogProps {
   ) => Promise<void>;
 }
 
+// ─── component ───────────────────────────────────────────────────────────────
+
 export function MobileQuickAddDialog({
   open,
   onOpenChange,
@@ -221,6 +193,8 @@ export function MobileQuickAddDialog({
 }: MobileQuickAddDialogProps) {
   const nameRef = React.useRef<HTMLInputElement>(null);
   const galleryInputRef = React.useRef<HTMLInputElement>(null);
+  const customRackRef = React.useRef<HTMLInputElement>(null);
+
   const [name, setName] = React.useState("");
   const [photoUrl, setPhotoUrl] = React.useState("");
   const [quantity, setQuantity] = React.useState(1);
@@ -232,9 +206,7 @@ export function MobileQuickAddDialog({
   const [project, setProject] = React.useState("");
   const [barcode, setBarcode] = React.useState("");
   const [assetStatus, setAssetStatus] = React.useState<string>("active");
-  const [assetTrackingMode, setAssetTrackingMode] = React.useState<"line_item" | "per_unit">(
-    "line_item"
-  );
+  const [assetTrackingMode, setAssetTrackingMode] = React.useState<"line_item" | "per_unit">("line_item");
   const [rackLocation, setRackLocation] = React.useState("");
   const [rackCfgEpoch, setRackCfgEpoch] = React.useState(0);
   const [subPickerParent, setSubPickerParent] = React.useState<ItemWithSubcategories | null>(null);
@@ -243,68 +215,39 @@ export function MobileQuickAddDialog({
   const [listening, setListening] = React.useState(false);
   const recognitionRef = React.useRef<SpeechRecognition | null>(null);
   const [usageTick, setUsageTick] = React.useState(0);
-  const [openSection, setOpenSection] = React.useState<"details" | "location" | "category" | "unit" | "project" | null>(null);
-  const [locFilter, setLocFilter] = React.useState("");
-  const [catFilter, setCatFilter] = React.useState("");
-  const [unitFilter, setUnitFilter] = React.useState("");
-  const [projFilter, setProjFilter] = React.useState("");
+  const [openSection, setOpenSection] = React.useState<
+    "details" | "location" | "category" | "unit" | "project" | null
+  >(null);
 
+  // refs for scroll-into-view
   const sectionNameRef = React.useRef<HTMLDivElement>(null);
-  const sectionRackInLocRef = React.useRef<HTMLDivElement>(null);
-  const sectionMetaRef = React.useRef<HTMLDivElement>(null);
   const sectionAllLocRef = React.useRef<HTMLDivElement>(null);
   const sectionAllCatRef = React.useRef<HTMLDivElement>(null);
   const sectionUnitRef = React.useRef<HTMLDivElement>(null);
   const sectionProjectRef = React.useRef<HTMLDivElement>(null);
+  const sectionRackInLocRef = React.useRef<HTMLDivElement>(null);
+  const sectionMetaRef = React.useRef<HTMLDivElement>(null);
 
   type JumpHighlight = "name" | "details" | "location" | "category" | "unit" | "project";
   const [jumpHighlight, setJumpHighlight] = React.useState<JumpHighlight | null>(null);
   const jumpTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flashJump = React.useCallback((id: JumpHighlight) => {
-    if (jumpTimerRef.current) {
-      clearTimeout(jumpTimerRef.current);
-    }
+    if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
     setJumpHighlight(id);
-    jumpTimerRef.current = setTimeout(() => {
-      setJumpHighlight(null);
-      jumpTimerRef.current = null;
-    }, 2200);
+    jumpTimerRef.current = setTimeout(() => { setJumpHighlight(null); jumpTimerRef.current = null; }, 1800);
   }, []);
 
-  React.useEffect(() => {
-    return () => {
-      if (jumpTimerRef.current) {
-        clearTimeout(jumpTimerRef.current);
-      }
-    };
-  }, []);
+  React.useEffect(() => () => { if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current); }, []);
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
-    requestAnimationFrame(() => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    requestAnimationFrame(() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
-  const jumpTo = (id: JumpHighlight, ref: React.RefObject<HTMLDivElement | null>) => {
-    flashJump(id);
-    scrollToSection(ref);
-  };
-
-  const goToRack = React.useCallback(() => {
-    setOpenSection("location");
-    flashJump("location");
-    requestAnimationFrame(() => {
-      sectionAllLocRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      window.setTimeout(() => {
-        sectionRackInLocRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }, 200);
-    });
-  }, [flashJump]);
+  // ── derived data ────────────────────────────────────────────────────────────
 
   const categoryPaths = React.useMemo(() => flattenCategoryPaths(categories), [categories]);
   const defaultUnitName = React.useMemo(() => resolveDefaultUnitName(units), [units]);
-
   const usage = React.useMemo(() => loadUsage(), [usageTick, open]);
 
   const favoriteCategories = React.useMemo(() => {
@@ -317,9 +260,7 @@ export function MobileQuickAddDialog({
     const valid = new Set<string>();
     for (const loc of locations) {
       valid.add(loc.id);
-      for (const sub of loc.children || []) {
-        valid.add(`${loc.id}/${sub.id}`);
-      }
+      for (const sub of loc.children || []) valid.add(`${loc.id}/${sub.id}`);
     }
     return top.filter((id) => valid.has(id));
   }, [usage.loc, locations]);
@@ -335,138 +276,76 @@ export function MobileQuickAddDialog({
     return () => window.removeEventListener(RACK_LOCATIONS_UPDATED_EVENT, onRackCfg);
   }, []);
 
-  const flatLocationPickOptions = React.useMemo(
-    () =>
-      locations.flatMap((loc) => [
-        { value: loc.id, label: loc.name },
-        ...(loc.children || []).map((s) => ({
-          value: `${loc.id}/${s.id}`,
-          label: `${loc.name} / ${s.name}`,
-        })),
-      ]),
-    [locations]
-  );
-
-  /** Same shape as BasicDetailsTab flattened `name` (slash path) for `rack-locations.json` rules. */
   const flatLocationLabelForRack = React.useMemo(() => {
-    const hit = flatLocationPickOptions.find((o) => o.value === locationId);
-    if (hit?.label) {
-      return hit.label.replace(/\s*\/\s*/g, "/");
-    }
     const resolved = resolveLocationLabel(locationId, locations);
     return resolved ? resolved.replace(/\s*\/\s*/g, "/") : "";
-  }, [flatLocationPickOptions, locationId, locations]);
+  }, [locationId, locations]);
 
   const selectedLocationRow = React.useMemo(
     () => findLocationByFlatId(locations, locationId),
-    [locations, locationId],
+    [locations, locationId]
   );
 
   const presetRackOptionsFromConfig = React.useMemo(() => {
     let opts = getRackOptionsForFlatLocationLabel(flatLocationLabelForRack);
-    if (opts.length > 0) {
-      return opts;
-    }
-    const resolved = resolveLocationLabel(locationId, locations).replace(/\s*\/\s*/g, "/");
-    if (resolved) {
-      opts = getRackOptionsForFlatLocationLabel(resolved);
-      if (opts.length > 0) {
-        return opts;
-      }
-    }
+    if (opts.length > 0) return opts;
     if (locationId.includes("/")) {
       const subId = locationId.split("/").pop() ?? "";
       opts = getRackOptionsForSubLocationKey(subId);
     }
     return opts;
-  }, [flatLocationLabelForRack, locationId, locations, rackCfgEpoch]);
+  }, [flatLocationLabelForRack, locationId, rackCfgEpoch]);
 
   const useCustomRacks = selectedLocationRow?.rackLocationEnabled === true;
   const customRackSlots = React.useMemo(() => {
-    if (!useCustomRacks || !Array.isArray(selectedLocationRow?.rackSlots)) {
-      return null as string[] | null;
-    }
+    if (!useCustomRacks || !Array.isArray(selectedLocationRow?.rackSlots)) return null as string[] | null;
     return selectedLocationRow!.rackSlots!.map((s) => String(s).trim()).filter(Boolean);
   }, [useCustomRacks, selectedLocationRow]);
 
   const quickRackOptions = React.useMemo(() => {
-    if (useCustomRacks) {
-      return customRackSlots ?? [];
-    }
+    if (useCustomRacks) return customRackSlots ?? [];
     return presetRackOptionsFromConfig;
   }, [useCustomRacks, customRackSlots, presetRackOptionsFromConfig]);
 
-  const quickRackComboboxOptions = React.useMemo(
-    () => quickRackOptions.map((o) => ({ label: o, value: o })),
-    [quickRackOptions],
-  );
-
-  /** Match BasicDetailsTab: settings rack slots and/or rack-location JSON presets. */
   const showRackLocationRow = useCustomRacks || presetRackOptionsFromConfig.length > 0;
 
   const projectStripLabel = React.useMemo(() => {
     if (!project) return "";
-    const p = projects.find((x) => x.id === project || x.name === project);
-    return p?.name ?? project;
+    return projects.find((x) => x.id === project || x.name === project)?.name ?? project;
   }, [project, projects]);
 
   const unitStripLabel = React.useMemo(() => {
     if (!unit) return "";
     const parent = units.find((u) => u.name === unit);
-    if (parent?.children?.length && unitSubcategory) {
-      return `${parent.name} / ${unitSubcategory}`;
-    }
+    if (parent?.children?.length && unitSubcategory) return `${parent.name} / ${unitSubcategory}`;
     return unit;
   }, [unit, unitSubcategory, units]);
-  const detailsIndicator = React.useMemo(() => {
-    const tags: string[] = [`Qty ${quantity}`];
-    if (rackLocation) tags.push("Rack");
-    if (barcode) tags.push("Barcode");
-    if (photoUrl) tags.push("Photo");
-    return tags.join(" · ");
-  }, [quantity, rackLocation, barcode, photoUrl]);
 
-  const filteredLocationsForPicker = React.useMemo(() => {
-    const q = locFilter.trim().toLowerCase();
-    if (!q) return locations;
-    return locations.filter((loc) => {
-      const parentMatch = loc.name.toLowerCase().includes(q);
-      const childMatch = (loc.children || []).some((s) => s.name.toLowerCase().includes(q));
-      return parentMatch || childMatch;
-    });
-  }, [locations, locFilter]);
+  // ── actions ─────────────────────────────────────────────────────────────────
 
-  const filteredCategoryPaths = React.useMemo(() => {
-    const q = catFilter.trim().toLowerCase();
-    if (!q) return categoryPaths;
-    return categoryPaths.filter((p) => p.toLowerCase().includes(q));
-  }, [categoryPaths, catFilter]);
+  const applyLocationId = React.useCallback((loc: string) => {
+    setLocationId(loc);
+    setRackLocation("");
+    const parent = findParentForLocationValue(loc, locations);
+    setSubPickerParent(parent?.children?.length ? parent : null);
+  }, [locations]);
 
-  const filteredUnitsForPicker = React.useMemo(() => {
-    const q = unitFilter.trim().toLowerCase();
-    if (!q) return units;
-    return units.filter((u) => {
-      const parentMatch = u.name.toLowerCase().includes(q);
-      const childMatch = (u.children || []).some((s) => s.name.toLowerCase().includes(q));
-      return parentMatch || childMatch;
-    });
-  }, [units, unitFilter]);
+  const selectParentLocation = (loc: ItemWithSubcategories) => {
+    if (loc.children?.length) {
+      setSubPickerParent(loc);
+      const firstSub = loc.children[0];
+      if (firstSub) setLocationId(`${loc.id}/${firstSub.id}`);
+    } else {
+      setSubPickerParent(null);
+      setLocationId(loc.id);
+    }
+    setRackLocation("");
+  };
 
-  const filteredProjects = React.useMemo(() => {
-    const q = projFilter.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => p.name.toLowerCase().includes(q));
-  }, [projects, projFilter]);
-
-  const applyLocationId = React.useCallback(
-    (loc: string) => {
-      setLocationId(loc);
-      setRackLocation("");
-      const parent = findParentForLocationValue(loc, locations);
-      setSubPickerParent(parent?.children?.length ? parent : null);
-    },
-    [locations]
-  );
+  const selectSubLocation = (parent: ItemWithSubcategories, subId: string) => {
+    setLocationId(`${parent.id}/${subId}`);
+    setRackLocation("");
+  };
 
   const selectParentUnit = React.useCallback((u: ItemWithSubcategories) => {
     setUnit(u.name);
@@ -479,10 +358,6 @@ export function MobileQuickAddDialog({
     }
   }, []);
 
-  const selectSubUnitSize = React.useCallback((_parent: ItemWithSubcategories, subName: string) => {
-    setUnitSubcategory(subName);
-  }, []);
-
   const hydrate = React.useCallback(() => {
     const prefs = loadPrefs();
     const ds = SettingsService.loadDefaultSettings();
@@ -490,26 +365,17 @@ export function MobileQuickAddDialog({
     const cat =
       prefs.category ||
       (ds.defaultCategory && paths.includes(ds.defaultCategory) ? ds.defaultCategory : "") ||
-      paths[0] ||
-      "";
-    let loc =
-      prefs.location ||
-      ds.defaultLocation ||
-      locations[0]?.id ||
-      "";
+      paths[0] || "";
+    let loc = prefs.location || ds.defaultLocation || locations[0]?.id || "";
     if (loc && !loc.includes("/")) {
       const top = locations.find((l) => l.id === loc);
-      if (top?.children?.length) {
-        loc = `${top.id}/${top.children[0].id}`;
-      }
+      if (top?.children?.length) loc = `${top.id}/${top.children[0].id}`;
     }
     let u = prefs.unit || ds.defaultUnit || defaultUnitName || units[0]?.name || "";
     const unitParent = units.find((x) => x.name === u);
     let uSub = prefs.unitSubcategory || "";
     if (unitParent?.children?.length) {
-      if (!uSub || !unitParent.children.some((c) => c.name === uSub)) {
-        uSub = unitParent.children[0].name;
-      }
+      if (!uSub || !unitParent.children.some((c) => c.name === uSub)) uSub = unitParent.children[0].name;
     } else {
       uSub = "";
     }
@@ -532,21 +398,12 @@ export function MobileQuickAddDialog({
     setAssetStatus("active");
     setAssetTrackingMode("line_item");
     setRackLocation(prefs.rackLocation?.trim() ?? "");
-    setLocFilter("");
-    setCatFilter("");
-    setUnitFilter("");
-    setProjFilter("");
-    if (!loc) {
-      setOpenSection("location");
-    } else if (!cat) {
-      setOpenSection("category");
-    } else if (!u) {
-      setOpenSection("unit");
-    } else if (!proj) {
-      setOpenSection("project");
-    } else {
-      setOpenSection(null);
-    }
+
+    if (!loc) setOpenSection("location");
+    else if (!cat) setOpenSection("category");
+    else if (!u) setOpenSection("unit");
+    else if (!proj) setOpenSection("project");
+    else setOpenSection(null);
   }, [categories, locations, projects, defaultUnitName, units, applyLocationId]);
 
   React.useEffect(() => {
@@ -557,10 +414,7 @@ export function MobileQuickAddDialog({
   }, [open, hydrate]);
 
   React.useEffect(() => {
-    return () => {
-      recognitionRef.current?.abort?.();
-      recognitionRef.current = null;
-    };
+    return () => { recognitionRef.current?.abort?.(); recognitionRef.current = null; };
   }, []);
 
   const persistSelections = React.useCallback(() => {
@@ -576,39 +430,19 @@ export function MobileQuickAddDialog({
 
   const buildPayload = React.useCallback((): Omit<InventoryItem, "id" | "lastUpdated"> | null => {
     const trimmed = name.trim();
-    if (trimmed.length < 2) {
-      toast.error("Enter a name (at least 2 characters).");
-      return null;
-    }
-    if (!category) {
-      toast.error("Choose a category.");
-      return null;
-    }
-    if (!locationId) {
-      toast.error("Choose a location.");
-      return null;
-    }
-    if (!unit) {
-      toast.error("Choose a unit.");
-      return null;
-    }
+    if (trimmed.length < 2) { toast.error("Enter a name (at least 2 characters)."); return null; }
+    if (!category) { toast.error("Choose a category."); return null; }
+    if (!locationId) { toast.error("Choose a location."); return null; }
+    if (!unit) { toast.error("Choose a unit."); return null; }
 
     const unitParentRow = units.find((x) => x.name === unit);
     if (unitParentRow?.children?.length) {
-      if (!unitSubcategory.trim()) {
-        toast.error("Choose a unit size for this unit type.");
-        return null;
-      }
-      if (!unitParentRow.children.some((c) => c.name === unitSubcategory)) {
-        toast.error("Invalid unit size.");
-        return null;
-      }
+      if (!unitSubcategory.trim()) { toast.error("Choose a unit size."); return null; }
+      if (!unitParentRow.children.some((c) => c.name === unitSubcategory)) { toast.error("Invalid unit size."); return null; }
     }
 
     const ds = SettingsService.loadDefaultSettings();
-    const supplierName =
-      suppliers.find((s) => s.name === ds.defaultSupplier)?.name ?? suppliers[0]?.name ?? "";
-
+    const supplierName = suppliers.find((s) => s.name === ds.defaultSupplier)?.name ?? suppliers[0]?.name ?? "";
     const today = getTodayDateInputValue();
 
     return {
@@ -643,36 +477,13 @@ export function MobileQuickAddDialog({
       companyAssetTag: undefined,
       photoUrl: photoUrl.trim() || undefined,
     };
-  }, [
-    name,
-    quantity,
-    unit,
-    unitSubcategory,
-    category,
-    locationId,
-    project,
-    suppliers,
-    photoUrl,
-    barcode,
-    units,
-    assetStatus,
-    assetTrackingMode,
-    rackLocation,
-  ]);
+  }, [name, quantity, unit, unitSubcategory, category, locationId, project, suppliers, photoUrl, barcode, units, assetStatus, assetTrackingMode, rackLocation]);
 
   const handleSubmit = async (mode: "once" | "next") => {
     const payload = buildPayload();
     if (!payload) return;
     persistSelections();
-    saveLast({
-      location: locationId,
-      category,
-      unit,
-      unitSubcategory: unitSubcategory || undefined,
-      project,
-      rackLocation: rackLocation.trim() || undefined,
-      name: payload.name,
-    });
+    saveLast({ location: locationId, category, unit, unitSubcategory: unitSubcategory || undefined, project, rackLocation: rackLocation.trim() || undefined, name: payload.name });
     bumpUsage(category, locationId);
     setUsageTick((t) => t + 1);
     try {
@@ -693,73 +504,34 @@ export function MobileQuickAddDialog({
 
   const applySameAsLast = () => {
     const last = loadLast();
-    if (!last) {
-      toast.info("No previous quick-add row yet.");
-      return;
-    }
-    if (!categoryPaths.includes(last.category)) {
-      toast.error("Saved category no longer exists.");
-      return;
-    }
-    const locOk =
-      locations.some((l) => l.id === last.location) ||
+    if (!last) { toast.info("No previous quick-add row yet."); return; }
+    if (!categoryPaths.includes(last.category)) { toast.error("Saved category no longer exists."); return; }
+    const locOk = locations.some((l) => l.id === last.location) ||
       locations.some((l) => (l.children || []).some((s) => `${l.id}/${s.id}` === last.location));
-    if (!locOk) {
-      toast.error("Saved location no longer exists.");
-      return;
-    }
-    if (!units.some((u) => u.name === last.unit)) {
-      toast.error("Saved unit no longer exists.");
-      return;
-    }
+    if (!locOk) { toast.error("Saved location no longer exists."); return; }
+    if (!units.some((u) => u.name === last.unit)) { toast.error("Saved unit no longer exists."); return; }
     setCategory(last.category);
     applyLocationId(last.location);
     setUnit(last.unit);
     const uParent = units.find((x) => x.name === last.unit);
     if (uParent?.children?.length) {
-      const sub =
-        last.unitSubcategory && uParent.children.some((c) => c.name === last.unitSubcategory)
-          ? last.unitSubcategory
-          : uParent.children[0].name;
+      const sub = last.unitSubcategory && uParent.children.some((c) => c.name === last.unitSubcategory)
+        ? last.unitSubcategory : uParent.children[0].name;
       setUnitSubcategory(sub);
       setUnitSubPickerParent(uParent);
     } else {
       setUnitSubcategory("");
       setUnitSubPickerParent(null);
     }
-    setProject(
-      last.project && projects.some((p) => p.id === last.project || p.name === last.project)
-        ? last.project
-        : ""
-    );
+    setProject(last.project && projects.some((p) => p.id === last.project || p.name === last.project) ? last.project : "");
     setRackLocation(last.rackLocation?.trim() ?? "");
-    toast.success("Applied last item’s location, category, unit, and rack (if saved).");
-  };
-
-  const applyLastName = () => {
-    const last = loadLast();
-    const n = last?.name?.trim();
-    if (!n) {
-      toast.info("No previous item name saved yet.");
-      return;
-    }
-    setName(n);
-    requestAnimationFrame(() => nameRef.current?.focus());
-    toast.success("Applied last item name.");
+    toast.success("Applied last item's settings.");
   };
 
   const startVoice = () => {
     const Ctor = getSpeechRecognitionCtor();
-    if (!Ctor) {
-      toast.error("Voice input is not supported in this browser.");
-      return;
-    }
-    if (listening) {
-      recognitionRef.current?.abort?.();
-      recognitionRef.current = null;
-      setListening(false);
-      return;
-    }
+    if (!Ctor) { toast.error("Voice input is not supported in this browser."); return; }
+    if (listening) { recognitionRef.current?.abort?.(); recognitionRef.current = null; setListening(false); return; }
     try {
       const r = new Ctor();
       recognitionRef.current = r;
@@ -769,79 +541,72 @@ export function MobileQuickAddDialog({
       r.continuous = false;
       r.onresult = (event: SpeechRecognitionEvent) => {
         const text = event.results[0]?.[0]?.transcript?.trim() ?? "";
-        if (text) {
-          setName((prev) => (prev ? `${prev} ${text}` : text));
-        }
+        if (text) setName((prev) => (prev ? `${prev} ${text}` : text));
         setListening(false);
         recognitionRef.current = null;
       };
-      r.onerror = () => {
-        setListening(false);
-        recognitionRef.current = null;
-        toast.error("Voice input failed.");
-      };
-      r.onend = () => {
-        setListening(false);
-        recognitionRef.current = null;
-      };
+      r.onerror = () => { setListening(false); recognitionRef.current = null; toast.error("Voice input failed."); };
+      r.onend = () => { setListening(false); recognitionRef.current = null; };
       r.start();
       setListening(true);
-    } catch {
-      toast.error("Could not start voice input.");
-      setListening(false);
-    }
-  };
-
-  const chipClass = (active: boolean) =>
-    cn(
-      "touch-manipulation min-h-8 rounded-full border px-2 py-1 text-left text-xs font-medium leading-tight transition-colors",
-      active
-        ? "border-primary bg-primary text-primary-foreground"
-        : "border-border bg-background hover:bg-muted"
-    );
-
-  const selectParentLocation = (loc: ItemWithSubcategories) => {
-    if (loc.children?.length) {
-      setSubPickerParent(loc);
-      const firstSub = loc.children[0];
-      if (firstSub) {
-        setLocationId(`${loc.id}/${firstSub.id}`);
-      }
-    } else {
-      setSubPickerParent(null);
-      setLocationId(loc.id);
-    }
-    setRackLocation("");
-  };
-
-  const selectSubLocation = (parent: ItemWithSubcategories, subId: string) => {
-    setLocationId(`${parent.id}/${subId}`);
-    setRackLocation("");
+    } catch { toast.error("Could not start voice input."); setListening(false); }
   };
 
   const readPhotoFile = (file: File) => {
-    void normalizeImageFileToDataUrl(file, {
-      targetBytes: TARGET_PHOTO_BYTES,
-    })
-      .then((normalizedDataUrl) => {
-        const finalBytes = estimateDataUrlBytes(normalizedDataUrl);
-        if (finalBytes > TARGET_PHOTO_BYTES) {
-          toast.error("Photo is still too large after compression. Try a smaller image.");
-          return;
-        }
-        setPhotoUrl(normalizedDataUrl);
+    void normalizeImageFileToDataUrl(file, { targetBytes: TARGET_PHOTO_BYTES })
+      .then((url) => {
+        if (estimateDataUrlBytes(url) > TARGET_PHOTO_BYTES) { toast.error("Photo too large after compression."); return; }
+        setPhotoUrl(url);
       })
-      .catch(() => {
-        toast.error("Could not process the selected photo.");
-      });
+      .catch(() => toast.error("Could not process photo."));
   };
 
-  const lastSnapshot = loadLast();
+  // ── chip class ──────────────────────────────────────────────────────────────
+
+  const chipClass = (active: boolean) => cn(
+    "touch-manipulation min-h-[2rem] rounded-full border px-2.5 py-1 text-left text-xs font-medium leading-tight transition-colors",
+    active
+      ? "border-primary bg-primary text-primary-foreground"
+      : "border-border bg-background hover:bg-muted"
+  );
+
+  // ── section expand state ────────────────────────────────────────────────────
+
   const detailsOpen = openSection === "details";
   const allLocOpen = openSection === "location";
   const allCatOpen = openSection === "category";
   const allUnitOpen = openSection === "unit";
   const allProjOpen = openSection === "project";
+
+  const sectionHeader = (
+    icon: React.ReactNode,
+    label: string,
+    sublabel: string,
+    isOpen: boolean,
+    toggle: () => void,
+    highlight: boolean,
+  ) => (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-muted/30 transition-colors"
+      onClick={toggle}
+      aria-expanded={isOpen}
+    >
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className={cn("shrink-0", highlight ? "text-primary" : "text-muted-foreground")} aria-hidden>{icon}</span>
+        <span className="text-sm font-semibold">{label}</span>
+        {sublabel && <span className="truncate text-xs font-normal text-muted-foreground/80">{sublabel}</span>}
+      </span>
+      <ChevronDown
+        className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")}
+        aria-hidden
+      />
+    </button>
+  );
+
+  const lastSnapshot = loadLast();
+
+  // ── render ──────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -862,615 +627,350 @@ export function MobileQuickAddDialog({
         onFallbackToFiles={() => galleryInputRef.current?.click()}
       />
 
+      {/* Hidden gallery file input */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) readPhotoFile(file);
+        }}
+      />
+
       <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
         <DialogContent
           nonModalBackdrop
           className={cn(
-            "flex w-[calc(100vw-0.75rem)] max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:w-auto sm:max-w-3xl md:max-w-4xl lg:max-w-5xl",
+            "flex w-[calc(100vw-0.75rem)] max-h-[90vh] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:w-auto sm:max-w-2xl md:max-w-3xl",
             "sm:rounded-xl",
-            "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
-            "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"
+            "!left-1/2 !right-auto !top-[max(0.5rem,5vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <DialogHeader className="shrink-0 border-b px-4 py-3 text-left sm:px-6 sm:py-4">
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold sm:text-lg">
-              <Zap className="h-5 w-5" aria-hidden />
+          {/* ── HEADER ──────────────────────────────────────────────────────── */}
+          <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-5">
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+              <Zap className="h-4 w-4 text-amber-500" aria-hidden />
               Quick add
             </DialogTitle>
           </DialogHeader>
 
-          <div
-            className="shrink-0 border-b border-border/50 bg-muted/35 px-4 py-3 backdrop-blur-sm sm:px-6"
-            aria-label="Current selection and quick navigation"
-          >
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Current</p>
-            <div className="mt-2 grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-4 md:gap-3">
-              <button
-                type="button"
-                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-2.5 py-2 text-left font-medium shadow-sm hover:bg-accent"
-                onClick={() => {
-                  setOpenSection("location");
-                  jumpTo("location", sectionAllLocRef);
-                }}
-              >
-                <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="truncate">{locationStripLabel || "—"}</span>
-              </button>
-              <button
-                type="button"
-                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-2.5 py-2 text-left font-medium shadow-sm hover:bg-accent"
-                onClick={() => {
-                  setOpenSection("category");
-                  jumpTo("category", sectionAllCatRef);
-                }}
-              >
-                <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="truncate">{category || "—"}</span>
-              </button>
-              <button
-                type="button"
-                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-2.5 py-2 text-left font-medium shadow-sm hover:bg-accent"
-                onClick={() => {
-                  setOpenSection("unit");
-                  jumpTo("unit", sectionUnitRef);
-                }}
-              >
-                <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="truncate">{unitStripLabel || "—"}</span>
-              </button>
-              <button
-                type="button"
-                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-2.5 py-2 text-left font-medium shadow-sm hover:bg-accent"
-                onClick={() => {
-                  setOpenSection("project");
-                  jumpTo("project", sectionProjectRef);
-                }}
-              >
-                <Briefcase className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="truncate">{projectStripLabel || "—"}</span>
-              </button>
-            </div>
-
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              <span className="mr-0.5 self-center text-[10px] text-muted-foreground">Go to</span>
-              <Button
-                type="button"
-                variant={jumpHighlight === "name" ? "secondary" : "outline"}
-                size="sm"
-                className="h-8 touch-manipulation px-2.5 text-xs"
-                onClick={() => jumpTo("name", sectionNameRef)}
-              >
-                Name
-              </Button>
-              {showRackLocationRow ? (
-                <Button
+          {/* ── SELECTION STRIP — current values, tap to jump ───────────────── */}
+          <div className="shrink-0 border-b border-border/50 bg-muted/25 px-3 py-2 sm:px-4">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {[
+                { icon: <MapPin className="h-3.5 w-3.5" />, label: locationStripLabel || "Location", key: "location" as const, ref: sectionAllLocRef },
+                { icon: <Tag className="h-3.5 w-3.5" />, label: category || "Category", key: "category" as const, ref: sectionAllCatRef },
+                { icon: <Layers className="h-3.5 w-3.5" />, label: unitStripLabel || "Unit", key: "unit" as const, ref: sectionUnitRef },
+                { icon: <Briefcase className="h-3.5 w-3.5" />, label: projectStripLabel || "Project", key: "project" as const, ref: sectionProjectRef },
+              ].map(({ icon, label, key, ref }) => (
+                <button
+                  key={key}
                   type="button"
-                  variant={jumpHighlight === "location" ? "secondary" : "outline"}
-                  size="sm"
-                  className="h-8 touch-manipulation px-2.5 text-xs"
-                  onClick={() => goToRack()}
+                  className={cn(
+                    "flex min-h-9 min-w-0 items-center gap-1.5 rounded-md border px-2 py-1.5 text-left text-xs font-medium shadow-sm transition-colors hover:bg-accent",
+                    jumpHighlight === key
+                      ? "border-primary/60 bg-primary/8 text-primary"
+                      : "border-border/60 bg-background/90"
+                  )}
+                  onClick={() => {
+                    setOpenSection(key);
+                    flashJump(key);
+                    scrollToSection(ref);
+                  }}
                 >
-                  Rack
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant={jumpHighlight === "details" ? "secondary" : "outline"}
-                size="sm"
-                className="h-8 touch-manipulation px-2.5 text-xs"
-                onClick={() => {
-                  setOpenSection("details");
-                  jumpTo("details", sectionMetaRef);
-                }}
-              >
-                Details
-              </Button>
-              <Button
-                type="button"
-                variant={jumpHighlight === "location" ? "secondary" : "outline"}
-                size="sm"
-                className="h-8 touch-manipulation px-2.5 text-xs"
-                onClick={() => {
-                  setOpenSection("location");
-                  jumpTo("location", sectionAllLocRef);
-                }}
-              >
-                Location
-              </Button>
-              <Button
-                type="button"
-                variant={jumpHighlight === "category" ? "secondary" : "outline"}
-                size="sm"
-                className="h-8 touch-manipulation px-2.5 text-xs"
-                onClick={() => {
-                  setOpenSection("category");
-                  jumpTo("category", sectionAllCatRef);
-                }}
-              >
-                Category
-              </Button>
-              <Button
-                type="button"
-                variant={jumpHighlight === "unit" ? "secondary" : "outline"}
-                size="sm"
-                className="h-8 touch-manipulation px-2.5 text-xs"
-                onClick={() => {
-                  setOpenSection("unit");
-                  jumpTo("unit", sectionUnitRef);
-                }}
-              >
-                Unit
-              </Button>
-              <Button
-                type="button"
-                variant={jumpHighlight === "project" ? "secondary" : "outline"}
-                size="sm"
-                className="h-8 touch-manipulation px-2.5 text-xs"
-                onClick={() => {
-                  setOpenSection("project");
-                  jumpTo("project", sectionProjectRef);
-                }}
-              >
-                Project
-              </Button>
+                  <span className="shrink-0 text-muted-foreground">{icon}</span>
+                  <span className="truncate">{label}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 [-webkit-overflow-scrolling:touch] sm:px-6">
-            <div className="space-y-3 py-3 pr-0 pb-6 sm:space-y-4 sm:py-4">
-              <div ref={sectionNameRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "name")}>
-                <div className="p-3">
-                  <Label htmlFor="quick-name" className="sr-only">
-                    Item name
-                  </Label>
-                <div className="flex gap-1.5">
-                  <Input
-                    id="quick-name"
-                    ref={nameRef}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Item name"
-                    className="h-11 min-w-0 flex-1 text-base touch-manipulation"
-                    autoComplete="off"
-                    enterKeyHint="done"
+          {/* ── NAME + QUICK INPUT STRIP ─────────────────────────────────────── */}
+          <div className="shrink-0 border-b border-border/50 px-3 py-2.5 space-y-2 sm:px-4" ref={sectionNameRef}>
+            {/* Name row */}
+            <div className="flex gap-1.5">
+              <Input
+                id="quick-name"
+                ref={nameRef}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Item name"
+                className="h-11 min-w-0 flex-1 text-base touch-manipulation"
+                autoComplete="off"
+                enterKeyHint="done"
+              />
+              <Button
+                type="button"
+                variant={listening ? "default" : "outline"}
+                size="icon"
+                className="h-11 w-11 shrink-0 touch-manipulation"
+                onClick={startVoice}
+                title={listening ? "Stop listening" : "Voice input"}
+                aria-pressed={listening}
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
+              {lastSnapshot && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11 shrink-0 touch-manipulation"
+                  onClick={applySameAsLast}
+                  title="Re-use last item's settings"
+                  aria-label="Re-use last item's settings"
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            {listening && <p className="text-[10px] text-muted-foreground">Listening…</p>}
+
+            {/* Quick tools row: Qty + Scan + Photo */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Qty stepper */}
+              <div className="flex items-center gap-1 rounded-md border border-border/70 bg-background">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 touch-manipulation rounded-r-none border-r border-border/50"
+                  onClick={() => setQuantity((q) => Math.max(0, q - 1))}
+                  aria-label="Decrease quantity"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </Button>
+                <input
+                  type="number"
+                  min={0}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(0, Number(e.target.value) || 0))}
+                  onFocus={(e) => e.target.select()}
+                  className="h-9 w-10 border-0 bg-transparent text-center text-sm font-medium focus:outline-none touch-manipulation"
+                  aria-label="Quantity"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 touch-manipulation rounded-l-none border-l border-border/50"
+                  onClick={() => setQuantity((q) => q + 1)}
+                  aria-label="Increase quantity"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
+              {/* Barcode scan — always one tap */}
+              <Button
+                type="button"
+                variant={barcode ? "secondary" : "outline"}
+                size="sm"
+                className="h-9 flex-1 min-w-0 touch-manipulation gap-1.5 text-xs"
+                onClick={() => setScannerOpen(true)}
+                title="Scan barcode"
+              >
+                <ScanLine className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{barcode || "Scan barcode"}</span>
+              </Button>
+              {barcode && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 touch-manipulation"
+                  onClick={() => setBarcode("")}
+                  aria-label="Clear barcode"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+
+              {/* Photo — inline thumbnail or camera button */}
+              {photoUrl ? (
+                <div className="relative flex-shrink-0">
+                  <img
+                    src={photoUrl}
+                    alt="Item photo"
+                    className="h-9 w-9 rounded-md border object-cover touch-manipulation cursor-pointer"
+                    onClick={() => setCaptureOpen(true)}
                   />
+                  <button
+                    type="button"
+                    className="absolute -right-1 -top-1 rounded-full border bg-background p-0.5 shadow-sm touch-manipulation"
+                    onClick={() => setPhotoUrl("")}
+                    aria-label="Remove photo"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              ) : (
+                <>
                   <Button
                     type="button"
-                    variant={listening ? "default" : "outline"}
+                    variant="outline"
                     size="icon"
-                    className="h-11 w-11 shrink-0 touch-manipulation"
-                    onClick={startVoice}
-                    title={listening ? "Stop" : "Voice input"}
-                    aria-pressed={listening}
+                    className="h-9 w-9 shrink-0 touch-manipulation"
+                    onClick={() => setCaptureOpen(true)}
+                    title="Take photo"
                   >
-                    <Mic className="h-4 w-4" />
+                    <Camera className="h-3.5 w-3.5" />
                   </Button>
-                  {lastSnapshot?.name ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-11 w-11 shrink-0 touch-manipulation"
-                      onClick={applyLastName}
-                      title="Use last item name"
-                      aria-label="Use last item name"
-                    >
-                      <Type className="h-4 w-4" />
-                    </Button>
-                  ) : null}
-                  {lastSnapshot ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-11 w-11 shrink-0 touch-manipulation"
-                      onClick={applySameAsLast}
-                      title="Apply same as last details"
-                      aria-label="Apply same as last details"
-                    >
-                      <History className="h-4 w-4" />
-                    </Button>
-                  ) : null}
-                </div>
-                {listening ? (
-                  <p className="mt-1 text-[10px] leading-tight text-muted-foreground">Listening…</p>
-                ) : null}
-                {favoriteLocationIds.length > 0 || favoriteCategories.length > 0 ? (
-                  <div className="mt-2.5 space-y-1.5 border-t border-dashed border-border/50 pt-2">
-                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                      <Sparkles className="h-3 w-3 shrink-0 text-amber-500" aria-hidden />
-                      <span>Often used</span>
-                    </div>
-                    {favoriteLocationIds.length > 0 ? (
-                      <div className="space-y-0.5">
-                        {favoriteCategories.length > 0 ? (
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">Loc</p>
-                        ) : null}
-                        <div className="flex flex-wrap gap-1">
-                          {favoriteLocationIds.map((id) => {
-                            const label =
-                              locations
-                                .flatMap((loc) => [
-                                  { id: loc.id, label: loc.name },
-                                  ...(loc.children || []).map((s) => ({
-                                    id: `${loc.id}/${s.id}`,
-                                    label: `${loc.name} / ${s.name}`,
-                                  })),
-                                ])
-                                .find((o) => o.id === id)?.label ?? id;
-                            return (
-                              <button
-                                key={id}
-                                type="button"
-                                className={chipClass(locationId === id)}
-                                onClick={() => applyLocationId(id)}
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                    {favoriteCategories.length > 0 ? (
-                      <div className="space-y-0.5">
-                        {favoriteLocationIds.length > 0 ? (
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">Cat</p>
-                        ) : null}
-                        <div className="flex flex-wrap gap-1">
-                          {favoriteCategories.map((path) => (
-                            <button
-                              key={path}
-                              type="button"
-                              className={chipClass(category === path)}
-                              onClick={() => setCategory(path)}
-                            >
-                              {path}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : !lastSnapshot ? (
-                  <p className="mt-2 text-[11px] text-muted-foreground">Often used shortcuts appear after you add items.</p>
-                ) : null}
-                </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 touch-manipulation"
+                    onClick={() => galleryInputRef.current?.click()}
+                    title="Choose from gallery"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Favorites (often-used chips) */}
+            {(favoriteLocationIds.length > 0 || favoriteCategories.length > 0) && (
+              <div className="flex flex-wrap items-center gap-1 border-t border-dashed border-border/40 pt-1.5">
+                <Sparkles className="h-3 w-3 shrink-0 text-amber-500" aria-hidden />
+                {favoriteLocationIds.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={chipClass(locationId === id)}
+                    onClick={() => applyLocationId(id)}
+                  >
+                    {resolveLocationLabel(id, locations)}
+                  </button>
+                ))}
+                {favoriteCategories.map((path) => (
+                  <button
+                    key={path}
+                    type="button"
+                    className={chipClass(category === path)}
+                    onClick={() => setCategory(path)}
+                  >
+                    {path}
+                  </button>
+                ))}
               </div>
+            )}
+          </div>
 
-              <div ref={sectionMetaRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "details")}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setOpenSection((o) => (o === "details" ? null : "details"))}
-                  aria-expanded={detailsOpen}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <LayoutList className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="text-sm font-semibold">Details</span>
-                    <span className="truncate text-xs font-normal text-muted-foreground/80">{detailsIndicator}</span>
-                  </span>
-                  <ChevronDown
-                    className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", detailsOpen && "rotate-180")}
-                    aria-hidden
-                  />
-                </button>
-                {detailsOpen ? (
-                  <div className="border-t border-border/50 bg-muted/5 px-3 pb-3 pt-2.5">
-                <div className="space-y-0">
-                  <div className="space-y-1 pb-2">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Asset status</Label>
-                    <select
-                      value={assetStatus}
-                      onChange={(e) => setAssetStatus(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-                    >
-                      <option value="active">Active</option>
-                      <option value="hot_spare">Hot Spare</option>
-                      <option value="cold_spare">Cold Spare</option>
-                      <option value="in_service">In Service</option>
-                      <option value="ready_decommission">Ready to Decommission</option>
-                      <option value="slated_removal">Slated for Removal</option>
-                      <option value="cut_over_pending">Cut-over pending</option>
-                      <option value="ewaste">E-Waste</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
+          {/* ── SCROLLABLE PICKER SECTIONS ───────────────────────────────────── */}
+          <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-0 [-webkit-overflow-scrolling:touch]">
+            <div className="divide-y divide-border/40 pb-4">
 
-                  <div className="space-y-1 border-t border-dashed border-border/50 pt-2">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Units &amp; tagging</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={assetTrackingMode === "line_item" ? "secondary" : "outline"}
-                        className="h-8 touch-manipulation px-3 text-xs"
-                        onClick={() => setAssetTrackingMode("line_item")}
-                      >
-                        Single unit
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={assetTrackingMode === "per_unit" ? "secondary" : "outline"}
-                        className="h-8 touch-manipulation px-3 text-xs"
-                        onClick={() => setAssetTrackingMode("per_unit")}
-                      >
-                        Multiple units
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 border-t border-dashed border-border/50 pb-2 pt-2">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Barcode (optional)</Label>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-9 touch-manipulation px-2.5 text-xs"
-                        onClick={() => setScannerOpen(true)}
-                      >
-                        <ScanLine className="mr-1 h-3.5 w-3.5" />
-                        Scan
-                      </Button>
-                      <Input
-                        value={barcode}
-                        onChange={(e) => setBarcode(e.target.value)}
-                        placeholder="Or type"
-                        className="h-9 min-w-0 flex-1 touch-manipulation text-sm"
-                      />
-                      {barcode ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() => setBarcode("")}
-                          aria-label="Clear barcode"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 border-t border-dashed border-border/50 pt-2">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Photo (optional)</Label>
-                    <input
-                      ref={galleryInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      tabIndex={-1}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        if (file) readPhotoFile(file);
-                      }}
-                    />
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-9 touch-manipulation px-2.5 text-xs"
-                        title="Live preview — needs a webcam or permission"
-                        onClick={() => setCaptureOpen(true)}
-                      >
-                        <Camera className="mr-1 h-3.5 w-3.5" />
-                        Camera
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-9 touch-manipulation px-2.5 text-xs"
-                        title="Choose a file from disk"
-                        onClick={() => galleryInputRef.current?.click()}
-                      >
-                        <ImagePlus className="mr-1 h-3.5 w-3.5" />
-                        Gallery
-                      </Button>
-                      {photoUrl ? (
-                        <>
-                          <img
-                            src={photoUrl}
-                            alt=""
-                            className="h-10 w-10 rounded border object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 shrink-0 touch-manipulation"
-                            onClick={() => setPhotoUrl("")}
-                            aria-label="Remove photo"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 border-t border-dashed border-border/50 pt-2">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Quantity</Label>
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10 shrink-0 touch-manipulation"
-                        onClick={() => setQuantity((q) => Math.max(0, q - 1))}
-                        aria-label="Decrease quantity"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={quantity}
-                        onChange={(e) => setQuantity(Math.max(0, Number(e.target.value) || 0))}
-                        className="h-10 w-[4rem] text-center text-base touch-manipulation"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10 shrink-0 touch-manipulation"
-                        onClick={() => setQuantity((q) => q + 1)}
-                        aria-label="Increase quantity"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                  </div>
-                ) : null}
-              </div>
-
+              {/* LOCATION */}
               <div ref={sectionAllLocRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "location")}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setOpenSection((o) => (o === "location" ? null : "location"))}
-                  aria-expanded={allLocOpen}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-sm font-semibold">All locations</span>
-                    <span className="truncate text-xs font-normal text-muted-foreground/80">
-                      {locationStripLabel || "Not set"}
-                    </span>
-                  </span>
-                  <ChevronDown
-                    className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allLocOpen && "rotate-180")}
-                    aria-hidden
-                  />
-                </button>
-                {allLocOpen ? (
-                  <div className="border-t border-border/60 px-2.5 pb-2.5 pt-2">
-                    <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                      Location
-                    </Label>
-                    <Combobox
-                      options={flatLocationPickOptions}
-                      value={locationId}
-                      onChange={(id) => applyLocationId(id)}
-                      placeholder="Select location"
-                      emptyText="No location matches."
-                    />
-                    <Input
-                      value={locFilter}
-                      onChange={(e) => setLocFilter(e.target.value)}
-                      placeholder="Filter chip lists…"
-                      className="mb-2 mt-2 h-9 text-sm placeholder:text-muted-foreground/50"
-                      aria-label="Filter location chip list"
-                    />
+                {sectionHeader(
+                  <MapPin className="h-4 w-4" />,
+                  "Location",
+                  locationStripLabel || "Not set",
+                  allLocOpen,
+                  () => setOpenSection((o) => (o === "location" ? null : "location")),
+                  jumpHighlight === "location",
+                )}
+                {allLocOpen && (
+                  <div className="px-3 pb-3 pt-1.5">
+                    {/* Parent location chips */}
                     <div className="flex flex-wrap gap-1">
-                      {filteredLocationsForPicker.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground">No locations match.</p>
-                      ) : (
-                        filteredLocationsForPicker.map((loc) => (
+                      {locations.length === 0
+                        ? <p className="text-[11px] text-muted-foreground">No locations defined.</p>
+                        : locations.map((loc) => (
                           <button
                             key={loc.id}
                             type="button"
                             className={chipClass(
                               locationId === loc.id ||
-                                locationId.startsWith(`${loc.id}/`) ||
-                                subPickerParent?.id === loc.id
+                              locationId.startsWith(`${loc.id}/`) ||
+                              subPickerParent?.id === loc.id
                             )}
                             onClick={() => selectParentLocation(loc)}
                           >
                             {loc.name}
                           </button>
-                        ))
-                      )}
+                        ))}
                     </div>
+
+                    {/* Sub-location chips */}
                     {subPickerParent && (subPickerParent.children?.length ?? 0) > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1 border-t border-dashed border-border/50 pt-1.5">
-                        {subPickerParent
-                          .children!.filter((sub) => {
-                            const q = locFilter.trim().toLowerCase();
-                            if (!q) return true;
-                            return sub.name.toLowerCase().includes(q);
-                          })
-                          .map((sub) => (
-                            <button
-                              key={sub.id}
-                              type="button"
-                              className={chipClass(locationId === `${subPickerParent.id}/${sub.id}`)}
-                              onClick={() => selectSubLocation(subPickerParent, sub.id)}
-                            >
-                              {sub.name}
-                            </button>
-                          ))}
+                      <div className="mt-1.5 flex flex-wrap gap-1 border-t border-dashed border-border/40 pt-1.5">
+                        {subPickerParent.children!.map((sub) => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            className={chipClass(locationId === `${subPickerParent.id}/${sub.id}`)}
+                            onClick={() => selectSubLocation(subPickerParent, sub.id)}
+                          >
+                            {sub.name}
+                          </button>
+                        ))}
                       </div>
                     )}
-                    {showRackLocationRow ? (
-                      <div
-                        ref={sectionRackInLocRef}
-                        className="mt-3 border-t border-dashed border-border/50 bg-muted/5 px-0.5 pt-3"
-                      >
-                        <div className="mb-2 flex items-center gap-2">
-                          <Warehouse className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                          <span className="text-xs font-semibold text-foreground">Rack location</span>
+
+                    {/* Rack location */}
+                    {showRackLocationRow && (
+                      <div ref={sectionRackInLocRef} className="mt-2 border-t border-dashed border-border/40 pt-2">
+                        <div className="mb-1.5 flex items-center gap-1.5">
+                          <Warehouse className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                          <span className="text-xs font-semibold">Rack</span>
+                          {rackLocation && (
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                              {rackLocation}
+                            </span>
+                          )}
                         </div>
-                        {quickRackOptions.length === 0 ? (
-                          <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
-                            No rack presets for this location. Enter a custom rack ID.
-                          </p>
-                        ) : null}
-                        <Combobox
-                          options={quickRackComboboxOptions}
-                          value={rackLocation}
-                          onChange={(v) => setRackLocation(v)}
-                          placeholder="Select rack or type…"
-                          emptyText="No rack matches."
-                          allowCustomValue
-                        />
+                        {quickRackOptions.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {quickRackOptions.map((slot) => (
+                              <button
+                                key={slot}
+                                type="button"
+                                className={chipClass(rackLocation === slot)}
+                                onClick={() => setRackLocation(rackLocation === slot ? "" : slot)}
+                              >
+                                {slot}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <Input
+                            ref={customRackRef}
+                            value={rackLocation}
+                            onChange={(e) => setRackLocation(e.target.value)}
+                            placeholder="Rack / bay ID"
+                            className="h-9 text-sm touch-manipulation"
+                          />
+                        )}
                       </div>
-                    ) : null}
+                    )}
                   </div>
-                ) : null}
+                )}
               </div>
 
+              {/* CATEGORY */}
               <div ref={sectionAllCatRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "category")}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setOpenSection((o) => (o === "category" ? null : "category"))}
-                  aria-expanded={allCatOpen}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <Tag className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-sm font-semibold">All categories</span>
-                    <span className="truncate text-xs font-normal text-muted-foreground/80">
-                      {category || "Not set"}
-                    </span>
-                  </span>
-                  <ChevronDown
-                    className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allCatOpen && "rotate-180")}
-                    aria-hidden
-                  />
-                </button>
-                {allCatOpen ? (
-                  <div className="border-t border-border/60 px-2.5 pb-2.5 pt-2">
-                    <Input
-                      value={catFilter}
-                      onChange={(e) => setCatFilter(e.target.value)}
-                      placeholder="Filter categories…"
-                      className="mb-2 h-9 text-sm placeholder:text-muted-foreground/50"
-                      aria-label="Filter category list"
-                    />
+                {sectionHeader(
+                  <Tag className="h-4 w-4" />,
+                  "Category",
+                  category || "Not set",
+                  allCatOpen,
+                  () => setOpenSection((o) => (o === "category" ? null : "category")),
+                  jumpHighlight === "category",
+                )}
+                {allCatOpen && (
+                  <div className="px-3 pb-3 pt-1.5">
                     <div className="flex flex-wrap gap-1">
-                      {filteredCategoryPaths.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground">No categories match.</p>
-                      ) : (
-                        filteredCategoryPaths.map((path) => (
+                      {categoryPaths.length === 0
+                        ? <p className="text-[11px] text-muted-foreground">No categories defined.</p>
+                        : categoryPaths.map((path) => (
                           <button
                             key={path}
                             type="button"
@@ -1479,159 +979,194 @@ export function MobileQuickAddDialog({
                           >
                             {path}
                           </button>
-                        ))
-                      )}
+                        ))}
                     </div>
                   </div>
-                ) : null}
+                )}
               </div>
 
+              {/* UNIT */}
               <div ref={sectionUnitRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "unit")}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setOpenSection((o) => (o === "unit" ? null : "unit"))}
-                  aria-expanded={allUnitOpen}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <Layers className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-sm font-semibold">Unit</span>
-                    <span className="truncate text-xs font-normal text-muted-foreground/80">
-                      {unitStripLabel || "Not set"}
-                    </span>
-                  </span>
-                  <ChevronDown
-                    className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allUnitOpen && "rotate-180")}
-                    aria-hidden
-                  />
-                </button>
-                {allUnitOpen ? (
-                  <div className="border-t border-border/60 px-2.5 pb-2.5 pt-2">
-                    <Input
-                      value={unitFilter}
-                      onChange={(e) => setUnitFilter(e.target.value)}
-                      placeholder="Filter units…"
-                      className="mb-2 h-9 text-sm placeholder:text-muted-foreground/50"
-                      aria-label="Filter units"
-                    />
+                {sectionHeader(
+                  <Layers className="h-4 w-4" />,
+                  "Unit",
+                  unitStripLabel || "Not set",
+                  allUnitOpen,
+                  () => setOpenSection((o) => (o === "unit" ? null : "unit")),
+                  jumpHighlight === "unit",
+                )}
+                {allUnitOpen && (
+                  <div className="px-3 pb-3 pt-1.5">
                     <div className="flex flex-wrap gap-1">
-                      {filteredUnitsForPicker.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground">No units match.</p>
-                      ) : (
-                        filteredUnitsForPicker.map((u) => (
+                      {units.length === 0
+                        ? <p className="text-[11px] text-muted-foreground">No units defined.</p>
+                        : units.map((u) => (
                           <button
                             key={u.id}
                             type="button"
-                            className={chipClass(
-                              unit === u.name &&
-                                (!u.children?.length || unitSubPickerParent?.id === u.id)
-                            )}
+                            className={chipClass(unit === u.name && (!u.children?.length || unitSubPickerParent?.id === u.id))}
                             onClick={() => selectParentUnit(u)}
-                            title={u.children && u.children.length > 0 ? "Has sizes — pick below" : undefined}
+                            title={u.children?.length ? "Has sizes — pick below" : undefined}
                           >
                             {u.name}
                           </button>
-                        ))
-                      )}
+                        ))}
                     </div>
                     {unitSubPickerParent && (unitSubPickerParent.children?.length ?? 0) > 0 && (
-                      <div className="mt-1.5 border-t border-dashed border-border/50 pt-1.5">
-                        <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Sizes
-                        </p>
+                      <div className="mt-1.5 border-t border-dashed border-border/40 pt-1.5">
+                        <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Sizes</p>
                         <div className="flex flex-wrap gap-1">
-                          {unitSubPickerParent
-                            .children!.filter((sub) => {
-                              const q = unitFilter.trim().toLowerCase();
-                              if (!q) return true;
-                              return sub.name.toLowerCase().includes(q);
-                            })
-                            .map((sub) => (
-                              <button
-                                key={sub.id}
-                                type="button"
-                                className={chipClass(
-                                  unit === unitSubPickerParent.name && unitSubcategory === sub.name
-                                )}
-                                onClick={() => selectSubUnitSize(unitSubPickerParent, sub.name)}
-                              >
-                                {sub.name}
-                              </button>
-                            ))}
+                          {unitSubPickerParent.children!.map((sub) => (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              className={chipClass(unit === unitSubPickerParent.name && unitSubcategory === sub.name)}
+                              onClick={() => setUnitSubcategory(sub.name)}
+                            >
+                              {sub.name}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     )}
                   </div>
-                ) : null}
+                )}
               </div>
 
+              {/* PROJECT */}
               <div ref={sectionProjectRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "project")}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 border-b border-border/50 bg-muted/20 px-3 py-2.5 text-left hover:bg-muted/35"
-                  onClick={() => setOpenSection((o) => (o === "project" ? null : "project"))}
-                  aria-expanded={allProjOpen}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <Briefcase className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-sm font-semibold">Project</span>
-                    <span className="truncate text-xs font-normal text-muted-foreground/80">
-                      {projectStripLabel || "None"}
-                    </span>
-                  </span>
-                  <ChevronDown
-                    className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", allProjOpen && "rotate-180")}
-                    aria-hidden
-                  />
-                </button>
-                {allProjOpen ? (
-                  <div className="border-t border-border/60 px-2.5 pb-2.5 pt-2">
-                    <Input
-                      value={projFilter}
-                      onChange={(e) => setProjFilter(e.target.value)}
-                      placeholder="Filter projects…"
-                      className="mb-2 h-9 text-sm placeholder:text-muted-foreground/50"
-                      aria-label="Filter projects"
-                    />
+                {sectionHeader(
+                  <Briefcase className="h-4 w-4" />,
+                  "Project",
+                  projectStripLabel || "None",
+                  allProjOpen,
+                  () => setOpenSection((o) => (o === "project" ? null : "project")),
+                  jumpHighlight === "project",
+                )}
+                {allProjOpen && (
+                  <div className="px-3 pb-3 pt-1.5">
                     <div className="flex flex-wrap gap-1">
-                      <button
-                        type="button"
-                        className={chipClass(!project)}
-                        onClick={() => setProject("")}
-                      >
+                      <button type="button" className={chipClass(!project)} onClick={() => setProject("")}>
                         None
                       </button>
+                      {projects.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className={chipClass(project === p.id || project === p.name)}
+                          onClick={() => setProject(p.id)}
+                        >
+                          {p.name}
+                        </button>
+                      ))}
                     </div>
-                    {projects.length > 0 ? (
-                      <div className="mt-1.5 border-t border-dashed border-border/50 pt-1.5">
-                        <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Projects
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          {filteredProjects.length === 0 ? (
-                            <p className="text-[11px] text-muted-foreground">No projects match.</p>
-                          ) : (
-                            filteredProjects.map((p) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                className={chipClass(project === p.id || project === p.name)}
-                                onClick={() => setProject(p.id)}
-                              >
-                                {p.name}
-                              </button>
-                            ))
-                          )}
+                  </div>
+                )}
+              </div>
+
+              {/* DETAILS — asset status, tracking mode */}
+              <div ref={sectionMetaRef} className={collapsibleSectionSurfaceClass(jumpHighlight === "details")}>
+                {sectionHeader(
+                  <LayoutList className="h-4 w-4" />,
+                  "Details",
+                  `${ASSET_STATUSES.find((s) => s.value === assetStatus)?.label ?? assetStatus} · ${assetTrackingMode === "line_item" ? "Single" : "Multiple"}`,
+                  detailsOpen,
+                  () => setOpenSection((o) => (o === "details" ? null : "details")),
+                  jumpHighlight === "details",
+                )}
+                {detailsOpen && (
+                  <div className="px-3 pb-3 pt-1.5 space-y-3">
+                    {/* Asset status chips */}
+                    <div>
+                      <Label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Asset status</Label>
+                      <div className="flex flex-wrap gap-1">
+                        {ASSET_STATUSES.map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            className={chipClass(assetStatus === value)}
+                            onClick={() => setAssetStatus(value)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Tracking mode */}
+                    <div>
+                      <Label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Tracking</Label>
+                      <div className="flex gap-1.5">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={assetTrackingMode === "line_item" ? "secondary" : "outline"}
+                          className="h-8 touch-manipulation px-3 text-xs"
+                          onClick={() => setAssetTrackingMode("line_item")}
+                        >
+                          Single unit
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={assetTrackingMode === "per_unit" ? "secondary" : "outline"}
+                          className="h-8 touch-manipulation px-3 text-xs"
+                          onClick={() => setAssetTrackingMode("per_unit")}
+                        >
+                          Multiple units
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Photo (if not yet set via quick strip) */}
+                    {!photoUrl && (
+                      <div>
+                        <Label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Photo (optional)</Label>
+                        <div className="flex gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 touch-manipulation px-2.5 text-xs"
+                            onClick={() => setCaptureOpen(true)}
+                          >
+                            <Camera className="mr-1 h-3.5 w-3.5" /> Camera
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 touch-manipulation px-2.5 text-xs"
+                            onClick={() => galleryInputRef.current?.click()}
+                          >
+                            <ImagePlus className="mr-1 h-3.5 w-3.5" /> Gallery
+                          </Button>
                         </div>
                       </div>
-                    ) : null}
+                    )}
+                    {photoUrl && (
+                      <div className="flex items-center gap-2">
+                        <img src={photoUrl} alt="" className="h-10 w-10 rounded border object-cover" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs touch-manipulation"
+                          onClick={() => setPhotoUrl("")}
+                        >
+                          <Trash2 className="mr-1 h-3 w-3" /> Remove photo
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                ) : null}
+                )}
               </div>
+
             </div>
           </div>
 
-          <DialogFooter className="shrink-0 flex-col gap-1 border-t bg-background p-2.5 sm:flex-col">
+          {/* ── FOOTER ──────────────────────────────────────────────────────── */}
+          <DialogFooter className="shrink-0 flex-col gap-1 border-t bg-background p-2.5">
             <Button
               type="button"
               className="h-10 w-full touch-manipulation text-sm font-medium"
