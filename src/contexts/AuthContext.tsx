@@ -432,7 +432,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
     try {
-      const redirectTo = `${window.location.origin}/login`;
+      const redirectTo = `${window.location.origin}/`;
       const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo });
       if (error) {
         toast.error(error.message);
