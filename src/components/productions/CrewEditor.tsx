@@ -15,6 +15,14 @@ interface CrewEditorProps {
 }
 
 const EMPTY_MEMBER: Omit<ProductionCrewMember, 'id'> = { name: '', role: '', positionLabel: '' };
+const EMPTY_SHIFT_DRAFT = {
+  date: '',
+  callTime: '',
+  startTime: '',
+  endTime: '',
+  location: '',
+  notes: '',
+};
 
 export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConfirm = false }: CrewEditorProps) {
   const [draft, setDraft] = useState<Omit<ProductionCrewMember, 'id'>>(EMPTY_MEMBER);
@@ -22,6 +30,19 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
   const [masterSearch, setMasterSearch] = useState('');
   const [masterContacts, setMasterContacts] = useState<CrewContact[]>(() => getCrewContacts());
   const [pendingDeleteMemberId, setPendingDeleteMemberId] = useState<string | null>(null);
+  const [shiftDraftsByMemberId, setShiftDraftsByMemberId] = useState<
+    Record<
+      string,
+      {
+        date: string;
+        callTime: string;
+        startTime: string;
+        endTime: string;
+        location: string;
+        notes: string;
+      }
+    >
+  >({});
 
   useEffect(() => {
     const refresh = () => setMasterContacts(getCrewContacts());
@@ -44,6 +65,99 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
 
   const updateMember = (id: string, updates: Partial<ProductionCrewMember>) => {
     onChange(crew.map((m) => (m.id === id ? { ...m, ...updates } : m)));
+  };
+
+  const getShiftDraft = (memberId: string) => shiftDraftsByMemberId[memberId] ?? EMPTY_SHIFT_DRAFT;
+
+  const updateShiftDraft = (
+    memberId: string,
+    updates: Partial<{
+      date: string;
+      callTime: string;
+      startTime: string;
+      endTime: string;
+      location: string;
+      notes: string;
+    }>,
+  ) => {
+    setShiftDraftsByMemberId((previous) => ({
+      ...previous,
+      [memberId]: {
+        ...getShiftDraft(memberId),
+        ...updates,
+      },
+    }));
+  };
+
+  const addShiftForMember = (memberId: string) => {
+    const draftForMember = getShiftDraft(memberId);
+    if (!draftForMember.date) return;
+    const shift = {
+      id: crypto.randomUUID(),
+      date: draftForMember.date,
+      callTime: draftForMember.callTime || undefined,
+      startTime: draftForMember.startTime || undefined,
+      endTime: draftForMember.endTime || undefined,
+      location: draftForMember.location.trim() || undefined,
+      notes: draftForMember.notes.trim() || undefined,
+    };
+    onChange(
+      crew.map((member) =>
+        member.id === memberId
+          ? {
+              ...member,
+              shifts: [...(member.shifts ?? []), shift],
+            }
+          : member,
+      ),
+    );
+    setShiftDraftsByMemberId((previous) => ({
+      ...previous,
+      [memberId]: EMPTY_SHIFT_DRAFT,
+    }));
+  };
+
+  const updateShiftForMember = (
+    memberId: string,
+    shiftId: string,
+    updates: Partial<{
+      date: string;
+      callTime?: string;
+      startTime?: string;
+      endTime?: string;
+      location?: string;
+      notes?: string;
+    }>,
+  ) => {
+    onChange(
+      crew.map((member) => {
+        if (member.id !== memberId) return member;
+        return {
+          ...member,
+          shifts: (member.shifts ?? []).map((shift) =>
+            shift.id === shiftId
+              ? {
+                  ...shift,
+                  ...updates,
+                }
+              : shift,
+          ),
+        };
+      }),
+    );
+  };
+
+  const removeShiftForMember = (memberId: string, shiftId: string) => {
+    onChange(
+      crew.map((member) =>
+        member.id === memberId
+          ? {
+              ...member,
+              shifts: (member.shifts ?? []).filter((shift) => shift.id !== shiftId),
+            }
+          : member,
+      ),
+    );
   };
 
   const removeMember = (id: string) => {
@@ -105,39 +219,165 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                 {member.positionLabel && <p className="text-xs text-muted-foreground">{member.positionLabel}</p>}
                 {member.contact && <p className="text-xs text-muted-foreground">{member.contact}</p>}
                 {member.notes && <p className="text-xs text-muted-foreground italic">{member.notes}</p>}
+                {(member.shifts ?? []).length > 0 ? (
+                  <div className="space-y-1">
+                    {(member.shifts ?? []).map((shift) => (
+                      <p key={shift.id} className="text-[11px] text-muted-foreground">
+                        {shift.date}
+                        {shift.callTime ? ` · Call ${shift.callTime}` : ''}
+                        {shift.startTime || shift.endTime ? ` · ${shift.startTime ?? '--:--'}-${shift.endTime ?? '--:--'}` : ''}
+                        {shift.location ? ` · ${shift.location}` : ''}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
               </>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  placeholder="Name *"
-                  className="h-7 text-sm"
-                  value={member.name}
-                  onChange={(e) => updateMember(member.id, { name: e.target.value })}
-                />
-                <Input
-                  placeholder="Role"
-                  className="h-7 text-sm"
-                  value={member.role}
-                  onChange={(e) => updateMember(member.id, { role: e.target.value })}
-                />
-                <Input
-                  placeholder="Contact (phone / email)"
-                  className="h-7 text-sm"
-                  value={member.contact ?? ''}
-                  onChange={(e) => updateMember(member.id, { contact: e.target.value })}
-                />
-                <Input
-                  placeholder="Position label"
-                  className="h-7 text-sm"
-                  value={member.positionLabel ?? ''}
-                  onChange={(e) => updateMember(member.id, { positionLabel: e.target.value })}
-                />
-                <Input
-                  placeholder="Notes"
-                  className="h-7 text-sm"
-                  value={member.notes ?? ''}
-                  onChange={(e) => updateMember(member.id, { notes: e.target.value })}
-                />
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Name *"
+                    className="h-7 text-sm"
+                    value={member.name}
+                    onChange={(e) => updateMember(member.id, { name: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Role"
+                    className="h-7 text-sm"
+                    value={member.role}
+                    onChange={(e) => updateMember(member.id, { role: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Contact (phone / email)"
+                    className="h-7 text-sm"
+                    value={member.contact ?? ''}
+                    onChange={(e) => updateMember(member.id, { contact: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Position label"
+                    className="h-7 text-sm"
+                    value={member.positionLabel ?? ''}
+                    onChange={(e) => updateMember(member.id, { positionLabel: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Notes"
+                    className="h-7 text-sm"
+                    value={member.notes ?? ''}
+                    onChange={(e) => updateMember(member.id, { notes: e.target.value })}
+                  />
+                </div>
+                <div className="rounded-md border p-2">
+                  <p className="mb-1 text-[11px] font-medium text-muted-foreground">Assignment shifts</p>
+                  <div className="space-y-2">
+                    {(member.shifts ?? []).map((shift) => (
+                      <div key={shift.id} className="grid grid-cols-6 gap-1 rounded border p-1.5">
+                        <Input
+                          className="h-7 text-xs"
+                          type="date"
+                          value={shift.date}
+                          onChange={(e) => updateShiftForMember(member.id, shift.id, { date: e.target.value })}
+                        />
+                        <Input
+                          className="h-7 text-xs"
+                          type="time"
+                          value={shift.callTime ?? ''}
+                          onChange={(e) =>
+                            updateShiftForMember(member.id, shift.id, { callTime: e.target.value || undefined })
+                          }
+                        />
+                        <Input
+                          className="h-7 text-xs"
+                          type="time"
+                          value={shift.startTime ?? ''}
+                          onChange={(e) =>
+                            updateShiftForMember(member.id, shift.id, { startTime: e.target.value || undefined })
+                          }
+                        />
+                        <Input
+                          className="h-7 text-xs"
+                          type="time"
+                          value={shift.endTime ?? ''}
+                          onChange={(e) =>
+                            updateShiftForMember(member.id, shift.id, { endTime: e.target.value || undefined })
+                          }
+                        />
+                        <Input
+                          className="h-7 text-xs"
+                          placeholder="Location"
+                          value={shift.location ?? ''}
+                          onChange={(e) =>
+                            updateShiftForMember(member.id, shift.id, { location: e.target.value || undefined })
+                          }
+                        />
+                        <div className="flex items-center justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => removeShiftForMember(member.id, shift.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                        <Input
+                          className="col-span-6 h-7 text-xs"
+                          placeholder="Shift notes"
+                          value={shift.notes ?? ''}
+                          onChange={(e) =>
+                            updateShiftForMember(member.id, shift.id, { notes: e.target.value || undefined })
+                          }
+                        />
+                      </div>
+                    ))}
+                    <div className="grid grid-cols-6 gap-1 rounded border border-dashed p-1.5">
+                      <Input
+                        className="h-7 text-xs"
+                        type="date"
+                        value={getShiftDraft(member.id).date}
+                        onChange={(e) => updateShiftDraft(member.id, { date: e.target.value })}
+                      />
+                      <Input
+                        className="h-7 text-xs"
+                        type="time"
+                        value={getShiftDraft(member.id).callTime}
+                        onChange={(e) => updateShiftDraft(member.id, { callTime: e.target.value })}
+                      />
+                      <Input
+                        className="h-7 text-xs"
+                        type="time"
+                        value={getShiftDraft(member.id).startTime}
+                        onChange={(e) => updateShiftDraft(member.id, { startTime: e.target.value })}
+                      />
+                      <Input
+                        className="h-7 text-xs"
+                        type="time"
+                        value={getShiftDraft(member.id).endTime}
+                        onChange={(e) => updateShiftDraft(member.id, { endTime: e.target.value })}
+                      />
+                      <Input
+                        className="h-7 text-xs"
+                        placeholder="Location"
+                        value={getShiftDraft(member.id).location}
+                        onChange={(e) => updateShiftDraft(member.id, { location: e.target.value })}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => addShiftForMember(member.id)}
+                        disabled={!getShiftDraft(member.id).date}
+                      >
+                        Add shift
+                      </Button>
+                      <Input
+                        className="col-span-6 h-7 text-xs"
+                        placeholder="Shift notes"
+                        value={getShiftDraft(member.id).notes}
+                        onChange={(e) => updateShiftDraft(member.id, { notes: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
