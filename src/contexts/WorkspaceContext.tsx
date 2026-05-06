@@ -26,11 +26,13 @@ const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefi
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { currentUser, authBackend } = useAuth();
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Start as true so the validation effect never fires with an empty list before the first load.
+  const [loading, setLoading] = useState(true);
 
   const refreshWorkspaces = useCallback(async () => {
     if (!isSupabaseConfigured() || authBackend !== 'supabase' || !currentUser?.id) {
       setWorkspaces([]);
+      setLoading(false);
       return;
     }
     setLoading(true);
