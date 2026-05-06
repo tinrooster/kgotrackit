@@ -364,6 +364,7 @@ export function ProductionDetail({
                   <VehiclePacklistEditor
                     packlists={production.vehiclePacklists}
                     onChange={handleVehicleChange}
+                    checklistGroups={production.checklistGroups}
                     inventoryItems={inventoryItems}
                     requireDeleteConfirm={confirmListDeletes}
                   />
@@ -434,6 +435,7 @@ export function ProductionDetail({
                 <VehiclePacklistEditor
                   packlists={production.vehiclePacklists}
                   onChange={handleVehicleChange}
+                  checklistGroups={production.checklistGroups}
                   inventoryItems={inventoryItems}
                   requireDeleteConfirm={confirmListDeletes}
                 />

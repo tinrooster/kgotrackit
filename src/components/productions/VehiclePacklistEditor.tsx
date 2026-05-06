@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Trash2, Truck, Unlink } from 'lucide-react';
-import { VehiclePacklist, ChecklistItem } from '@/types/productions';
+import { VehiclePacklist, ChecklistItem, ChecklistGroup } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ import {
 interface VehiclePacklistEditorProps {
   packlists: VehiclePacklist[];
   onChange: (packlists: VehiclePacklist[]) => void;
+  checklistGroups?: ChecklistGroup[];
   inventoryItems?: InventoryItem[];
   readOnly?: boolean;
   requireDeleteConfirm?: boolean;
@@ -35,12 +36,14 @@ function newItem(label: string): ChecklistItem {
 export function VehiclePacklistEditor({
   packlists,
   onChange,
+  checklistGroups = [],
   inventoryItems = [],
   readOnly = false,
   requireDeleteConfirm = false
 }: VehiclePacklistEditorProps) {
   const [newVehicleName, setNewVehicleName] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
+  const [selectedChecklistGroupByPacklist, setSelectedChecklistGroupByPacklist] = useState<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<{ packlistId?: string; itemId?: string } | null>(null);
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [packedFilter, setPackedFilter] = useState<'all' | 'open' | 'done'>('all');
@@ -92,6 +95,30 @@ export function VehiclePacklistEditor({
     const packlist = packlists.find((p) => p.id === packlistId)!;
     updatePacklist(packlistId, { items: [...packlist.items, newItem(label)] });
     setNewItemLabels((prev) => ({ ...prev, [packlistId]: '' }));
+  };
+
+  const addChecklistPackToPacklist = (packlistId: string) => {
+    const checklistGroupId = selectedChecklistGroupByPacklist[packlistId];
+    if (!checklistGroupId) return;
+    const checklistGroup = checklistGroups.find((group) => group.id === checklistGroupId);
+    const packlist = packlists.find((entry) => entry.id === packlistId);
+    if (!checklistGroup || !packlist) return;
+
+    const existingKeys = new Set(
+      packlist.items.map((item) => `${item.label.toLowerCase()}::${item.inventoryItemId || ''}`)
+    );
+    const additions: ChecklistItem[] = checklistGroup.items
+      .filter((item) => !existingKeys.has(`${item.label.toLowerCase()}::${item.inventoryItemId || ''}`))
+      .map((item) => ({
+        id: crypto.randomUUID(),
+        label: item.label,
+        completed: item.completed,
+        quantity: item.quantity ?? 1,
+        inventoryItemId: item.inventoryItemId,
+        notes: item.notes,
+      }));
+    if (additions.length === 0) return;
+    updatePacklist(packlistId, { items: [...packlist.items, ...additions] });
   };
 
   const addLinkedItem = (packlistId: string, inv: InventoryItem) => {
@@ -319,6 +346,40 @@ export function VehiclePacklistEditor({
                   }
                 }}
               />
+              {checklistGroups.length > 0 && (
+                <>
+                  <Select
+                    value={selectedChecklistGroupByPacklist[packlist.id] || 'none'}
+                    onValueChange={(value) =>
+                      setSelectedChecklistGroupByPacklist((previous) => ({
+                        ...previous,
+                        [packlist.id]: value === 'none' ? '' : value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-7 min-w-[170px] text-xs">
+                      <SelectValue placeholder="Checklist pack" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Checklist pack</SelectItem>
+                      {checklistGroups.map((group) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          {group.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 shrink-0 text-xs"
+                    disabled={!selectedChecklistGroupByPacklist[packlist.id]}
+                    onClick={() => addChecklistPackToPacklist(packlist.id)}
+                  >
+                    Add Pack
+                  </Button>
+                </>
+              )}
               <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={() => addItem(packlist.id)}>
                 <Plus className="h-3.5 w-3.5" />
               </Button>
