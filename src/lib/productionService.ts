@@ -38,6 +38,15 @@ function normalizeProductionChecklistGroupIds(production: Production): Productio
         checkedOutQuantity: Number(item.checkedOutQuantity ?? 0) || 0,
       })),
     })),
+    vehiclePacklists: production.vehiclePacklists.map((packlist) => ({
+      ...packlist,
+      items: packlist.items.map((item) => ({
+        ...item,
+        quantity: normalizeChecklistQuantity(item),
+        reservedQuantity: Number(item.reservedQuantity ?? 0) || 0,
+        checkedOutQuantity: Number(item.checkedOutQuantity ?? 0) || 0,
+      })),
+    })),
   };
 }
 
@@ -117,16 +126,24 @@ export function deleteProduction(id: string): void {
 
 export function getInventoryProductionAllocationMap(productions: Production[] = getProductions()): InventoryProductionAllocationMap {
   const map: InventoryProductionAllocationMap = {};
+  const appendItem = (item: ChecklistItem) => {
+    if (!item.inventoryItemId) return;
+    const key = item.inventoryItemId;
+    if (!map[key]) {
+      map[key] = { reserved: 0, checkedOut: 0 };
+    }
+    map[key].reserved += Number(item.reservedQuantity ?? 0) || 0;
+    map[key].checkedOut += Number(item.checkedOutQuantity ?? 0) || 0;
+  };
   for (const production of productions) {
     for (const group of production.checklistGroups) {
       for (const item of group.items) {
-        if (!item.inventoryItemId) continue;
-        const key = item.inventoryItemId;
-        if (!map[key]) {
-          map[key] = { reserved: 0, checkedOut: 0 };
-        }
-        map[key].reserved += Number(item.reservedQuantity ?? 0) || 0;
-        map[key].checkedOut += Number(item.checkedOutQuantity ?? 0) || 0;
+        appendItem(item);
+      }
+    }
+    for (const packlist of production.vehiclePacklists) {
+      for (const item of packlist.items) {
+        appendItem(item);
       }
     }
   }
@@ -192,65 +209,71 @@ export function applyProductionInventoryAction(
     return true;
   };
 
+  const processLinkedItem = (item: ChecklistItem): ChecklistItem => {
+    if (!item.inventoryItemId) return item;
+    const quantity = normalizeChecklistQuantity(item);
+    const currentReserved = Number(item.reservedQuantity ?? 0) || 0;
+    const currentCheckedOut = Number(item.checkedOutQuantity ?? 0) || 0;
+
+    if (action === 'reserve') {
+      if (currentReserved !== quantity) {
+        changed += 1;
+      }
+      return { ...item, reservedQuantity: quantity };
+    }
+
+    if (action === 'checkout') {
+      const delta = quantity - currentCheckedOut;
+      if (delta <= 0) {
+        return { ...item, reservedQuantity: quantity, checkedOutQuantity: quantity };
+      }
+      const applied = applyToInventoryItem(item.inventoryItemId, (available) => available - delta);
+      if (!applied) return item;
+      changed += 1;
+      recordCheckoutRecentActivity(production, item.label, delta, 'ITEM_CHECKOUT', username);
+      logger.info('audit', 'ITEM_CHECKOUT', {
+        itemId: item.inventoryItemId,
+        itemName: item.label,
+        quantity: delta,
+        cabinetName: `Production: ${production.name}`,
+        cabinetId: `production:${production.id}`,
+        performedBy: username,
+        source: 'productions-module',
+      }, 'ProductionDetail');
+      return { ...item, reservedQuantity: quantity, checkedOutQuantity: quantity };
+    }
+
+    if (action === 'checkin') {
+      const delta = currentCheckedOut;
+      if (delta <= 0) return { ...item, checkedOutQuantity: 0 };
+      const applied = applyToInventoryItem(item.inventoryItemId, (available) => available + delta);
+      if (!applied) return item;
+      changed += 1;
+      recordCheckoutRecentActivity(production, item.label, delta, 'ITEM_CHECKIN', username);
+      logger.info('audit', 'ITEM_CHECKIN', {
+        itemId: item.inventoryItemId,
+        itemName: item.label,
+        quantity: delta,
+        cabinetName: `Production: ${production.name}`,
+        cabinetId: `production:${production.id}`,
+        performedBy: username,
+        source: 'productions-module',
+      }, 'ProductionDetail');
+      return { ...item, checkedOutQuantity: 0 };
+    }
+
+    return item;
+  };
+
   const nextProduction = normalizeProductionChecklistGroupIds({
     ...production,
     checklistGroups: production.checklistGroups.map((group) => ({
       ...group,
-      items: group.items.map((item) => {
-        if (!item.inventoryItemId) return item;
-        const quantity = normalizeChecklistQuantity(item);
-        const currentReserved = Number(item.reservedQuantity ?? 0) || 0;
-        const currentCheckedOut = Number(item.checkedOutQuantity ?? 0) || 0;
-
-        if (action === 'reserve') {
-          if (currentReserved !== quantity) {
-            changed += 1;
-          }
-          return { ...item, reservedQuantity: quantity };
-        }
-
-        if (action === 'checkout') {
-          const delta = quantity - currentCheckedOut;
-          if (delta <= 0) {
-            return { ...item, reservedQuantity: quantity, checkedOutQuantity: quantity };
-          }
-          const applied = applyToInventoryItem(item.inventoryItemId, (available) => available - delta);
-          if (!applied) return item;
-          changed += 1;
-          recordCheckoutRecentActivity(production, item.label, delta, 'ITEM_CHECKOUT', username);
-          logger.info('audit', 'ITEM_CHECKOUT', {
-            itemId: item.inventoryItemId,
-            itemName: item.label,
-            quantity: delta,
-            cabinetName: `Production: ${production.name}`,
-            cabinetId: `production:${production.id}`,
-            performedBy: username,
-            source: 'productions-module',
-          }, 'ProductionDetail');
-          return { ...item, reservedQuantity: quantity, checkedOutQuantity: quantity };
-        }
-
-        if (action === 'checkin') {
-          const delta = currentCheckedOut;
-          if (delta <= 0) return { ...item, checkedOutQuantity: 0 };
-          const applied = applyToInventoryItem(item.inventoryItemId, (available) => available + delta);
-          if (!applied) return item;
-          changed += 1;
-          recordCheckoutRecentActivity(production, item.label, delta, 'ITEM_CHECKIN', username);
-          logger.info('audit', 'ITEM_CHECKIN', {
-            itemId: item.inventoryItemId,
-            itemName: item.label,
-            quantity: delta,
-            cabinetName: `Production: ${production.name}`,
-            cabinetId: `production:${production.id}`,
-            performedBy: username,
-            source: 'productions-module',
-          }, 'ProductionDetail');
-          return { ...item, checkedOutQuantity: 0 };
-        }
-
-        return item;
-      }),
+      items: group.items.map((item) => processLinkedItem(item)),
+    })),
+    vehiclePacklists: production.vehiclePacklists.map((packlist) => ({
+      ...packlist,
+      items: packlist.items.map((item) => processLinkedItem(item)),
     })),
   });
 

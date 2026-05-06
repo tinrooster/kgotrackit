@@ -46,7 +46,7 @@ function toDraft(production?: Production): ProductionDraft {
 interface ProductionFormProps {
   open: boolean;
   production?: Production;
-  onSave: (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew'>) => void;
+  onSave: (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew' | 'crewSchedule'>) => void;
   onClose: () => void;
 }
 

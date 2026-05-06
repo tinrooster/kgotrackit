@@ -71,7 +71,7 @@ export default function ProductionsPage() {
     });
   }, [filtered]);
 
-  const handleCreate = (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew'>) => {
+  const handleCreate = (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew' | 'crewSchedule'>) => {
     createProduction(
       { ...data, checklistGroups: [], vehiclePacklists: [], crew: [], crewSchedule: [] },
       currentUser?.id

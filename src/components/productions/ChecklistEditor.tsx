@@ -5,9 +5,8 @@ import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { InventoryItemPicker } from './InventoryItemPicker';
 
 interface ChecklistEditorProps {
   groups: ChecklistGroup[];
@@ -23,47 +22,6 @@ function newItem(label: string): ChecklistItem {
 
 function newGroup(title: string): ChecklistGroup {
   return { id: crypto.randomUUID(), title, items: [] };
-}
-
-interface InventoryPickerProps {
-  inventoryItems: InventoryItem[];
-  onSelect: (item: InventoryItem) => void;
-}
-
-function InventoryPicker({ inventoryItems, onSelect }: InventoryPickerProps) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Link inventory item">
-          <Link2 className="h-3.5 w-3.5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="end">
-        <Command>
-          <CommandInput placeholder="Search inventory..." />
-          <CommandEmpty>No items found.</CommandEmpty>
-          <CommandGroup className="max-h-56 overflow-y-auto">
-            {inventoryItems.map((inv) => (
-              <CommandItem
-                key={inv.id}
-                value={inv.name}
-                onSelect={() => {
-                  onSelect(inv);
-                  setOpen(false);
-                }}
-              >
-                <span className="truncate">{inv.name}</span>
-                {inv.category && (
-                  <span className="ml-auto pl-2 text-xs text-muted-foreground">{inv.category}</span>
-                )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
 }
 
 export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnly = false }: ChecklistEditorProps) {
@@ -191,7 +149,7 @@ export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnl
                   {!readOnly && (
                     <>
                       {inventoryItems.length > 0 && !item.inventoryItemId && (
-                        <InventoryPicker
+                        <InventoryItemPicker
                           inventoryItems={inventoryItems}
                           onSelect={(inv) => linkInventoryItem(group.id, item.id, inv)}
                         />

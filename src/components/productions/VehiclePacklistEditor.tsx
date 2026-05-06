@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { Plus, Trash2, Truck } from 'lucide-react';
+import { Plus, Trash2, Truck, Unlink } from 'lucide-react';
 import { VehiclePacklist, ChecklistItem } from '@/types/productions';
+import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { InventoryItemPicker } from './InventoryItemPicker';
 
 interface VehiclePacklistEditorProps {
   packlists: VehiclePacklist[];
   onChange: (packlists: VehiclePacklist[]) => void;
+  inventoryItems?: InventoryItem[];
   readOnly?: boolean;
 }
 
@@ -16,7 +19,12 @@ function newItem(label: string): ChecklistItem {
   return { id: crypto.randomUUID(), label, completed: false };
 }
 
-export function VehiclePacklistEditor({ packlists, onChange, readOnly = false }: VehiclePacklistEditorProps) {
+export function VehiclePacklistEditor({
+  packlists,
+  onChange,
+  inventoryItems = [],
+  readOnly = false
+}: VehiclePacklistEditorProps) {
   const [newVehicleName, setNewVehicleName] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
 
@@ -53,6 +61,10 @@ export function VehiclePacklistEditor({ packlists, onChange, readOnly = false }:
     const packlist = packlists.find((p) => p.id === packlistId)!;
     updatePacklist(packlistId, { items: [...packlist.items, newItem(label)] });
     setNewItemLabels((prev) => ({ ...prev, [packlistId]: '' }));
+  };
+
+  const linkInventoryItem = (packlistId: string, itemId: string, inv: InventoryItem) => {
+    updateItem(packlistId, itemId, { inventoryItemId: inv.id, label: inv.name });
   };
 
   if (packlists.length === 0 && readOnly) {
@@ -100,9 +112,42 @@ export function VehiclePacklistEditor({ packlists, onChange, readOnly = false }:
                 <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground line-through')}>
                   {item.label}
                 </span>
-                {item.quantity != null && (
-                  <span className="text-xs text-muted-foreground">×{item.quantity}</span>
+                {!readOnly ? (
+                  <Input
+                    type="number"
+                    min={1}
+                    className="h-7 w-16 text-xs"
+                    value={item.quantity ?? 1}
+                    onChange={(event) =>
+                      updateItem(packlist.id, item.id, {
+                        quantity: Math.max(1, Number(event.target.value) || 1),
+                      })
+                    }
+                  />
+                ) : (
+                  <span className="text-xs text-muted-foreground">×{item.quantity ?? 1}</span>
                 )}
+                {item.inventoryItemId && (
+                  <span className="text-xs text-blue-700 dark:text-blue-300">linked</span>
+                )}
+                {!readOnly && inventoryItems.length > 0 && !item.inventoryItemId ? (
+                  <InventoryItemPicker
+                    inventoryItems={inventoryItems}
+                    onSelect={(inv) => linkInventoryItem(packlist.id, item.id, inv)}
+                    title="Link inventory item to packlist"
+                  />
+                ) : null}
+                {!readOnly && item.inventoryItemId ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    title="Unlink inventory item"
+                    onClick={() => updateItem(packlist.id, item.id, { inventoryItemId: undefined })}
+                  >
+                    <Unlink className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
                 {!readOnly && (
                   <Button
                     variant="ghost"
