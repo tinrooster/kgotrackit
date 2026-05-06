@@ -12,6 +12,7 @@ import { getItems } from '@/lib/storageService';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -19,6 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ProductionCard } from '@/components/productions/ProductionCard';
 import { ProductionDetail } from '@/components/productions/ProductionDetail';
 import { ProductionForm } from '@/components/productions/ProductionForm';
@@ -43,6 +52,11 @@ export default function ProductionsPage() {
   const [newFormOpen, setNewFormOpen] = useState(false);
   const [undoAvailable, setUndoAvailable] = useState(false);
   const [redoAvailable, setRedoAvailable] = useState(false);
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [cloneCrew, setCloneCrew] = useState(true);
+  const [cloneSchedule, setCloneSchedule] = useState(true);
+  const [cloneChecklist, setCloneChecklist] = useState(false);
+  const [cloneVehiclePacklists, setCloneVehiclePacklists] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -144,25 +158,64 @@ export default function ProductionsPage() {
       toast.info('Select a production to clone.');
       return;
     }
+    setCloneDialogOpen(true);
+  };
+
+  const confirmCloneSelected = () => {
+    if (!selectedProduction) {
+      setCloneDialogOpen(false);
+      return;
+    }
     const source = selectedProduction;
     const crewIdMap = new Map<string, string>();
-    const clonedCrew = source.crew.map((member) => {
-      const nextMemberId = crypto.randomUUID();
-      crewIdMap.set(member.id, nextMemberId);
-      return {
-        ...member,
-        id: nextMemberId,
-        shifts: (member.shifts ?? []).map((shift) => ({
-          ...shift,
+    const clonedCrew = cloneCrew
+      ? source.crew.map((member) => {
+          const nextMemberId = crypto.randomUUID();
+          crewIdMap.set(member.id, nextMemberId);
+          return {
+            ...member,
+            id: nextMemberId,
+            shifts: (member.shifts ?? []).map((shift) => ({
+              ...shift,
+              id: crypto.randomUUID(),
+            })),
+          };
+        })
+      : [];
+    const clonedSchedule =
+      cloneCrew && cloneSchedule
+        ? (source.crewSchedule ?? []).map((entry) => ({
+            ...entry,
+            id: crypto.randomUUID(),
+            crewMemberId: crewIdMap.get(entry.crewMemberId) ?? entry.crewMemberId,
+          }))
+        : [];
+    const clonedChecklistGroups = cloneChecklist
+      ? source.checklistGroups.map((group) => ({
+          ...group,
           id: crypto.randomUUID(),
-        })),
-      };
-    });
-    const clonedSchedule = (source.crewSchedule ?? []).map((entry) => ({
-      ...entry,
-      id: crypto.randomUUID(),
-      crewMemberId: crewIdMap.get(entry.crewMemberId) ?? entry.crewMemberId,
-    }));
+          items: group.items.map((item) => ({
+            ...item,
+            id: crypto.randomUUID(),
+            completed: false,
+            reservedQuantity: 0,
+            checkedOutQuantity: 0,
+          })),
+        }))
+      : [];
+    const clonedVehiclePacklists = cloneVehiclePacklists
+      ? source.vehiclePacklists.map((packlist) => ({
+          ...packlist,
+          id: crypto.randomUUID(),
+          items: packlist.items.map((item) => ({
+            ...item,
+            id: crypto.randomUUID(),
+            completed: false,
+            reservedQuantity: 0,
+            checkedOutQuantity: 0,
+          })),
+        }))
+      : [];
 
     recordProductionSnapshotBeforeChange(productions);
     const clonedProduction = createProduction(
@@ -177,8 +230,8 @@ export default function ProductionsPage() {
         status: 'planning',
         description: source.description,
         notes: source.notes,
-        checklistGroups: [],
-        vehiclePacklists: [],
+        checklistGroups: clonedChecklistGroups,
+        vehiclePacklists: clonedVehiclePacklists,
         crew: clonedCrew,
         crewSchedule: clonedSchedule,
         createdBy: currentUser?.id,
@@ -188,6 +241,7 @@ export default function ProductionsPage() {
     setUndoAvailable(canUndoProduction());
     setRedoAvailable(canRedoProduction());
     setSelectedProduction(clonedProduction);
+    setCloneDialogOpen(false);
     toast.success('Production cloned with crew assignments.');
   };
 
@@ -301,6 +355,50 @@ export default function ProductionsPage() {
         onSave={handleCreate}
         onClose={() => setNewFormOpen(false)}
       />
+      <Dialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clone Production Options</DialogTitle>
+            <DialogDescription>
+              Choose which planning blocks to copy into the new production.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={cloneCrew} onCheckedChange={(checked) => setCloneCrew(Boolean(checked))} />
+              Copy crew assignments
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={cloneSchedule}
+                disabled={!cloneCrew}
+                onCheckedChange={(checked) => setCloneSchedule(Boolean(checked))}
+              />
+              Copy schedule board entries
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={cloneChecklist}
+                onCheckedChange={(checked) => setCloneChecklist(Boolean(checked))}
+              />
+              Copy checklist groups and items
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={cloneVehiclePacklists}
+                onCheckedChange={(checked) => setCloneVehiclePacklists(Boolean(checked))}
+              />
+              Copy vehicle packlists
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloneDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmCloneSelected}>Clone</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
