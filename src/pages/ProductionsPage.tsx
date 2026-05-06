@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Undo2, Redo2 } from 'lucide-react';
 import { Production, ProductionStatus, PRODUCTION_STATUS_OPTIONS } from '@/types/productions';
 import {
   getProductions,
@@ -23,6 +23,15 @@ import { ProductionCard } from '@/components/productions/ProductionCard';
 import { ProductionDetail } from '@/components/productions/ProductionDetail';
 import { ProductionForm } from '@/components/productions/ProductionForm';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import {
+  applyProductionState,
+  canRedoProduction,
+  canUndoProduction,
+  recordProductionSnapshotBeforeChange,
+  redoProductionMutation,
+  undoProductionMutation,
+} from '@/lib/productionUndo';
 
 export default function ProductionsPage() {
   const { currentUser } = useAuth();
@@ -32,6 +41,8 @@ export default function ProductionsPage() {
   const [statusFilter, setStatusFilter] = useState<ProductionStatus | 'all'>('all');
   const [selectedProduction, setSelectedProduction] = useState<Production | null>(null);
   const [newFormOpen, setNewFormOpen] = useState(false);
+  const [undoAvailable, setUndoAvailable] = useState(false);
+  const [redoAvailable, setRedoAvailable] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -40,6 +51,8 @@ export default function ProductionsPage() {
       setSelectedProduction((current) =>
         current ? latest.find((production) => production.id === current.id) ?? null : null
       );
+      setUndoAvailable(canUndoProduction());
+      setRedoAvailable(canRedoProduction());
     };
     window.addEventListener(PRODUCTIONS_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(PRODUCTIONS_UPDATED_EVENT, handleUpdate);
@@ -72,23 +85,110 @@ export default function ProductionsPage() {
   }, [filtered]);
 
   const handleCreate = (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew' | 'crewSchedule'>) => {
+    recordProductionSnapshotBeforeChange(productions);
     createProduction(
       { ...data, checklistGroups: [], vehiclePacklists: [], crew: [], crewSchedule: [] },
       currentUser?.id
     );
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
     setNewFormOpen(false);
   };
 
   const handleUpdate = (id: string, updates: Partial<Production>) => {
+    recordProductionSnapshotBeforeChange(productions);
     const updated = updateProduction(id, updates);
     if (updated && selectedProduction?.id === id) {
       setSelectedProduction(updated);
     }
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
   };
 
   const handleDelete = (id: string) => {
+    recordProductionSnapshotBeforeChange(productions);
     deleteProduction(id);
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
     setSelectedProduction(null);
+  };
+
+  const handleUndo = () => {
+    const restored = undoProductionMutation(productions);
+    if (!restored) {
+      toast.info('Nothing to undo');
+      return;
+    }
+    applyProductionState(restored, setProductions);
+    setSelectedProduction((current) => (current ? restored.find((production) => production.id === current.id) ?? null : null));
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
+    toast.success('Undone');
+  };
+
+  const handleRedo = () => {
+    const restored = redoProductionMutation(productions);
+    if (!restored) {
+      toast.info('Nothing to redo');
+      return;
+    }
+    applyProductionState(restored, setProductions);
+    setSelectedProduction((current) => (current ? restored.find((production) => production.id === current.id) ?? null : null));
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
+    toast.success('Redone');
+  };
+
+  const handleCloneSelected = () => {
+    if (!selectedProduction) {
+      toast.info('Select a production to clone.');
+      return;
+    }
+    const source = selectedProduction;
+    const crewIdMap = new Map<string, string>();
+    const clonedCrew = source.crew.map((member) => {
+      const nextMemberId = crypto.randomUUID();
+      crewIdMap.set(member.id, nextMemberId);
+      return {
+        ...member,
+        id: nextMemberId,
+        shifts: (member.shifts ?? []).map((shift) => ({
+          ...shift,
+          id: crypto.randomUUID(),
+        })),
+      };
+    });
+    const clonedSchedule = (source.crewSchedule ?? []).map((entry) => ({
+      ...entry,
+      id: crypto.randomUUID(),
+      crewMemberId: crewIdMap.get(entry.crewMemberId) ?? entry.crewMemberId,
+    }));
+
+    recordProductionSnapshotBeforeChange(productions);
+    const clonedProduction = createProduction(
+      {
+        name: `${source.name} (Copy)`,
+        client: source.client,
+        location: source.location,
+        startDate: source.startDate,
+        endDate: source.endDate,
+        scheduleDefaultStartTime: source.scheduleDefaultStartTime,
+        scheduleDefaultEndTime: source.scheduleDefaultEndTime,
+        status: 'planning',
+        description: source.description,
+        notes: source.notes,
+        checklistGroups: [],
+        vehiclePacklists: [],
+        crew: clonedCrew,
+        crewSchedule: clonedSchedule,
+        createdBy: currentUser?.id,
+      },
+      currentUser?.id,
+    );
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
+    setSelectedProduction(clonedProduction);
+    toast.success('Production cloned with crew assignments.');
   };
 
   return (
@@ -100,10 +200,29 @@ export default function ProductionsPage() {
             Plan and manage event and shoot productions, crew, and equipment.
           </p>
         </div>
-        <Button onClick={() => setNewFormOpen(true)} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          New Production
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleUndo} disabled={!undoAvailable} className="gap-1.5">
+            <Undo2 className="h-4 w-4" />
+            Undo
+          </Button>
+          <Button variant="outline" onClick={handleRedo} disabled={!redoAvailable} className="gap-1.5">
+            <Redo2 className="h-4 w-4" />
+            Redo
+          </Button>
+          <Button onClick={() => setNewFormOpen(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            New Production
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleCloneSelected}
+            disabled={!selectedProduction}
+            className="gap-1.5"
+          >
+            <Plus className="h-4 w-4" />
+            Clone Selected
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
