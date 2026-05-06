@@ -1,8 +1,11 @@
-import { useState } from 'react';
-import { Plus, Trash2, User } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2, User, Database } from 'lucide-react';
 import { ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getCrewContacts, CREW_CONTACTS_UPDATED_EVENT } from '@/lib/crewContactsService';
+import { CrewContact } from '@/types/crewContacts';
 
 interface CrewEditorProps {
   crew: ProductionCrewMember[];
@@ -14,6 +17,28 @@ const EMPTY_MEMBER: Omit<ProductionCrewMember, 'id'> = { name: '', role: '' };
 
 export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps) {
   const [draft, setDraft] = useState<Omit<ProductionCrewMember, 'id'>>(EMPTY_MEMBER);
+  const [masterDialogOpen, setMasterDialogOpen] = useState(false);
+  const [masterSearch, setMasterSearch] = useState('');
+  const [masterContacts, setMasterContacts] = useState<CrewContact[]>(() => getCrewContacts());
+
+  useEffect(() => {
+    const refresh = () => setMasterContacts(getCrewContacts());
+    window.addEventListener(CREW_CONTACTS_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(CREW_CONTACTS_UPDATED_EVENT, refresh);
+  }, []);
+
+  const filteredMasterContacts = useMemo(() => {
+    const normalizedQuery = masterSearch.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return masterContacts.filter((contact) => contact.isActive);
+    }
+    return masterContacts.filter((contact) => {
+      const haystack = [contact.fullName, ...contact.roleTags, contact.phone ?? '', contact.email ?? '']
+        .join(' ')
+        .toLowerCase();
+      return contact.isActive && haystack.includes(normalizedQuery);
+    });
+  }, [masterContacts, masterSearch]);
 
   const updateMember = (id: string, updates: Partial<ProductionCrewMember>) => {
     onChange(crew.map((m) => (m.id === id ? { ...m, ...updates } : m)));
@@ -27,6 +52,23 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
     if (!draft.name.trim()) return;
     onChange([...crew, { ...draft, id: crypto.randomUUID(), name: draft.name.trim(), role: draft.role.trim() }]);
     setDraft(EMPTY_MEMBER);
+  };
+
+  const addMemberFromMaster = (contact: CrewContact) => {
+    const alreadyAssigned = crew.some(
+      (member) => member.name.trim().toLowerCase() === contact.fullName.trim().toLowerCase()
+    );
+    if (alreadyAssigned) return;
+    onChange([
+      ...crew,
+      {
+        id: crypto.randomUUID(),
+        name: contact.fullName,
+        role: contact.roleTags[0] ?? '',
+        contact: [contact.phone, contact.email].filter(Boolean).join(' · ') || undefined,
+        notes: contact.notes,
+      },
+    ]);
   };
 
   if (crew.length === 0 && readOnly) {
@@ -89,7 +131,18 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
       ))}
       {!readOnly && (
         <div className="rounded-md border px-3 py-2">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Add crew member</p>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-muted-foreground">Add crew member</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1"
+              onClick={() => setMasterDialogOpen(true)}
+            >
+              <Database className="h-3.5 w-3.5" />
+              Add from master DB
+            </Button>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <Input
               placeholder="Name *"
@@ -124,6 +177,51 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
           </Button>
         </div>
       )}
+      <Dialog open={masterDialogOpen} onOpenChange={setMasterDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Master Crew Contacts</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              placeholder="Search contacts..."
+              value={masterSearch}
+              onChange={(event) => setMasterSearch(event.target.value)}
+            />
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+              {filteredMasterContacts.map((contact) => {
+                const alreadyAssigned = crew.some(
+                  (member) => member.name.trim().toLowerCase() === contact.fullName.trim().toLowerCase()
+                );
+                return (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    disabled={alreadyAssigned}
+                    onClick={() => addMemberFromMaster(contact)}
+                    className="flex w-full items-start justify-between rounded-md border px-3 py-2 text-left transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{contact.fullName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {[contact.roleTags.join(', '), contact.phone, contact.email].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {alreadyAssigned ? 'Assigned' : 'Add'}
+                    </span>
+                  </button>
+                );
+              })}
+              {filteredMasterContacts.length === 0 && (
+                <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                  No active contacts match your search.
+                </p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

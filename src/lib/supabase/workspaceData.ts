@@ -15,6 +15,7 @@ export type WorkspaceAppDataRow = {
   general_settings: unknown;
   custom_report_definitions?: unknown;
   productions?: unknown;
+  crew_contacts?: unknown;
   updated_at?: string;
 };
 

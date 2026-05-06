@@ -20,6 +20,7 @@ import { refreshRackLocationsFromServer } from './lib/rackLocationsConfig';
 import HelpPage from './pages/HelpPage';
 import AboutPage from './pages/AboutPage';
 import ProductionsPage from './pages/ProductionsPage';
+import CrewPage from './pages/CrewPage';
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -146,6 +147,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <ProductionsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/crew"
+                element={
+                  <ProtectedRoute>
+                    <CrewPage />
                   </ProtectedRoute>
                 }
               />

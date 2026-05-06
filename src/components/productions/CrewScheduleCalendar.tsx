@@ -4,8 +4,9 @@ import { CrewScheduleEntry, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface CrewScheduleCalendarProps {
   crewMembers: ProductionCrewMember[];
@@ -86,6 +87,40 @@ export function CrewScheduleCalendar({
     onChange(schedule.filter((entry) => entry.id !== id));
   };
 
+  const openEditEntry = (entry: CrewScheduleEntry) => {
+    setEditingEntryId(entry.id);
+    setEditingDraft({
+      crewMemberId: entry.crewMemberId,
+      date: entry.date,
+      startTime: entry.startTime ?? '',
+      endTime: entry.endTime ?? '',
+      role: entry.role ?? '',
+      location: entry.location ?? '',
+      notes: entry.notes ?? '',
+    });
+  };
+
+  const saveEditedEntry = () => {
+    if (!editingEntryId || !editingDraft?.crewMemberId || !editingDraft.date) return;
+    onChange(
+      schedule.map((entry) =>
+        entry.id === editingEntryId
+          ? {
+              ...entry,
+              ...editingDraft,
+              startTime: editingDraft.startTime || undefined,
+              endTime: editingDraft.endTime || undefined,
+              role: editingDraft.role || undefined,
+              location: editingDraft.location || undefined,
+              notes: editingDraft.notes || undefined,
+            }
+          : entry
+      )
+    );
+    setEditingEntryId(null);
+    setEditingDraft(null);
+  };
+
   const groupedByDate = useMemo(() => {
     const map: Record<string, CrewScheduleEntry[]> = {};
     for (const entry of schedule) {
@@ -110,6 +145,8 @@ export function CrewScheduleCalendar({
     initialStartMinutes: number;
     initialEndMinutes: number;
   } | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState<Omit<CrewScheduleEntry, 'id'> | null>(null);
 
   const dayEntries = useMemo(
     () =>
@@ -278,6 +315,30 @@ export function CrewScheduleCalendar({
                     >
                       <div className="truncate font-medium">{block.entry.location || 'Scheduled block'}</div>
                       <div className="truncate text-[10px] text-muted-foreground">{block.entry.notes || 'Drag to move'}</div>
+                      <div className="absolute left-1 top-1 flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          className="rounded border bg-background/80 p-0.5 hover:bg-background"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEditEntry(block.entry);
+                          }}
+                          title="Edit block"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border bg-background/80 p-0.5 text-destructive hover:bg-background"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            removeEntry(block.entry.id);
+                          }}
+                          title="Delete block"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                       <div
                         className="absolute right-0 top-0 h-full w-2 cursor-ew-resize rounded-r bg-primary/40"
                         onMouseDown={(event) => {
@@ -357,13 +418,24 @@ export function CrewScheduleCalendar({
                       <div key={entry.id} className="rounded border bg-muted/30 p-1.5 text-xs">
                         <div className="flex items-start justify-between gap-1">
                           <p className="font-medium">{resolveCrewLabel(crewMembers, entry.crewMemberId)}</p>
-                          <button
-                            type="button"
-                            className="text-destructive hover:text-destructive/80"
-                            onClick={() => removeEntry(entry.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground"
+                              onClick={() => openEditEntry(entry)}
+                              title="Edit shift"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              className="text-destructive hover:text-destructive/80"
+                              onClick={() => removeEntry(entry.id)}
+                              title="Delete shift"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
                         </div>
                         <p>{entry.startTime || '--:--'} - {entry.endTime || '--:--'}</p>
                         {entry.location ? <p className="text-muted-foreground">{entry.location}</p> : null}
@@ -376,6 +448,104 @@ export function CrewScheduleCalendar({
           </div>
         </TabsContent>
       </Tabs>
+      <Dialog
+        open={Boolean(editingEntryId && editingDraft)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingEntryId(null);
+            setEditingDraft(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Schedule Block</DialogTitle>
+          </DialogHeader>
+          {editingDraft ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Select
+                value={editingDraft.crewMemberId}
+                onValueChange={(value) =>
+                  setEditingDraft((previous) => (previous ? { ...previous, crewMemberId: value } : previous))
+                }
+              >
+                <SelectTrigger className="h-8 sm:col-span-2">
+                  <SelectValue placeholder="Crew member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {crewMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name} {member.role ? `(${member.role})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                className="h-8"
+                type="date"
+                value={editingDraft.date}
+                onChange={(event) =>
+                  setEditingDraft((previous) => (previous ? { ...previous, date: event.target.value } : previous))
+                }
+              />
+              <Input
+                className="h-8"
+                placeholder="Role override"
+                value={editingDraft.role}
+                onChange={(event) =>
+                  setEditingDraft((previous) => (previous ? { ...previous, role: event.target.value } : previous))
+                }
+              />
+              <Input
+                className="h-8"
+                type="time"
+                value={editingDraft.startTime}
+                onChange={(event) =>
+                  setEditingDraft((previous) => (previous ? { ...previous, startTime: event.target.value } : previous))
+                }
+              />
+              <Input
+                className="h-8"
+                type="time"
+                value={editingDraft.endTime}
+                onChange={(event) =>
+                  setEditingDraft((previous) => (previous ? { ...previous, endTime: event.target.value } : previous))
+                }
+              />
+              <Input
+                className="h-8 sm:col-span-2"
+                placeholder="Location"
+                value={editingDraft.location}
+                onChange={(event) =>
+                  setEditingDraft((previous) => (previous ? { ...previous, location: event.target.value } : previous))
+                }
+              />
+              <Input
+                className="h-8 sm:col-span-2"
+                placeholder="Notes"
+                value={editingDraft.notes}
+                onChange={(event) =>
+                  setEditingDraft((previous) => (previous ? { ...previous, notes: event.target.value } : previous))
+                }
+              />
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingEntryId(null);
+                setEditingDraft(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={saveEditedEntry} disabled={!editingDraft?.crewMemberId || !editingDraft?.date}>
+              Save Block
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -44,6 +44,8 @@ export interface UserAppDataRow {
   custom_report_definitions?: unknown;
   /** JSON array of production records (optional on legacy DB rows before migration). */
   productions?: unknown;
+  /** JSON array of crew contacts (optional on legacy DB rows before migration). */
+  crew_contacts?: unknown;
   updated_at?: string;
 }
 
@@ -148,6 +150,7 @@ export type CloudSnapshotPayload = Pick<
   | 'general_settings'
   | 'custom_report_definitions'
   | 'productions'
+  | 'crew_contacts'
 >;
 
 export function snapshotHasMeaningfulRemoteData(row: CloudSnapshotPayload): boolean {
@@ -184,6 +187,10 @@ export function snapshotHasMeaningfulRemoteData(row: CloudSnapshotPayload): bool
   }
   const customDefs = row.custom_report_definitions;
   if (Array.isArray(customDefs) && customDefs.length > 0) {
+    return true;
+  }
+  const crewContacts = row.crew_contacts;
+  if (Array.isArray(crewContacts) && crewContacts.length > 0) {
     return true;
   }
   return false;
@@ -226,6 +233,15 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
     productions = [];
   }
 
+  let crewContacts: unknown[] = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CREW_CONTACTS);
+    const parsed = raw ? JSON.parse(raw) : [];
+    crewContacts = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    crewContacts = [];
+  }
+
   return {
     items,
     settings,
@@ -237,6 +253,7 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
     general_settings: generalSettings,
     custom_report_definitions: customReportDefinitions,
     productions,
+    crew_contacts: crewContacts,
   };
 }
 
@@ -300,6 +317,15 @@ export async function applySnapshotToLocal(row: CloudSnapshotPayload): Promise<v
     const prods = Array.isArray(row.productions) ? row.productions : [];
     try {
       localStorage.setItem(STORAGE_KEYS.PRODUCTIONS, JSON.stringify(prods));
+    } catch {
+      // quota or private mode
+    }
+  }
+
+  if ('crew_contacts' in row && row.crew_contacts !== undefined) {
+    const contacts = Array.isArray(row.crew_contacts) ? row.crew_contacts : [];
+    try {
+      localStorage.setItem(STORAGE_KEYS.CREW_CONTACTS, JSON.stringify(contacts));
     } catch {
       // quota or private mode
     }
@@ -376,6 +402,7 @@ const EMPTY_WORKSPACE_SNAPSHOT: WorkspaceSnapshotPayload = {
   general_settings: null,
   custom_report_definitions: [],
   productions: [],
+  crew_contacts: [],
 };
 
 export async function bootstrapCloudData(userId: string): Promise<void> {

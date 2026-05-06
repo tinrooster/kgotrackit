@@ -29,6 +29,7 @@ export const STORAGE_KEYS = {
   CUSTOM_REPORT_DEFINITIONS: 'inventory-custom-report-definitions',
   DEVICE_LIBRARY: 'inventory-device-library',
   PRODUCTIONS: 'inventory-productions',
+  CREW_CONTACTS: 'inventory-crew-contacts',
 };
 
 export const SETTINGS_UPDATED_EVENT = 'trackit:settings-updated';
