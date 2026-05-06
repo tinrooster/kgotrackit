@@ -62,10 +62,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (workspaces.length === 0) {
-      if (activeWorkspaceId) {
-        persistActiveWorkspaceId(null);
-        setActiveWorkspaceIdState(null);
-      }
+      // The list may be empty because of a transient load error (RLS, network) rather than
+      // the user genuinely having no workspaces.  Never clear the stored preference here —
+      // wait until the list loads with at least one entry before making any decision.
       return;
     }
     const hasActiveWorkspace = activeWorkspaceId

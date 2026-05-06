@@ -79,7 +79,7 @@ export function InitialDefaultsDialog({ open, onApply, onDismiss }: InitialDefau
         <DialogFooter>
           {onDismiss && (
             <Button variant="outline" onClick={onDismiss}>
-              Skip for now
+              Use blank setup
             </Button>
           )}
           <Button onClick={() => onApply(choice, choice === 'starter' ? includeSampleInventory : false)}>
