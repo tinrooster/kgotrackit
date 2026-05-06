@@ -5,9 +5,20 @@ import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { InventoryItemPicker } from './InventoryItemPicker';
 import { BulkInventorySelectionDialog, BulkSelectionResult } from './BulkInventorySelectionDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ChecklistEditorProps {
   groups: ChecklistGroup[];
@@ -35,20 +46,24 @@ export function ChecklistEditor({
 }: ChecklistEditorProps) {
   const [newGroupTitle, setNewGroupTitle] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
-  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ groupId?: string; itemId?: string } | null>(null);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<string[]>([]);
   const [draggingItem, setDraggingItem] = useState<{ groupId: string; itemId: string } | null>(null);
+  const [listSearchQuery, setListSearchQuery] = useState('');
+  const [completionFilter, setCompletionFilter] = useState<'all' | 'open' | 'done'>('all');
+  const [sortMode, setSortMode] = useState<'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'>('manual');
   const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
     if (!requireDeleteConfirm) {
       deleteAction();
       return;
     }
-    if (pendingDeleteKey === deleteKey) {
-      deleteAction();
-      setPendingDeleteKey(null);
+    if (deleteKey.startsWith('group:')) {
+      setPendingDelete({ groupId: deleteKey.replace('group:', '') });
       return;
     }
-    setPendingDeleteKey(deleteKey);
+    if (deleteKey.startsWith('item:')) {
+      setPendingDelete({ itemId: deleteKey.replace('item:', '') });
+    }
   };
 
 
@@ -153,12 +168,74 @@ export function ChecklistEditor({
   const resolveInventoryName = (id?: string) =>
     id ? inventoryItems.find((i) => i.id === id)?.name : undefined;
 
+  const getVisibleItems = (items: ChecklistItem[]): ChecklistItem[] => {
+    const normalizedQuery = listSearchQuery.trim().toLowerCase();
+    const filteredItems = items.filter((item) => {
+      const inventoryName = resolveInventoryName(item.inventoryItemId) || '';
+      const matchesQuery =
+        !normalizedQuery ||
+        item.label.toLowerCase().includes(normalizedQuery) ||
+        inventoryName.toLowerCase().includes(normalizedQuery) ||
+        (item.notes || '').toLowerCase().includes(normalizedQuery);
+      const matchesCompletion =
+        completionFilter === 'all' ||
+        (completionFilter === 'done' && item.completed) ||
+        (completionFilter === 'open' && !item.completed);
+      return matchesQuery && matchesCompletion;
+    });
+    if (sortMode === 'manual') return filteredItems;
+    const sortedItems = [...filteredItems];
+    sortedItems.sort((left, right) => {
+      if (sortMode === 'name_asc') return left.label.localeCompare(right.label);
+      if (sortMode === 'name_desc') return right.label.localeCompare(left.label);
+      if (sortMode === 'qty_asc') return (left.quantity ?? 1) - (right.quantity ?? 1);
+      return (right.quantity ?? 1) - (left.quantity ?? 1);
+    });
+    return sortedItems;
+  };
+
   if (groups.length === 0 && readOnly) {
     return <p className="text-sm text-muted-foreground">No checklist items.</p>;
   }
 
   return (
     <div className="space-y-4">
+      <div className="grid gap-2 rounded-md border p-2 sm:grid-cols-3">
+        <Input
+          placeholder="Search checklist items..."
+          value={listSearchQuery}
+          onChange={(event) => setListSearchQuery(event.target.value)}
+          className="h-8"
+        />
+        <Select value={completionFilter} onValueChange={(value) => setCompletionFilter(value as 'all' | 'open' | 'done')}>
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="Filter status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All status</SelectItem>
+            <SelectItem value="open">Open only</SelectItem>
+            <SelectItem value="done">Completed only</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={sortMode}
+          onValueChange={(value) => setSortMode(value as 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc')}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="Sort" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="manual">Manual order</SelectItem>
+            <SelectItem value="name_asc">Name (A-Z)</SelectItem>
+            <SelectItem value="name_desc">Name (Z-A)</SelectItem>
+            <SelectItem value="qty_asc">Qty (low-high)</SelectItem>
+            <SelectItem value="qty_desc">Qty (high-low)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Item checkbox marks completion status only (not multi-select for list actions).
+      </p>
       {groups.map((group) => (
         <div key={group.id} className="rounded-md border">
           <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2">
@@ -191,14 +268,14 @@ export function ChecklistEditor({
                 size="icon"
                 className="h-6 w-6 shrink-0"
                 onClick={() => runDeleteAction(`group:${group.id}`, () => removeGroup(group.id))}
-                title={pendingDeleteKey === `group:${group.id}` ? 'Click again to confirm delete' : 'Delete group'}
+                title="Delete group"
               >
                 <Trash2 className="h-3.5 w-3.5 text-red-400" />
               </Button>
             )}
           </div>
           {!collapsedGroupIds.includes(group.id) && <div className="divide-y">
-            {group.items.map((item) => {
+            {getVisibleItems(group.items).map((item) => {
               const invName = resolveInventoryName(item.inventoryItemId);
               return (
                 <div
@@ -223,14 +300,20 @@ export function ChecklistEditor({
                     onCheckedChange={(checked) =>
                       updateItem(group.id, item.id, { completed: Boolean(checked) })
                     }
+                    title={item.completed ? 'Mark as not completed' : 'Mark as completed'}
                   />
-                  <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground line-through')}>
+                  <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
                     {item.label}
                     {invName && item.inventoryItemId && item.label !== invName && (
                       <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
                     )}
                     {item.inventoryItemId && (
                       <Link2 className="ml-1 inline h-3 w-3 text-blue-500" />
+                    )}
+                    {item.completed && (
+                      <span className="ml-2 rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-300">
+                        Completed
+                      </span>
                     )}
                   </span>
                   {!readOnly ? (
@@ -282,18 +365,12 @@ export function ChecklistEditor({
                         size="icon"
                         className={cn(
                           'h-8 w-8 shrink-0 border',
-                          pendingDeleteKey === `item:${item.id}`
-                            ? 'border-red-400/70 bg-red-500/20'
-                            : 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+                          'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
                         )}
                         onClick={() =>
                           runDeleteAction(`item:${item.id}`, () => removeItem(group.id, item.id))
                         }
-                        title={
-                          pendingDeleteKey === `item:${item.id}`
-                            ? 'Click again to confirm delete'
-                            : 'Delete item'
-                        }
+                        title="Delete item"
                       >
                         <Trash2 className="h-3.5 w-3.5 text-red-300" />
                       </Button>
@@ -361,6 +438,40 @@ export function ChecklistEditor({
           </Button>
         </div>
       )}
+      <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm delete</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.groupId
+                ? 'Delete this checklist section and all items in it?'
+                : 'Delete this checklist item?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={() => {
+                if (!pendingDelete) return;
+                if (pendingDelete.groupId) {
+                  removeGroup(pendingDelete.groupId);
+                } else if (pendingDelete.itemId) {
+                  for (const group of groups) {
+                    if (group.items.some((item) => item.id === pendingDelete.itemId)) {
+                      removeItem(group.id, pendingDelete.itemId);
+                      break;
+                    }
+                  }
+                }
+                setPendingDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

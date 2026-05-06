@@ -105,13 +105,13 @@ export function BulkInventorySelectionDialog({
       </DialogTrigger>
       <DraggableDialogContent
         dismissOnOutsidePointer
-        className="h-[min(88vh,900px)] w-[min(94vw,1200px)] overflow-hidden p-0"
+        className="flex max-h-[min(92vh,920px)] w-[min(94vw,1200px)] flex-col overflow-hidden p-0"
       >
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>Bulk Inventory Picker</DialogTitle>
         </DialogHeader>
 
-        <div className="grid h-full grid-rows-[auto_1fr_auto]">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto]">
           <div className="grid gap-2 border-b px-4 py-3 sm:grid-cols-4">
             <Input
               value={searchQuery}

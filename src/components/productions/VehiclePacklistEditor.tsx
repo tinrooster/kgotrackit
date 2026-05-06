@@ -5,9 +5,20 @@ import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { InventoryItemPicker } from './InventoryItemPicker';
 import { BulkInventorySelectionDialog, BulkSelectionResult } from './BulkInventorySelectionDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface VehiclePacklistEditorProps {
   packlists: VehiclePacklist[];
@@ -30,18 +41,22 @@ export function VehiclePacklistEditor({
 }: VehiclePacklistEditorProps) {
   const [newVehicleName, setNewVehicleName] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
-  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ packlistId?: string; itemId?: string } | null>(null);
+  const [listSearchQuery, setListSearchQuery] = useState('');
+  const [packedFilter, setPackedFilter] = useState<'all' | 'open' | 'done'>('all');
+  const [sortMode, setSortMode] = useState<'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'>('manual');
   const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
     if (!requireDeleteConfirm) {
       deleteAction();
       return;
     }
-    if (pendingDeleteKey === deleteKey) {
-      deleteAction();
-      setPendingDeleteKey(null);
+    if (deleteKey.startsWith('packlist:')) {
+      setPendingDelete({ packlistId: deleteKey.replace('packlist:', '') });
       return;
     }
-    setPendingDeleteKey(deleteKey);
+    if (deleteKey.startsWith('item:')) {
+      setPendingDelete({ itemId: deleteKey.replace('item:', '') });
+    }
   };
 
   const updatePacklist = (id: string, updates: Partial<VehiclePacklist>) => {
@@ -120,12 +135,72 @@ export function VehiclePacklistEditor({
     updateItem(packlistId, itemId, { inventoryItemId: inv.id, label: inv.name });
   };
 
+  const getVisibleItems = (items: ChecklistItem[]): ChecklistItem[] => {
+    const normalizedQuery = listSearchQuery.trim().toLowerCase();
+    const filteredItems = items.filter((item) => {
+      const matchesQuery =
+        !normalizedQuery ||
+        item.label.toLowerCase().includes(normalizedQuery) ||
+        (item.notes || '').toLowerCase().includes(normalizedQuery);
+      const matchesPacked =
+        packedFilter === 'all' ||
+        (packedFilter === 'done' && item.completed) ||
+        (packedFilter === 'open' && !item.completed);
+      return matchesQuery && matchesPacked;
+    });
+    if (sortMode === 'manual') return filteredItems;
+    const sortedItems = [...filteredItems];
+    sortedItems.sort((left, right) => {
+      if (sortMode === 'name_asc') return left.label.localeCompare(right.label);
+      if (sortMode === 'name_desc') return right.label.localeCompare(left.label);
+      if (sortMode === 'qty_asc') return (left.quantity ?? 1) - (right.quantity ?? 1);
+      return (right.quantity ?? 1) - (left.quantity ?? 1);
+    });
+    return sortedItems;
+  };
+
   if (packlists.length === 0 && readOnly) {
     return <p className="text-sm text-muted-foreground">No vehicle packlists.</p>;
   }
 
   return (
     <div className="space-y-4">
+      <div className="grid gap-2 rounded-md border p-2 sm:grid-cols-3">
+        <Input
+          placeholder="Search packlist items..."
+          value={listSearchQuery}
+          onChange={(event) => setListSearchQuery(event.target.value)}
+          className="h-8"
+        />
+        <Select value={packedFilter} onValueChange={(value) => setPackedFilter(value as 'all' | 'open' | 'done')}>
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="Filter packed state" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All status</SelectItem>
+            <SelectItem value="open">Not packed</SelectItem>
+            <SelectItem value="done">Packed</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={sortMode}
+          onValueChange={(value) => setSortMode(value as 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc')}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="Sort" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="manual">Manual order</SelectItem>
+            <SelectItem value="name_asc">Name (A-Z)</SelectItem>
+            <SelectItem value="name_desc">Name (Z-A)</SelectItem>
+            <SelectItem value="qty_asc">Qty (low-high)</SelectItem>
+            <SelectItem value="qty_desc">Qty (high-low)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Item checkbox marks packed status only (not multi-select for list actions).
+      </p>
       {packlists.map((packlist) => (
         <div key={packlist.id} className="rounded-md border">
           <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2">
@@ -148,23 +223,29 @@ export function VehiclePacklistEditor({
                 size="icon"
                 className="h-6 w-6 shrink-0"
                 onClick={() => runDeleteAction(`packlist:${packlist.id}`, () => removePacklist(packlist.id))}
-                title={pendingDeleteKey === `packlist:${packlist.id}` ? 'Click again to confirm delete' : 'Delete packlist'}
+                title="Delete packlist"
               >
                 <Trash2 className="h-3.5 w-3.5 text-red-400" />
               </Button>
             )}
           </div>
           <div className="divide-y">
-            {packlist.items.map((item) => (
+            {getVisibleItems(packlist.items).map((item) => (
               <div key={item.id} className="flex items-center gap-2 px-3 py-2">
                 <Checkbox
                   checked={item.completed}
                   onCheckedChange={(checked) =>
                     updateItem(packlist.id, item.id, { completed: Boolean(checked) })
                   }
+                  title={item.completed ? 'Mark as not packed' : 'Mark as packed'}
                 />
-                <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground line-through')}>
+                <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
                   {item.label}
+                  {item.completed && (
+                    <span className="ml-2 rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-300">
+                      Packed
+                    </span>
+                  )}
                 </span>
                 {!readOnly ? (
                   <Input
@@ -208,12 +289,10 @@ export function VehiclePacklistEditor({
                     size="icon"
                     className={cn(
                       'h-8 w-8 shrink-0 border',
-                      pendingDeleteKey === `item:${item.id}`
-                        ? 'border-red-400/70 bg-red-500/20'
-                        : 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+                      'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
                     )}
                     onClick={() => runDeleteAction(`item:${item.id}`, () => removeItem(packlist.id, item.id))}
-                    title={pendingDeleteKey === `item:${item.id}` ? 'Click again to confirm delete' : 'Delete item'}
+                    title="Delete item"
                   >
                     <Trash2 className="h-3.5 w-3.5 text-red-300" />
                   </Button>
@@ -282,6 +361,40 @@ export function VehiclePacklistEditor({
           </Button>
         </div>
       )}
+      <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm delete</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.packlistId
+                ? 'Delete this vehicle packlist and all items in it?'
+                : 'Delete this packlist item?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={() => {
+                if (!pendingDelete) return;
+                if (pendingDelete.packlistId) {
+                  removePacklist(pendingDelete.packlistId);
+                } else if (pendingDelete.itemId) {
+                  for (const packlist of packlists) {
+                    if (packlist.items.some((item) => item.id === pendingDelete.itemId)) {
+                      removeItem(packlist.id, pendingDelete.itemId);
+                      break;
+                    }
+                  }
+                }
+                setPendingDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

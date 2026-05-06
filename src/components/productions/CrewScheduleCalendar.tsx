@@ -7,6 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface CrewScheduleCalendarProps {
   crewMembers: ProductionCrewMember[];
@@ -133,11 +143,6 @@ export function CrewScheduleCalendar({
   const runDeleteAction = (entryId: string) => {
     if (!requireDeleteConfirm) {
       removeEntry(entryId);
-      return;
-    }
-    if (pendingDeleteEntryId === entryId) {
-      removeEntry(entryId);
-      setPendingDeleteEntryId(null);
       return;
     }
     setPendingDeleteEntryId(entryId);
@@ -474,19 +479,13 @@ export function CrewScheduleCalendar({
                         <button
                           type="button"
                           className={`rounded border p-0.5 ${
-                            pendingDeleteEntryId === block.entry.id
-                              ? 'border-red-400/70 bg-red-500/20'
-                              : 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+                            'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
                           }`}
                           onClick={(event) => {
                             event.stopPropagation();
                             runDeleteAction(block.entry.id);
                           }}
-                          title={
-                            pendingDeleteEntryId === block.entry.id
-                              ? 'Click again to confirm delete'
-                              : 'Delete block'
-                          }
+                          title="Delete block"
                         >
                           <Trash2 className="h-3 w-3 text-red-300" />
                         </button>
@@ -582,16 +581,10 @@ export function CrewScheduleCalendar({
                             <button
                               type="button"
                               className={`rounded border p-0.5 ${
-                                pendingDeleteEntryId === entry.id
-                                  ? 'border-red-400/70 bg-red-500/20 text-red-200'
-                                  : 'border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20'
+                                'border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20'
                               }`}
                               onClick={() => runDeleteAction(entry.id)}
-                              title={
-                                pendingDeleteEntryId === entry.id
-                                  ? 'Click again to confirm delete'
-                                  : 'Delete shift'
-                              }
+                              title="Delete shift"
                             >
                               <Trash2 className="h-3 w-3" />
                             </button>
@@ -722,6 +715,29 @@ export function CrewScheduleCalendar({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={Boolean(pendingDeleteEntryId)} onOpenChange={(open) => !open && setPendingDeleteEntryId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete schedule block?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the selected crew schedule block.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={() => {
+                if (!pendingDeleteEntryId) return;
+                removeEntry(pendingDeleteEntryId);
+                setPendingDeleteEntryId(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

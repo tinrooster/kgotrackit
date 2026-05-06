@@ -7,6 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { getCrewContacts, CREW_CONTACTS_UPDATED_EVENT } from '@/lib/crewContactsService';
 import { CrewContact } from '@/types/crewContacts';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   createPositionTemplate,
   getPositionTemplates,
   POSITION_TEMPLATES_UPDATED_EVENT,
@@ -180,11 +190,6 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
   const runDeleteAction = (memberId: string) => {
     if (!requireDeleteConfirm) {
       removeMember(memberId);
-      return;
-    }
-    if (pendingDeleteMemberId === memberId) {
-      removeMember(memberId);
-      setPendingDeleteMemberId(null);
       return;
     }
     setPendingDeleteMemberId(memberId);
@@ -441,16 +446,10 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
               variant="ghost"
               size="icon"
               className={`h-8 w-8 shrink-0 border ${
-                pendingDeleteMemberId === member.id
-                  ? 'border-red-400/70 bg-red-500/20'
-                  : 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+                'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
               }`}
               onClick={() => runDeleteAction(member.id)}
-              title={
-                pendingDeleteMemberId === member.id
-                  ? 'Click again to confirm remove'
-                  : 'Remove crew member'
-              }
+              title="Remove crew member"
             >
               <Trash2 className="h-3.5 w-3.5 text-red-300" />
             </Button>
@@ -593,6 +592,29 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
           </div>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={Boolean(pendingDeleteMemberId)} onOpenChange={(open) => !open && setPendingDeleteMemberId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove crew member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the crew member from this production.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={() => {
+                if (!pendingDeleteMemberId) return;
+                removeMember(pendingDeleteMemberId);
+                setPendingDeleteMemberId(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
