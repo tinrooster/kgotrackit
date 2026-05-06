@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { InventoryItem } from '@/types/inventory';
-import { Plus, Filter } from 'lucide-react';
+import { Plus, Filter, Clapperboard } from 'lucide-react';
 import { SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getSettings } from '@/lib/storageService';
@@ -132,10 +132,16 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Button onClick={() => navigate('/inventory')} className="w-full shrink-0 sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Manage Inventory
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button onClick={() => navigate('/inventory')} className="w-full shrink-0 sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Manage Inventory
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/productions')} className="w-full shrink-0 sm:w-auto">
+            <Clapperboard className="mr-2 h-4 w-4" />
+            Manage Productions
+          </Button>
+        </div>
       </div>
 
       {items.length === 0 ? (
@@ -471,6 +477,10 @@ export default function DashboardPage() {
                 <Button variant="outline" className="flex items-center gap-2" onClick={() => navigate('/inventory')}>
                   <Filter className="h-4 w-4" />
                   All Items
+                </Button>
+                <Button variant="outline" className="flex items-center gap-2" onClick={() => navigate('/productions')}>
+                  <Clapperboard className="h-4 w-4" />
+                  Productions
                 </Button>
                 {activeStats.slice(0, 5).map((stat, index) => (
                   <Button
