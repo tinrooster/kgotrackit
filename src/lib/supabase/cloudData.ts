@@ -35,6 +35,8 @@ import {
 } from '@/lib/supabase/organizationData';
 import { dispatchCloudHydrated } from '@/lib/cloudSyncEvents';
 import { getCrewContacts } from '@/lib/crewContactsService';
+import { getPositionTemplates, savePositionTemplates } from '@/lib/positionTemplatesService';
+import type { PositionTemplate } from '@/types/productions';
 
 export type AuthBackend = 'local' | 'supabase';
 
@@ -348,12 +350,18 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
     const organizationId = await fetchWorkspaceOrganizationId(wsId);
     if (organizationId) {
       setActiveOrganizationId(organizationId);
+      const existingOrganizationRow = await pullOrganizationAppData(organizationId);
       await pushOrganizationSnapshot(organizationId, {
         contacts: snapshot.crew_contacts ?? [],
-        position_templates: [],
-        inventory_baseline: snapshot.items ?? [],
-        role_tags: [],
-        branding: {},
+        position_templates: getPositionTemplates(),
+        inventory_baseline: Array.isArray(existingOrganizationRow?.inventory_baseline)
+          ? existingOrganizationRow.inventory_baseline
+          : [],
+        role_tags: Array.isArray(existingOrganizationRow?.role_tags) ? existingOrganizationRow.role_tags : [],
+        branding:
+          existingOrganizationRow?.branding && typeof existingOrganizationRow.branding === 'object'
+            ? existingOrganizationRow.branding
+            : {},
       } satisfies OrganizationSnapshotPayload);
     }
     await pushWorkspaceSnapshot(wsId, snapshot as WorkspaceSnapshotPayload);
@@ -444,6 +452,10 @@ export async function bootstrapCloudData(userId: string): Promise<void> {
           const organizationRow = await pullOrganizationAppData(organizationId);
           if (organizationRow) {
             remoteRow.crew_contacts = Array.isArray(organizationRow.contacts) ? organizationRow.contacts : [];
+            const positionTemplates = Array.isArray(organizationRow.position_templates)
+              ? organizationRow.position_templates
+              : [];
+            savePositionTemplates(positionTemplates as PositionTemplate[]);
           }
         }
         await applySnapshotToLocal(remoteRow as CloudSnapshotPayload);

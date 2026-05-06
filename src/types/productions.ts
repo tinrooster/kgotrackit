@@ -36,6 +36,14 @@ export interface ProductionCrewMember {
   shifts?: CrewAssignmentShift[];
 }
 
+export interface PositionTemplate {
+  id: string;
+  label: string;
+  defaultRoleTag?: string;
+  defaultLocation?: string;
+  sortOrder: number;
+}
+
 export interface CrewAssignmentShift {
   id: string;
   date: string;

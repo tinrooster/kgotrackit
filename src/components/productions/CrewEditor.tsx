@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, User, Database } from 'lucide-react';
-import { ProductionCrewMember } from '@/types/productions';
+import { PositionTemplate, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getCrewContacts, CREW_CONTACTS_UPDATED_EVENT } from '@/lib/crewContactsService';
 import { CrewContact } from '@/types/crewContacts';
+import {
+  createPositionTemplate,
+  getPositionTemplates,
+  POSITION_TEMPLATES_UPDATED_EVENT,
+} from '@/lib/positionTemplatesService';
 
 interface CrewEditorProps {
   crew: ProductionCrewMember[];
@@ -30,6 +35,8 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
   const [masterSearch, setMasterSearch] = useState('');
   const [masterContacts, setMasterContacts] = useState<CrewContact[]>(() => getCrewContacts());
   const [pendingDeleteMemberId, setPendingDeleteMemberId] = useState<string | null>(null);
+  const [positionTemplates, setPositionTemplates] = useState<PositionTemplate[]>(() => getPositionTemplates());
+  const [newTemplateLabel, setNewTemplateLabel] = useState('');
   const [shiftDraftsByMemberId, setShiftDraftsByMemberId] = useState<
     Record<
       string,
@@ -48,6 +55,12 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     const refresh = () => setMasterContacts(getCrewContacts());
     window.addEventListener(CREW_CONTACTS_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(CREW_CONTACTS_UPDATED_EVENT, refresh);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setPositionTemplates(getPositionTemplates());
+    window.addEventListener(POSITION_TEMPLATES_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(POSITION_TEMPLATES_UPDATED_EVENT, refresh);
   }, []);
 
   const filteredMasterContacts = useMemo(() => {
@@ -202,6 +215,29 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     ]);
   };
 
+  const applyPositionTemplateToMember = (memberId: string, positionTemplateId: string) => {
+    const selectedTemplate = positionTemplates.find((template) => template.id === positionTemplateId);
+    if (!selectedTemplate) return;
+    onChange(
+      crew.map((member) =>
+        member.id === memberId
+          ? {
+              ...member,
+              positionTemplateId: selectedTemplate.id,
+              positionLabel: selectedTemplate.label,
+              role: member.role || selectedTemplate.defaultRoleTag || '',
+            }
+          : member,
+      ),
+    );
+  };
+
+  const handleCreateTemplate = () => {
+    const template = createPositionTemplate({ label: newTemplateLabel });
+    if (!template) return;
+    setNewTemplateLabel('');
+  };
+
   if (crew.length === 0 && readOnly) {
     return <p className="text-sm text-muted-foreground">No crew members assigned.</p>;
   }
@@ -259,6 +295,25 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                     value={member.positionLabel ?? ''}
                     onChange={(e) => updateMember(member.id, { positionLabel: e.target.value })}
                   />
+                  <select
+                    className="h-7 rounded-md border px-2 text-xs"
+                    value={member.positionTemplateId ?? ''}
+                    onChange={(event) => {
+                      const nextTemplateId = event.target.value;
+                      if (!nextTemplateId) {
+                        updateMember(member.id, { positionTemplateId: undefined });
+                        return;
+                      }
+                      applyPositionTemplateToMember(member.id, nextTemplateId);
+                    }}
+                  >
+                    <option value="">No template</option>
+                    {positionTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.label}
+                      </option>
+                    ))}
+                  </select>
                   <Input
                     placeholder="Notes"
                     className="h-7 text-sm"
@@ -416,6 +471,17 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
               Add from master DB
             </Button>
           </div>
+          <div className="mb-2 flex items-center gap-2">
+            <Input
+              placeholder="New position template label"
+              className="h-7 text-sm"
+              value={newTemplateLabel}
+              onChange={(e) => setNewTemplateLabel(e.target.value)}
+            />
+            <Button variant="outline" size="sm" className="h-7" onClick={handleCreateTemplate}>
+              Save template
+            </Button>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <Input
               placeholder="Name *"
@@ -443,6 +509,32 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
               value={draft.positionLabel ?? ''}
               onChange={(e) => setDraft((d) => ({ ...d, positionLabel: e.target.value }))}
             />
+            <select
+              className="h-7 rounded-md border px-2 text-xs"
+              value={draft.positionTemplateId ?? ''}
+              onChange={(event) => {
+                const nextTemplateId = event.target.value;
+                if (!nextTemplateId) {
+                  setDraft((current) => ({ ...current, positionTemplateId: undefined }));
+                  return;
+                }
+                const selectedTemplate = positionTemplates.find((template) => template.id === nextTemplateId);
+                if (!selectedTemplate) return;
+                setDraft((current) => ({
+                  ...current,
+                  positionTemplateId: selectedTemplate.id,
+                  positionLabel: selectedTemplate.label,
+                  role: current.role || selectedTemplate.defaultRoleTag || '',
+                }));
+              }}
+            >
+              <option value="">No template</option>
+              {positionTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.label}
+                </option>
+              ))}
+            </select>
             <Input
               placeholder="Notes"
               className="h-7 text-sm"

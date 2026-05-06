@@ -30,6 +30,7 @@ export const STORAGE_KEYS = {
   DEVICE_LIBRARY: 'inventory-device-library',
   PRODUCTIONS: 'inventory-productions',
   CREW_CONTACTS: 'inventory-crew-contacts',
+  POSITION_TEMPLATES: 'inventory-position-templates',
 };
 
 export const SETTINGS_UPDATED_EVENT = 'trackit:settings-updated';
