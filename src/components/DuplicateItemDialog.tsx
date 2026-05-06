@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -101,7 +101,7 @@ export function DuplicateItemDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),460px)]">
         <DialogHeader>
           <DialogTitle>Duplicate Item</DialogTitle>
           <DialogDescription>
@@ -186,7 +186,7 @@ export function DuplicateItemDialog({
             )}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }

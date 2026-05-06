@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,7 +76,7 @@ export function ExportDialog({ isOpen, onClose, items, defaultFilename }: Export
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),430px)]">
         <DialogHeader>
           <DialogTitle>Export Inventory</DialogTitle>
           <DialogDescription>
@@ -117,7 +117,7 @@ export function ExportDialog({ isOpen, onClose, items, defaultFilename }: Export
             Export
           </Button>
         </div>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }

@@ -5,11 +5,11 @@ import { Plus } from "lucide-react";
 import { ItemTemplate } from '@/types/templates';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -202,13 +202,14 @@ export function TemplatesPage() {
       </AlertDialog>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} modal={false}>
-        <DialogContent
-          nonModalBackdrop
+        <DraggableDialogContent
+          showOverlay={false}
           className={cn(
-            "flex max-h-[90vh] min-h-0 flex-col gap-0 overflow-x-hidden overflow-y-visible p-0 sm:max-w-3xl md:max-w-4xl lg:max-w-5xl",
-            "!left-1/2 !right-auto !top-[max(0.5rem,6vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
-            "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[6vh] data-[state=closed]:slide-out-to-top-[6vh]"
+            "w-[min(calc(100vw-1rem),900px)] gap-0 p-0",
+            "h-[min(92vh,820px)]",
           )}
+          minWidth={360}
+          minHeight={300}
         >
           <div className="shrink-0 border-b px-6 pb-4 pt-6">
             <DialogHeader className="space-y-2 p-0 text-left">
@@ -232,7 +233,7 @@ export function TemplatesPage() {
               projects={projects}
             />
           </div>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
 
       {/* Render AddItemDialog outside of other dialogs */}

@@ -18,12 +18,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Input } from '@/components/ui/input';
 import { validateFullBackupJsonText, validateSettingsSnapshotJsonText } from '@/lib/backupValidation';
 import { buildFullOfflineBackupPayload } from '@/lib/trackItDailyBackup';
@@ -993,7 +993,7 @@ export function DataBackupTab({
       </AlertDialog>
 
       <Dialog open={createRestorePointOpen} onOpenChange={setCreateRestorePointOpen}>
-        <DialogContent>
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
           <DialogHeader>
             <DialogTitle>Create restore point</DialogTitle>
             <DialogDescription>
@@ -1025,7 +1025,7 @@ export function DataBackupTab({
               )}
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
 
       <AlertDialog
@@ -1113,3 +1113,4 @@ export function DataBackupTab({
     </div>
   );
 }
+

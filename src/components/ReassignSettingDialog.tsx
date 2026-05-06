@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -72,7 +72,7 @@ export function ReassignSettingDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),460px)]">
         <DialogHeader>
           <DialogTitle>Remove "{valueToRemove}"?</DialogTitle>
           <DialogDescription>
@@ -150,7 +150,7 @@ export function ReassignSettingDialog({
             </Button>
           </div>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }

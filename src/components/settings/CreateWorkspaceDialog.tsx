@@ -3,12 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -132,7 +132,7 @@ export function CreateWorkspaceDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="sm:max-w-xl">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),560px)]">
         <DialogHeader>
           <DialogTitle>Create workspace</DialogTitle>
           <DialogDescription>Name the workspace and choose how it starts.</DialogDescription>
@@ -204,7 +204,7 @@ export function CreateWorkspaceDialog({
             {busy ? 'Creating…' : 'Create'}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }

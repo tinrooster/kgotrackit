@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -48,7 +49,7 @@ export function DeleteListItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
         <DialogHeader>
           <DialogTitle>Delete {listType.slice(0, -1)}</DialogTitle>
           <DialogDescription>
@@ -99,7 +100,7 @@ export function DeleteListItemDialog({
             Delete
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 } 

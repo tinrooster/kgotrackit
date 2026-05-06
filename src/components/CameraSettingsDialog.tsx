@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
+    DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -125,7 +125,7 @@ export function CameraSettingsDialog({ isOpen, onClose }: CameraSettingsDialogPr
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-[480px]">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
         <DialogHeader>
           <DialogTitle>Camera Settings</DialogTitle>
           <DialogDescription>
@@ -176,7 +176,8 @@ export function CameraSettingsDialog({ isOpen, onClose }: CameraSettingsDialogPr
             Save
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }
+

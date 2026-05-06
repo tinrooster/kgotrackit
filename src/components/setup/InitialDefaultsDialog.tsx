@@ -3,12 +3,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
+    DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { SetupDefaultsChoice } from '@/lib/dummyData';
 
 interface InitialDefaultsDialogProps {
@@ -31,7 +31,7 @@ export function InitialDefaultsDialog({ open, onApply, onDismiss }: InitialDefau
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onDismiss?.(); }}>
-      <DialogContent className="sm:max-w-xl">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),560px)]">
         <DialogHeader>
           <DialogTitle>Choose setup defaults</DialogTitle>
           <DialogDescription>
@@ -86,7 +86,8 @@ export function InitialDefaultsDialog({ open, onApply, onDismiss }: InitialDefau
             Apply setup
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }
+

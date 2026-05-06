@@ -9,7 +9,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff, Loader2, LogIn, Key, Mail } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import type { UserWithPassword, LoginResult } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { logger } from '@/utils/logger';
@@ -389,7 +390,7 @@ export function LoginForm() {
       </p>
 
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <DialogContent>
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
@@ -497,7 +498,7 @@ export function LoginForm() {
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
     </div>
   );

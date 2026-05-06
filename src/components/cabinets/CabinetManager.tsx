@@ -13,13 +13,13 @@ import {
 } from "@/components/ui/form";
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
+    DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -143,7 +143,7 @@ export function CabinetManager({ locations, categories, items, onCabinetChange }
               Add Cabinet
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
             <DialogHeader>
               <DialogTitle>{selectedCabinet ? "Edit Cabinet" : "Add New Cabinet"}</DialogTitle>
               <DialogDescription>
@@ -273,7 +273,7 @@ export function CabinetManager({ locations, categories, items, onCabinetChange }
                 </DialogFooter>
               </form>
             </Form>
-          </DialogContent>
+          </DraggableDialogContent>
         </Dialog>
       </div>
 
@@ -327,7 +327,7 @@ export function CabinetManager({ locations, categories, items, onCabinetChange }
       </Table>
 
       <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
-        <DialogContent>
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
           <DialogHeader>
             <DialogTitle>Cabinet QR Code</DialogTitle>
             <DialogDescription>
@@ -347,7 +347,7 @@ export function CabinetManager({ locations, categories, items, onCabinetChange }
               </p>
             </div>
           )}
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
     </div>
   );

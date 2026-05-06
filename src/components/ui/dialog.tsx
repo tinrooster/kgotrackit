@@ -165,8 +165,12 @@ const DialogHeader = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
+    data-drag-handle="true"
     className={cn(
       "flex flex-col space-y-1.5 text-center sm:text-left",
+      // Show grab cursor so users know this region is draggable when the
+      // dialog is wrapped in DraggableDialogContent.
+      "cursor-grab active:cursor-grabbing select-none",
       className
     )}
     {...props}

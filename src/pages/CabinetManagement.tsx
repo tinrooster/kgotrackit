@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog"
 import { toast } from 'sonner'
 import { Pencil, Trash2, GripVertical, ArrowLeftRight, QrCode, Printer, Download } from "lucide-react"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -377,7 +378,7 @@ export default function CabinetManagement({ locations = [] }: CabinetManagementP
                       Add Secure Cabinet / Storage Location
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-3xl">
+                  <DraggableDialogContent className="w-[min(calc(100vw-1rem),760px)]">
                     <DialogHeader>
                       <DialogTitle>{editingCabinet ? 'Edit Secure Cabinet or Storage Unit' : 'Add New Secure Cabinet or Storage Location'}</DialogTitle>
                       <DialogDescription>
@@ -465,7 +466,7 @@ export default function CabinetManagement({ locations = [] }: CabinetManagementP
                         </Button>
                       </DialogFooter>
                     </form>
-                  </DialogContent>
+                  </DraggableDialogContent>
                 </Dialog>
               </div>
             </CardHeader>
@@ -546,7 +547,7 @@ export default function CabinetManagement({ locations = [] }: CabinetManagementP
       </Tabs>
 
       <Dialog open={!!qrCabinet} onOpenChange={(open) => !open && setQrCabinet(null)}>
-        <DialogContent className="max-w-md">
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),460px)]">
           <DialogHeader>
             <DialogTitle>Storage QR Code</DialogTitle>
             <DialogDescription>Print or download QR for location labeling and fast check-in/out.</DialogDescription>
@@ -606,7 +607,7 @@ export default function CabinetManagement({ locations = [] }: CabinetManagementP
               </DialogFooter>
             </div>
           )}
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
     </div>
   )

@@ -3,12 +3,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
+    DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS } from '@/lib/dummyData';
@@ -106,7 +106,7 @@ export function WorkspaceUtilitiesDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="sm:max-w-xl">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),560px)]">
         <DialogHeader>
           <DialogTitle>Workspace utilities</DialogTitle>
           <DialogDescription>
@@ -167,8 +167,9 @@ export function WorkspaceUtilitiesDialog({
             {busy ? 'Applying…' : 'Apply'}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }
+
 

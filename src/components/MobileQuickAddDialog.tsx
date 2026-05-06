@@ -3,11 +3,11 @@
 import * as React from "react";
 import {
   Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -645,14 +645,14 @@ export function MobileQuickAddDialog({
       />
 
       <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
-        <DialogContent
-          nonModalBackdrop
+        <DraggableDialogContent
+          showOverlay={false}
           className={cn(
-            "flex w-[calc(100vw-0.75rem)] flex-col gap-0 overflow-hidden p-0 sm:w-auto sm:max-w-2xl md:max-w-3xl",
+            "w-[min(calc(100vw-1rem),680px)] gap-0 p-0",
             "h-[min(92vh,680px)]",
-            "sm:rounded-xl",
-            "!left-1/2 !right-auto !top-[max(0.375rem,4vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
           )}
+          minWidth={320}
+          minHeight={300}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {/* ── HEADER ──────────────────────────────────────────────────────── */}
@@ -1214,7 +1214,7 @@ export function MobileQuickAddDialog({
               </Button>
             </div>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
     </>
   );

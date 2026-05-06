@@ -23,11 +23,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import {
   Select,
   SelectContent,
@@ -236,7 +236,7 @@ export function DeviceLibrarySortableList({ entries, onEntriesChange }: DeviceLi
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),520px)] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{entries.some((e) => e.id === draft.id) ? 'Edit catalog entry' : 'Add catalog entry'}</DialogTitle>
           </DialogHeader>
@@ -380,8 +380,9 @@ export function DeviceLibrarySortableList({ entries, onEntriesChange }: DeviceLi
               Save
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
     </div>
   );
 }
+

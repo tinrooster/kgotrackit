@@ -18,7 +18,8 @@ import { buildFullOfflineBackupPayload } from '@/lib/trackItDailyBackup'
 import { validateFullBackupJsonText } from '@/lib/backupValidation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
@@ -139,7 +140,7 @@ function EditUserDialog({ open, onOpenChange, user, onSave }: EditUserDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
         <DialogHeader>
           <DialogTitle>Edit User</DialogTitle>
           <DialogDescription>Update user profile details.</DialogDescription>
@@ -187,7 +188,7 @@ function EditUserDialog({ open, onOpenChange, user, onSave }: EditUserDialogProp
             Save Changes
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }
@@ -219,7 +220,7 @@ function AdminResetPasswordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
         <DialogHeader>
           <DialogTitle>Reset User Password</DialogTitle>
           <DialogDescription>
@@ -265,7 +266,7 @@ function AdminResetPasswordDialog({
             {isSubmitting ? 'Resetting...' : 'Reset Password'}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }
@@ -2028,7 +2029,7 @@ export default function SettingsPage() {
 
       {/* Reconciliation Dialog */}
       <Dialog open={showReconcileDialog} onOpenChange={setShowReconcileDialog}>
-        <DialogContent>
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
           <DialogHeader>
             <DialogTitle>Confirm Removal</DialogTitle>
             <DialogDescription>
@@ -2099,7 +2100,7 @@ export default function SettingsPage() {
               Confirm
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
 
       {/* Import Reconciliation Dialog */}
@@ -2114,7 +2115,7 @@ export default function SettingsPage() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl">
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),660px)]">
           <DialogHeader>
             <DialogTitle>Duplicate Items Found</DialogTitle>
             <DialogDescription>
@@ -2257,7 +2258,7 @@ export default function SettingsPage() {
               Confirm Import
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
 
       <CameraSettingsDialog
@@ -2274,7 +2275,7 @@ export default function SettingsPage() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),460px)]">
           <DialogHeader>
             <DialogTitle>Import Successful</DialogTitle>
             <DialogDescription>
@@ -2306,7 +2307,7 @@ export default function SettingsPage() {
               Close
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
     </div>
   );

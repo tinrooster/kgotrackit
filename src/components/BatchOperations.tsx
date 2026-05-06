@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -447,7 +448,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
             Delete Selected
           </Button>
         </DialogTrigger>
-        <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-md">
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),460px)]">
           <DialogHeader>
             <DialogTitle>Delete Items</DialogTitle>
             <DialogDescription>
@@ -462,7 +463,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
               Delete
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
 
       <Dialog open={isBatchEditOpen} onOpenChange={setIsBatchEditOpen}>
@@ -477,7 +478,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
             Batch Edit ({selectedItems.length})
           </Button>
         </DialogTrigger>
-        <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-[625px]">
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),640px)]">
           <DialogHeader>
             <DialogTitle>Batch Edit Items</DialogTitle>
           </DialogHeader>
@@ -613,7 +614,7 @@ export default function BatchOperations({ allItems, selectedItems, onReplaceItem
               )}
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
     </div>
   );

@@ -2,12 +2,12 @@ import React, { useState, useCallback, ChangeEvent } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -285,7 +285,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete }: ImportDi
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { resetState(); onClose(); } }}>
-      <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-auto sm:max-w-4xl">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),880px)]" minWidth={400}>
         <DialogHeader>
           <DialogTitle>Import Inventory</DialogTitle>
           <DialogDescription>
@@ -440,7 +440,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete }: ImportDi
             Import Data
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 }

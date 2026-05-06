@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,7 +64,7 @@ export default function AddUserDialog({ open, onOpenChange, onAdd }: AddUserDial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DraggableDialogContent className="w-[min(calc(100vw-1rem),460px)]">
         <DialogHeader>
           <DialogTitle>Add New User</DialogTitle>
           <DialogDescription>
@@ -120,7 +120,7 @@ export default function AddUserDialog({ open, onOpenChange, onAdd }: AddUserDial
             {isSubmitting ? 'Adding...' : 'Add User'}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DraggableDialogContent>
     </Dialog>
   );
 } 

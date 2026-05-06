@@ -45,7 +45,8 @@ import { MobileQuickAddDialog } from '@/components/MobileQuickAddDialog';
 import { EditItemDialog } from '@/components/EditItemDialog';
 import { DuplicateItemDialog } from '@/components/DuplicateItemDialog';
 import { ExportDialog } from '@/components/ExportDialog';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ItemTemplate } from '@/types/templates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1675,7 +1676,7 @@ export default function InventoryPage() {
       />
 
       <Dialog open={!!printItem} onOpenChange={(open) => !open && setPrintItem(null)}>
-        <DialogContent dismissOnOutsidePointer className="sm:max-w-md">
+        <DraggableDialogContent dismissOnOutsidePointer className="w-[min(calc(100vw-1rem),460px)]">
           <DialogHeader>
             <DialogTitle>Print Label</DialogTitle>
             <DialogDescription>Choose compact code label or detailed sticker.</DialogDescription>
@@ -1724,11 +1725,11 @@ export default function InventoryPage() {
               Print
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
 
       <Dialog open={isBulkPrintDialogOpen} onOpenChange={setIsBulkPrintDialogOpen}>
-        <DialogContent dismissOnOutsidePointer className="sm:max-w-md">
+        <DraggableDialogContent dismissOnOutsidePointer className="w-[min(calc(100vw-1rem),460px)]">
           <DialogHeader>
             <DialogTitle>Bulk Label Print</DialogTitle>
             <DialogDescription>Select Avery sheet format and content options.</DialogDescription>
@@ -1781,7 +1782,7 @@ export default function InventoryPage() {
               Open Preview
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
     </div>
   );

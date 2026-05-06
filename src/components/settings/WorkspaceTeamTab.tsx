@@ -25,12 +25,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CreateWorkspaceDialog } from '@/components/settings/CreateWorkspaceDialog';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -312,7 +312,7 @@ export function WorkspaceTeamTab() {
       />
 
       <Dialog open={manageDialogOpen} onOpenChange={setManageDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),760px)]">
           <DialogHeader>
             <DialogTitle>Manage workspaces</DialogTitle>
             <DialogDescription>
@@ -536,7 +536,7 @@ export function WorkspaceTeamTab() {
               Close
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
 
       <Dialog
@@ -548,7 +548,7 @@ export function WorkspaceTeamTab() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),460px)]">
           <DialogHeader>
             <DialogTitle>Reset password</DialogTitle>
             <DialogDescription>Set a new password for this member.</DialogDescription>
@@ -600,7 +600,7 @@ export function WorkspaceTeamTab() {
               {resettingPassword ? 'Saving…' : 'Reset'}
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DraggableDialogContent>
       </Dialog>
 
       <AlertDialog open={deleteWorkspaceDialogOpen} onOpenChange={setDeleteWorkspaceDialogOpen}>
@@ -661,3 +661,4 @@ export function WorkspaceTeamTab() {
     </Card>
   );
 }
+
