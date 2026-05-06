@@ -189,6 +189,16 @@ export const isFreshSetupState = (): boolean => {
   return existingItems.length === 0;
 };
 
+/**
+ * Pre-record a setup choice for a specific workspace ID before it becomes the active context.
+ * Use this when creating a new workspace so InitialDefaultsDialog never fires for that workspace.
+ */
+export const recordSetupChoiceForWorkspace = (workspaceId: string, choice: SetupDefaultsChoice): void => {
+  const map = readChoiceMap();
+  map[`workspace:${workspaceId}`] = choice;
+  writeChoiceMap(map);
+};
+
 export const applySetupDefaultsChoice = (choice: SetupDefaultsChoice, includeSampleInventory: boolean): void => {
   if (choice === 'starter') {
     saveSettings({

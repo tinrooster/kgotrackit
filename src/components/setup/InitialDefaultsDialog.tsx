@@ -14,9 +14,10 @@ import { SetupDefaultsChoice } from '@/lib/dummyData';
 interface InitialDefaultsDialogProps {
   open: boolean;
   onApply: (choice: SetupDefaultsChoice, includeSampleInventory: boolean) => void;
+  onDismiss?: () => void;
 }
 
-export function InitialDefaultsDialog({ open, onApply }: InitialDefaultsDialogProps) {
+export function InitialDefaultsDialog({ open, onApply, onDismiss }: InitialDefaultsDialogProps) {
   const [choice, setChoice] = useState<SetupDefaultsChoice>('blank');
   const [includeSampleInventory, setIncludeSampleInventory] = useState(false);
 
@@ -29,7 +30,7 @@ export function InitialDefaultsDialog({ open, onApply }: InitialDefaultsDialogPr
   );
 
   return (
-    <Dialog open={open}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onDismiss?.(); }}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Choose setup defaults</DialogTitle>
@@ -76,6 +77,11 @@ export function InitialDefaultsDialog({ open, onApply }: InitialDefaultsDialogPr
         )}
 
         <DialogFooter>
+          {onDismiss && (
+            <Button variant="outline" onClick={onDismiss}>
+              Skip for now
+            </Button>
+          )}
           <Button onClick={() => onApply(choice, choice === 'starter' ? includeSampleInventory : false)}>
             Apply setup
           </Button>

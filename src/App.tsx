@@ -10,7 +10,8 @@ import { Toaster } from './components/ui/toaster';
 import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { InitialDefaultsDialog } from './components/setup/InitialDefaultsDialog';
-import { applySetupDefaultsChoice, getSetupDefaultsChoice, isFreshSetupState } from './lib/dummyData';
+import { applySetupDefaultsChoice, getSetupDefaultsChoice, isFreshSetupState, recordSetupChoiceForWorkspace } from './lib/dummyData';
+import { getActiveWorkspaceId } from './lib/supabase/workspaceData';
 import { CLOUD_HYDRATED_EVENT } from './lib/cloudSyncEvents';
 import CheckoutPage from './pages/CheckoutPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -48,7 +49,10 @@ export default function App() {
 
   useEffect(() => {
     const evaluateSetupDialog = () => {
-      if (authLoading) {
+      if (authLoading) return;
+      // Team workspaces are set up via CreateWorkspaceDialog — never prompt here.
+      if (getActiveWorkspaceId()) {
+        setShowInitialDefaultsDialog(false);
         return;
       }
       const hasRecordedChoice = getSetupDefaultsChoice() !== null;
@@ -66,6 +70,17 @@ export default function App() {
     window.location.reload();
   };
 
+  const handleDismissSetupDialog = () => {
+    // Record 'blank' so the dialog doesn't reappear after dismissal.
+    const activeWsId = getActiveWorkspaceId();
+    if (activeWsId) {
+      recordSetupChoiceForWorkspace(activeWsId, 'blank');
+    } else {
+      applySetupDefaultsChoice('blank', false);
+    }
+    setShowInitialDefaultsDialog(false);
+  };
+
   return (
     <>
       <ErrorBoundary>
@@ -73,6 +88,7 @@ export default function App() {
           <InitialDefaultsDialog
             open={showInitialDefaultsDialog}
             onApply={handleApplySetupDefaults}
+            onDismiss={handleDismissSetupDialog}
           />
           <Navigation />
           <main

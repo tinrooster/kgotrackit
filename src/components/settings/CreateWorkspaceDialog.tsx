@@ -12,7 +12,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS } from '@/lib/dummyData';
+import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS, recordSetupChoiceForWorkspace } from '@/lib/dummyData';
 import { STORAGE_KEYS, type Settings } from '@/lib/storageService';
 import { createWorkspaceWithSnapshot, type WorkspaceSnapshotPayload } from '@/lib/supabase/workspaceData';
 
@@ -108,6 +108,9 @@ export function CreateWorkspaceDialog({
       };
 
       const workspaceId = await createWorkspaceWithSnapshot(trimmedName, snapshot);
+      // Pre-record the setup choice for this workspace so InitialDefaultsDialog
+      // never fires when the page reloads into the new workspace context.
+      recordSetupChoiceForWorkspace(workspaceId, choice);
       toast.success('Workspace created');
       await onCreated(workspaceId);
       onClose();
