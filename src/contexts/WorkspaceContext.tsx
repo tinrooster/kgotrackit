@@ -58,7 +58,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     if (workspaces.length === 0) {
       if (activeWorkspaceId) {
         persistActiveWorkspaceId(null);
-        window.location.reload();
+        setActiveWorkspaceIdState(null);
       }
       return;
     }
@@ -74,7 +74,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     persistActiveWorkspaceId(defaultWorkspaceId);
-    window.location.reload();
+    setActiveWorkspaceIdState(defaultWorkspaceId);
   }, [activeWorkspaceId, authBackend, currentUser?.id, loading, workspaces]);
 
   const activeWorkspaceRole = useMemo(() => {
