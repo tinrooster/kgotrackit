@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { InventoryItem } from '@/types/inventory';
 import { Plus, Filter, Clapperboard } from 'lucide-react';
@@ -10,12 +11,53 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getSettings } from '@/lib/storageService';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
 import { resolveProjectDisplay } from '@/lib/projectOptions';
+import { getProductions, PRODUCTIONS_UPDATED_EVENT } from '@/lib/productionService';
+import { Production, ProductionStatus, PRODUCTION_STATUS_LABELS } from '@/types/productions';
+
+const ACTIVE_PRODUCTION_STATUS_FILTERS: ProductionStatus[] = ['planning', 'confirmed', 'in_progress'];
+
+function getChecklistProgress(production: Production): { done: number; total: number; percent: number } {
+  let done = 0;
+  let total = 0;
+  for (const group of production.checklistGroups) {
+    for (const item of group.items) {
+      total += 1;
+      if (item.completed) done += 1;
+    }
+  }
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return { done, total, percent };
+}
+
+function getPacklistProgress(production: Production): { done: number; total: number; percent: number } {
+  let done = 0;
+  let total = 0;
+  for (const packlist of production.vehiclePacklists) {
+    for (const item of packlist.items) {
+      total += 1;
+      if (item.completed) done += 1;
+    }
+  }
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return { done, total, percent };
+}
+
+function getCrewCoverage(production: Production): { scheduled: number; crewCount: number; percent: number } {
+  const crewCount = production.crew.length;
+  if (crewCount === 0) return { scheduled: 0, crewCount: 0, percent: 0 };
+  const scheduledCrewIds = new Set((production.crewSchedule ?? []).map((entry) => entry.crewMemberId));
+  const scheduled = production.crew.filter((member) => scheduledCrewIds.has(member.id)).length;
+  const percent = Math.round((scheduled / crewCount) * 100);
+  return { scheduled, crewCount, percent };
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [items, setItems] = useLocalStorage<InventoryItem[]>('inventoryItems', []);
-  const [activeView, setActiveView] = useState<'project' | 'location'>('project');
+  const [productions, setProductions] = useState<Production[]>(() => getProductions());
+  const [activeView, setActiveView] = useState<'project' | 'location' | 'production'>('project');
   const [activeSegment, setActiveSegment] = useState<string | null>(null);
+  const [productionStatusFilter, setProductionStatusFilter] = useState<ProductionStatus | 'all'>('all');
 
   // Add storage event listener
   useEffect(() => {
@@ -58,6 +100,18 @@ export default function DashboardPage() {
       window.removeEventListener('focus', refreshItems);
     };
   }, [setItems]);
+
+  useEffect(() => {
+    const refreshProductions = () => {
+      setProductions(getProductions());
+    };
+    window.addEventListener(PRODUCTIONS_UPDATED_EVENT, refreshProductions as EventListener);
+    window.addEventListener('focus', refreshProductions);
+    return () => {
+      window.removeEventListener(PRODUCTIONS_UPDATED_EVENT, refreshProductions as EventListener);
+      window.removeEventListener('focus', refreshProductions);
+    };
+  }, []);
 
   // Get project statistics
   const projectStats = useMemo(() => {
@@ -114,6 +168,24 @@ export default function DashboardPage() {
   }, [items]);
 
   const activeStats = activeView === 'project' ? projectStats : locationStats;
+  const activeProductions = useMemo(
+    () =>
+      productions
+        .filter((production) => production.status !== 'completed' && production.status !== 'cancelled')
+        .sort((left, right) => {
+          const leftDate = left.startDate ? new Date(left.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+          const rightDate = right.startDate ? new Date(right.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+          return leftDate - rightDate;
+        }),
+    [productions]
+  );
+  const filteredProductions = useMemo(
+    () =>
+      activeProductions.filter(
+        (production) => productionStatusFilter === 'all' || production.status === productionStatusFilter
+      ),
+    [activeProductions, productionStatusFilter]
+  );
   const colors = [
     '#3B82F6', // 2024:NAB - bright blue
     '#10B981', // REMOTE_KIT_BUILD - emerald green
@@ -160,10 +232,11 @@ export default function DashboardPage() {
         </Card>
       ) : (
         <>
-          <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'project' | 'location')}>
-            <TabsList className="grid w-full grid-cols-2">
+          <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'project' | 'location' | 'production')}>
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="project">By Project</TabsTrigger>
               <TabsTrigger value="location">By Location</TabsTrigger>
+              <TabsTrigger value="production">By Production</TabsTrigger>
             </TabsList>
 
             <TabsContent value="project" className="mt-4">
@@ -462,6 +535,79 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="production" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Active Productions</CardTitle>
+                  <CardDescription>Current productions in planning, confirmed, or in-progress stages</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant={productionStatusFilter === 'all' ? 'default' : 'outline'}
+                      onClick={() => setProductionStatusFilter('all')}
+                    >
+                      All Active
+                    </Button>
+                    {ACTIVE_PRODUCTION_STATUS_FILTERS.map((status) => (
+                      <Button
+                        key={status}
+                        size="sm"
+                        variant={productionStatusFilter === status ? 'default' : 'outline'}
+                        onClick={() => setProductionStatusFilter(status)}
+                      >
+                        {PRODUCTION_STATUS_LABELS[status]}
+                      </Button>
+                    ))}
+                  </div>
+                  {filteredProductions.length === 0 ? (
+                    <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      No productions match this filter.
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {filteredProductions.map((production) => {
+                        const checklist = getChecklistProgress(production);
+                        const packlists = getPacklistProgress(production);
+                        const crew = getCrewCoverage(production);
+                        return (
+                        <button
+                          key={production.id}
+                          type="button"
+                          onClick={() => navigate(`/productions?productionId=${encodeURIComponent(production.id)}`)}
+                          className="rounded-md border p-3 text-left transition-colors hover:bg-accent"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="font-medium">{production.name}</p>
+                            <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                              {PRODUCTION_STATUS_LABELS[production.status]}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {production.startDate ? `Start: ${production.startDate}` : 'Start date not set'}
+                            {production.location ? ` • ${production.location}` : ''}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <Badge variant="outline" className="text-[11px]">
+                              Checklist {checklist.percent}% ({checklist.done}/{checklist.total})
+                            </Badge>
+                            <Badge variant="outline" className="text-[11px]">
+                              Packlists {packlists.percent}% ({packlists.done}/{packlists.total})
+                            </Badge>
+                            <Badge variant="outline" className="text-[11px]">
+                              Crew {crew.percent}% ({crew.scheduled}/{crew.crewCount})
+                            </Badge>
+                          </div>
+                        </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

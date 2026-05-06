@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, Undo2, Redo2 } from 'lucide-react';
 import { Production, ProductionStatus, PRODUCTION_STATUS_OPTIONS } from '@/types/productions';
 import {
@@ -43,6 +44,7 @@ import {
 } from '@/lib/productionUndo';
 
 export default function ProductionsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser } = useAuth();
   const [productions, setProductions] = useState<Production[]>(() => getProductions());
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() => getItems());
@@ -57,6 +59,7 @@ export default function ProductionsPage() {
   const [cloneSchedule, setCloneSchedule] = useState(true);
   const [cloneChecklist, setCloneChecklist] = useState(false);
   const [cloneVehiclePacklists, setCloneVehiclePacklists] = useState(false);
+  const productionIdFromQuery = searchParams.get('productionId');
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -75,6 +78,18 @@ export default function ProductionsPage() {
   useEffect(() => {
     setInventoryItems(getItems());
   }, []);
+
+  useEffect(() => {
+    if (!productionIdFromQuery) return;
+    const queryProduction = productions.find((production) => production.id === productionIdFromQuery);
+    if (queryProduction) {
+      setSelectedProduction(queryProduction);
+      return;
+    }
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('productionId');
+    setSearchParams(nextParams, { replace: true });
+  }, [productions, productionIdFromQuery, searchParams, setSearchParams]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -347,7 +362,13 @@ export default function ProductionsPage() {
         currentUsername={currentUser?.username || currentUser?.displayName}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
-        onClose={() => setSelectedProduction(null)}
+        onClose={() => {
+          setSelectedProduction(null);
+          if (!productionIdFromQuery) return;
+          const nextParams = new URLSearchParams(searchParams);
+          nextParams.delete('productionId');
+          setSearchParams(nextParams, { replace: true });
+        }}
       />
 
       <ProductionForm
