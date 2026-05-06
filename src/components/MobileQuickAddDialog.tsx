@@ -196,6 +196,7 @@ export function MobileQuickAddDialog({
   const customRackRef = React.useRef<HTMLInputElement>(null);
 
   const [name, setName] = React.useState("");
+  const [notes, setNotes] = React.useState("");
   const [photoUrl, setPhotoUrl] = React.useState("");
   const [quantity, setQuantity] = React.useState(1);
   const [category, setCategory] = React.useState("");
@@ -392,6 +393,7 @@ export function MobileQuickAddDialog({
     setUnitSubPickerParent(unitParent?.children?.length ? unitParent : null);
     setProject(proj || "");
     setName("");
+    setNotes("");
     setQuantity(1);
     setPhotoUrl("");
     setBarcode("");
@@ -456,7 +458,7 @@ export function MobileQuickAddDialog({
       supplier: supplierName,
       supplierWebsite: "",
       description: "",
-      notes: "",
+      notes: notes.trim(),
       minQuantity: ds.defaultMinQuantity ?? 0,
       costPerUnit: 0,
       assetStatus: assetStatus as InventoryItem["assetStatus"],
@@ -477,7 +479,7 @@ export function MobileQuickAddDialog({
       companyAssetTag: undefined,
       photoUrl: photoUrl.trim() || undefined,
     };
-  }, [name, quantity, unit, unitSubcategory, category, locationId, project, suppliers, photoUrl, barcode, units, assetStatus, assetTrackingMode, rackLocation]);
+  }, [name, notes, quantity, unit, unitSubcategory, category, locationId, project, suppliers, photoUrl, barcode, units, assetStatus, assetTrackingMode, rackLocation]);
 
   const handleSubmit = async (mode: "once" | "next") => {
     const payload = buildPayload();
@@ -490,6 +492,7 @@ export function MobileQuickAddDialog({
       await onSubmit(payload, mode);
       if (mode === "next") {
         setName("");
+        setNotes("");
         setQuantity(1);
         setPhotoUrl("");
         setBarcode("");
@@ -645,9 +648,10 @@ export function MobileQuickAddDialog({
         <DialogContent
           nonModalBackdrop
           className={cn(
-            "flex w-[calc(100vw-0.75rem)] max-h-[90vh] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:w-auto sm:max-w-2xl md:max-w-3xl",
+            "flex w-[calc(100vw-0.75rem)] flex-col gap-0 overflow-hidden p-0 sm:w-auto sm:max-w-2xl md:max-w-3xl",
+            "h-[min(92vh,680px)]",
             "sm:rounded-xl",
-            "!left-1/2 !right-auto !top-[max(0.5rem,5vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
+            "!left-1/2 !right-auto !top-[max(0.375rem,4vh)] !bottom-auto !translate-x-[-50%] !translate-y-0",
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
@@ -700,7 +704,7 @@ export function MobileQuickAddDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Item name"
-                className="h-11 min-w-0 flex-1 text-base touch-manipulation"
+                className="h-10 min-w-0 flex-1 text-base touch-manipulation"
                 autoComplete="off"
                 enterKeyHint="done"
               />
@@ -708,7 +712,7 @@ export function MobileQuickAddDialog({
                 type="button"
                 variant={listening ? "default" : "outline"}
                 size="icon"
-                className="h-11 w-11 shrink-0 touch-manipulation"
+                className="h-10 w-10 shrink-0 touch-manipulation"
                 onClick={startVoice}
                 title={listening ? "Stop listening" : "Voice input"}
                 aria-pressed={listening}
@@ -720,7 +724,7 @@ export function MobileQuickAddDialog({
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-11 w-11 shrink-0 touch-manipulation"
+                  className="h-10 w-10 shrink-0 touch-manipulation"
                   onClick={applySameAsLast}
                   title="Re-use last item's settings"
                   aria-label="Re-use last item's settings"
@@ -731,10 +735,19 @@ export function MobileQuickAddDialog({
             </div>
             {listening && <p className="text-[10px] text-muted-foreground">Listening…</p>}
 
-            {/* Quick tools row: Qty + Scan + Photo */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Notes field */}
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notes (optional)"
+              rows={2}
+              className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+            />
+
+            {/* Quick tools row: Qty + icon buttons */}
+            <div className="flex items-center gap-1.5">
               {/* Qty stepper */}
-              <div className="flex items-center gap-1 rounded-md border border-border/70 bg-background">
+              <div className="flex items-center rounded-md border border-border/70 bg-background">
                 <Button
                   type="button"
                   variant="ghost"
@@ -766,43 +779,49 @@ export function MobileQuickAddDialog({
                 </Button>
               </div>
 
-              {/* Barcode scan — always one tap */}
+              {/* Barcode badge (when set) or spacer */}
+              {barcode ? (
+                <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-border/60 bg-muted/30 px-2 py-1.5">
+                  <ScanLine className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="truncate text-xs font-medium">{barcode}</span>
+                  <button
+                    type="button"
+                    className="ml-auto shrink-0 touch-manipulation text-muted-foreground hover:text-foreground"
+                    onClick={() => setBarcode("")}
+                    aria-label="Clear barcode"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex-1" />
+              )}
+
+              {/* Icon action buttons: scan, camera, gallery */}
               <Button
                 type="button"
                 variant={barcode ? "secondary" : "outline"}
-                size="sm"
-                className="h-9 flex-1 min-w-0 touch-manipulation gap-1.5 text-xs"
+                size="icon"
+                className="h-9 w-9 shrink-0 touch-manipulation"
                 onClick={() => setScannerOpen(true)}
                 title="Scan barcode"
+                aria-label="Scan barcode"
               >
-                <ScanLine className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{barcode || "Scan barcode"}</span>
+                <ScanLine className="h-4 w-4" />
               </Button>
-              {barcode && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 touch-manipulation"
-                  onClick={() => setBarcode("")}
-                  aria-label="Clear barcode"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              )}
 
-              {/* Photo — inline thumbnail or camera button */}
               {photoUrl ? (
-                <div className="relative flex-shrink-0">
+                <div className="relative shrink-0">
                   <img
                     src={photoUrl}
                     alt="Item photo"
-                    className="h-9 w-9 rounded-md border object-cover touch-manipulation cursor-pointer"
+                    className="h-9 w-9 rounded-md border object-cover cursor-pointer touch-manipulation"
                     onClick={() => setCaptureOpen(true)}
+                    title="Retake photo"
                   />
                   <button
                     type="button"
-                    className="absolute -right-1 -top-1 rounded-full border bg-background p-0.5 shadow-sm touch-manipulation"
+                    className="absolute -right-1 -top-1 rounded-full border border-border bg-background p-0.5 shadow-sm touch-manipulation"
                     onClick={() => setPhotoUrl("")}
                     aria-label="Remove photo"
                   >
@@ -818,8 +837,9 @@ export function MobileQuickAddDialog({
                     className="h-9 w-9 shrink-0 touch-manipulation"
                     onClick={() => setCaptureOpen(true)}
                     title="Take photo"
+                    aria-label="Take photo"
                   >
-                    <Camera className="h-3.5 w-3.5" />
+                    <Camera className="h-4 w-4" />
                   </Button>
                   <Button
                     type="button"
@@ -828,8 +848,9 @@ export function MobileQuickAddDialog({
                     className="h-9 w-9 shrink-0 touch-manipulation"
                     onClick={() => galleryInputRef.current?.click()}
                     title="Choose from gallery"
+                    aria-label="Choose photo from gallery"
                   >
-                    <ImagePlus className="h-3.5 w-3.5" />
+                    <ImagePlus className="h-4 w-4" />
                   </Button>
                 </>
               )}
@@ -1166,30 +1187,32 @@ export function MobileQuickAddDialog({
           </div>
 
           {/* ── FOOTER ──────────────────────────────────────────────────────── */}
-          <DialogFooter className="shrink-0 flex-col gap-1 border-t bg-background p-2.5">
-            <Button
-              type="button"
-              className="h-10 w-full touch-manipulation text-sm font-medium"
-              onClick={() => void handleSubmit("once")}
-            >
-              Add to inventory
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="h-10 w-full touch-manipulation text-sm font-medium"
-              onClick={() => void handleSubmit("next")}
-            >
-              Add &amp; next
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-9 w-full touch-manipulation text-sm"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
+          <DialogFooter className="shrink-0 border-t bg-background p-2.5">
+            <div className="grid w-full grid-cols-3 gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 touch-manipulation text-sm"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="h-10 touch-manipulation text-sm font-medium"
+                onClick={() => void handleSubmit("once")}
+              >
+                Add to inventory
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10 touch-manipulation text-sm font-medium"
+                onClick={() => void handleSubmit("next")}
+              >
+                Add &amp; next
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
