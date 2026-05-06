@@ -36,6 +36,10 @@ import {
   type RestorePointListEntry,
 } from '@/lib/localRestorePoints';
 import { logger } from '@/lib/logging';
+import type {
+  OrganizationImportPreview,
+  OrganizationImportSections,
+} from '@/lib/supabase/organizationPortability';
 
 interface DataBackupTabProps {
   onExportData: () => void;
@@ -48,7 +52,13 @@ interface DataBackupTabProps {
   onRestoreSettingsSnapshot: (file: File) => Promise<void>;
   onRunGroupInventoryReconcile: () => GroupReconcileResult;
   onExportOrganizationData?: () => Promise<void>;
-  onImportOrganizationData?: (file: File, strategy: 'replace' | 'merge' | 'skip') => Promise<void>;
+  onPreviewOrganizationImportData?: (file: File) => Promise<OrganizationImportPreview>;
+  onImportOrganizationData?: (
+    file: File,
+    strategy: 'replace' | 'merge' | 'skip',
+    sections: OrganizationImportSections,
+  ) => Promise<void>;
+  onResetOrganizationSettings?: () => Promise<void>;
   organizationDataLabel?: string | null;
 }
 
@@ -94,7 +104,9 @@ export function DataBackupTab({
   onRestoreSettingsSnapshot,
   onRunGroupInventoryReconcile,
   onExportOrganizationData,
+  onPreviewOrganizationImportData,
   onImportOrganizationData,
+  onResetOrganizationSettings,
   organizationDataLabel,
 }: DataBackupTabProps) {
   const { toast } = useToast();
@@ -114,6 +126,18 @@ export function DataBackupTab({
   const [pendingExcelImportFile, setPendingExcelImportFile] = useState<File | null>(null);
   const [isExportingOrganization, setIsExportingOrganization] = useState(false);
   const [isImportingOrganization, setIsImportingOrganization] = useState(false);
+  const [orgImportPreviewOpen, setOrgImportPreviewOpen] = useState(false);
+  const [orgResetConfirmOpen, setOrgResetConfirmOpen] = useState(false);
+  const [orgImportPendingFile, setOrgImportPendingFile] = useState<File | null>(null);
+  const [orgImportPreview, setOrgImportPreview] = useState<OrganizationImportPreview | null>(null);
+  const [orgImportSections, setOrgImportSections] = useState<OrganizationImportSections>({
+    contacts: true,
+    position_templates: true,
+    role_tags: true,
+    branding: true,
+    inventory_baseline: true,
+  });
+  const [isResettingOrganization, setIsResettingOrganization] = useState(false);
   const [organizationImportStrategy, setOrganizationImportStrategy] = useState<'replace' | 'merge' | 'skip'>('merge');
   const [fullRestoreSummary, setFullRestoreSummary] = useState<{ lines: string[]; warnings: string[] } | null>(null);
   const [settingsRestoreSummary, setSettingsRestoreSummary] = useState<{ lines: string[]; warnings: string[] } | null>(
@@ -161,10 +185,13 @@ export function DataBackupTab({
     if (organizationImportRef.current) {
       organizationImportRef.current.value = '';
     }
-    if (!file || !onImportOrganizationData) return;
+    if (!file || !onImportOrganizationData || !onPreviewOrganizationImportData) return;
     try {
       setIsImportingOrganization(true);
-      await onImportOrganizationData(file, organizationImportStrategy);
+      const preview = await onPreviewOrganizationImportData(file);
+      setOrgImportPendingFile(file);
+      setOrgImportPreview(preview);
+      setOrgImportPreviewOpen(true);
     } catch (error) {
       toast({
         title: 'Organization import failed',
@@ -173,6 +200,42 @@ export function DataBackupTab({
       });
     } finally {
       setIsImportingOrganization(false);
+    }
+  };
+
+  const executeOrganizationImport = async () => {
+    if (!orgImportPendingFile || !onImportOrganizationData) return;
+    try {
+      setIsImportingOrganization(true);
+      await onImportOrganizationData(orgImportPendingFile, organizationImportStrategy, orgImportSections);
+      setOrgImportPreviewOpen(false);
+      setOrgImportPendingFile(null);
+      setOrgImportPreview(null);
+    } catch (error) {
+      toast({
+        title: 'Organization import failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsImportingOrganization(false);
+    }
+  };
+
+  const executeOrganizationReset = async () => {
+    if (!onResetOrganizationSettings) return;
+    try {
+      setIsResettingOrganization(true);
+      await onResetOrganizationSettings();
+      setOrgResetConfirmOpen(false);
+    } catch (error) {
+      toast({
+        title: 'Organization reset failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResettingOrganization(false);
     }
   };
 
@@ -615,7 +678,7 @@ export function DataBackupTab({
                   </div>
                 </div>
               </div>
-              {onExportOrganizationData || onImportOrganizationData ? (
+              {onExportOrganizationData || onImportOrganizationData || onResetOrganizationSettings ? (
                 <div className="rounded-md border border-border/60 bg-muted/20 p-3">
                   <h3 className="text-sm font-medium">Organization Library Portability</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -651,9 +714,19 @@ export function DataBackupTab({
                       size="sm"
                       className="active:bg-accent"
                       onClick={() => organizationImportRef.current?.click()}
-                      disabled={!onImportOrganizationData || isImportingOrganization}
+                      disabled={!onImportOrganizationData || !onPreviewOrganizationImportData || isImportingOrganization}
                     >
                       {isImportingOrganization ? 'Importing…' : 'Import organization JSON'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setOrgResetConfirmOpen(true)}
+                      disabled={!onResetOrganizationSettings || isResettingOrganization}
+                    >
+                      Reset organization settings
                     </Button>
                     <input
                       type="file"
@@ -925,6 +998,136 @@ export function DataBackupTab({
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog
+        open={orgImportPreviewOpen}
+        onOpenChange={(open) => {
+          if (!open && isImportingOrganization) return;
+          setOrgImportPreviewOpen(open);
+          if (!open) {
+            setOrgImportPendingFile(null);
+            setOrgImportPreview(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Review organization import</AlertDialogTitle>
+            <AlertDialogDescription>
+              {orgImportPendingFile ? (
+                <>
+                  Import file <span className="font-mono text-foreground">{orgImportPendingFile.name}</span> with strategy{' '}
+                  <span className="font-medium text-foreground">{organizationImportStrategy}</span>.
+                </>
+              ) : (
+                'Review counts and conflicts before applying organization import.'
+              )}
+            </AlertDialogDescription>
+            {orgImportPreview ? (
+              <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-foreground">
+                <p className="mb-2 font-medium text-foreground">
+                  Source org: {orgImportPreview.bundleOrganizationId} · Exported {new Date(orgImportPreview.exportedAt).toLocaleString()}
+                </p>
+                <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+                  <li>Contacts: incoming {orgImportPreview.incomingCounts.contacts}, overlaps {orgImportPreview.overlapCounts.contacts}</li>
+                  <li>Position templates: incoming {orgImportPreview.incomingCounts.position_templates}, overlaps {orgImportPreview.overlapCounts.position_templates}</li>
+                  <li>Role tags: incoming {orgImportPreview.incomingCounts.role_tags}, overlaps {orgImportPreview.overlapCounts.role_tags}</li>
+                  <li>Branding keys: incoming {orgImportPreview.incomingCounts.branding}, overlaps {orgImportPreview.overlapCounts.branding}</li>
+                  <li>Inventory baseline rows: incoming {orgImportPreview.incomingCounts.inventory_baseline}, overlaps {orgImportPreview.overlapCounts.inventory_baseline}</li>
+                </ul>
+              </div>
+            ) : null}
+            <div className="grid grid-cols-1 gap-2 rounded-md border border-border/60 bg-muted/20 p-3 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={orgImportSections.contacts}
+                  onChange={(event) => setOrgImportSections((prev) => ({ ...prev, contacts: event.target.checked }))}
+                />
+                Contacts
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={orgImportSections.position_templates}
+                  onChange={(event) =>
+                    setOrgImportSections((prev) => ({ ...prev, position_templates: event.target.checked }))
+                  }
+                />
+                Position templates
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={orgImportSections.role_tags}
+                  onChange={(event) => setOrgImportSections((prev) => ({ ...prev, role_tags: event.target.checked }))}
+                />
+                Role tags
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={orgImportSections.branding}
+                  onChange={(event) => setOrgImportSections((prev) => ({ ...prev, branding: event.target.checked }))}
+                />
+                Branding
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={orgImportSections.inventory_baseline}
+                  onChange={(event) =>
+                    setOrgImportSections((prev) => ({ ...prev, inventory_baseline: event.target.checked }))
+                  }
+                />
+                Inventory baseline
+              </label>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              disabled={
+                isImportingOrganization ||
+                !Object.values(orgImportSections).some(Boolean)
+              }
+              onClick={() => void executeOrganizationImport()}
+            >
+              {isImportingOrganization ? 'Importing…' : 'Apply import'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={orgResetConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open && isResettingOrganization) return;
+          setOrgResetConfirmOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset organization settings-only data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This clears shared library metadata (contacts, position templates, role tags, branding, inventory baseline)
+              for the active organization. Production and workspace operational records are preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isResettingOrganization}
+              onClick={() => void executeOrganizationReset()}
+            >
+              {isResettingOrganization ? 'Resetting…' : 'Reset settings-only data'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={fullRestoreDialogOpen}

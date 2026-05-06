@@ -10,6 +10,22 @@ import type { CrewContact } from '@/types/crewContacts';
 import type { PositionTemplate } from '@/types/productions';
 
 export type OrganizationImportStrategy = 'replace' | 'merge' | 'skip';
+export type OrganizationImportSection =
+  | 'contacts'
+  | 'position_templates'
+  | 'role_tags'
+  | 'branding'
+  | 'inventory_baseline';
+
+export type OrganizationImportSections = Record<OrganizationImportSection, boolean>;
+
+export interface OrganizationImportPreview {
+  bundleOrganizationId: string;
+  exportedAt: string;
+  incomingCounts: Record<OrganizationImportSection, number>;
+  existingCounts: Record<OrganizationImportSection, number>;
+  overlapCounts: Record<OrganizationImportSection, number>;
+}
 
 export interface OrganizationExportBundle {
   version: 'trackit-organization-export-v1';
@@ -140,6 +156,68 @@ function applyStrategy(
   };
 }
 
+function applySectionSelection(
+  current: OrganizationSnapshotPayload,
+  incoming: OrganizationSnapshotPayload,
+  sections: OrganizationImportSections,
+): OrganizationSnapshotPayload {
+  return {
+    contacts: sections.contacts ? incoming.contacts : current.contacts,
+    position_templates: sections.position_templates ? incoming.position_templates : current.position_templates,
+    role_tags: sections.role_tags ? incoming.role_tags : current.role_tags,
+    branding: sections.branding ? incoming.branding : current.branding,
+    inventory_baseline: sections.inventory_baseline ? incoming.inventory_baseline : current.inventory_baseline,
+  };
+}
+
+function defaultSections(): OrganizationImportSections {
+  return {
+    contacts: true,
+    position_templates: true,
+    role_tags: true,
+    branding: true,
+    inventory_baseline: true,
+  };
+}
+
+function overlapCounts(
+  current: OrganizationSnapshotPayload,
+  incoming: OrganizationSnapshotPayload,
+): Record<OrganizationImportSection, number> {
+  const currentContactKeys = new Set(
+    (current.contacts as CrewContact[]).map((contact) =>
+      (contact.id || `${contact.contactType}:${contact.fullName}`).toLowerCase(),
+    ),
+  );
+  const currentTemplateKeys = new Set(
+    (current.position_templates as PositionTemplate[]).map((template) =>
+      (template.id || template.label).toLowerCase(),
+    ),
+  );
+  const incomingContactOverlaps = (incoming.contacts as CrewContact[]).filter((contact) =>
+    currentContactKeys.has((contact.id || `${contact.contactType}:${contact.fullName}`).toLowerCase()),
+  ).length;
+  const incomingTemplateOverlaps = (incoming.position_templates as PositionTemplate[]).filter((template) =>
+    currentTemplateKeys.has((template.id || template.label).toLowerCase()),
+  ).length;
+  const roleTagOverlaps = normalizeArray(incoming.role_tags).filter((entry) =>
+    normalizeArray(current.role_tags).some((value) => stableJsonKey(value) === stableJsonKey(entry)),
+  ).length;
+  const baselineOverlaps = normalizeArray(incoming.inventory_baseline).filter((entry) =>
+    normalizeArray(current.inventory_baseline).some((value) => stableJsonKey(value) === stableJsonKey(entry)),
+  ).length;
+  const brandingOverlap = Object.keys(incoming.branding).filter((key) =>
+    Object.prototype.hasOwnProperty.call(current.branding, key),
+  ).length;
+  return {
+    contacts: incomingContactOverlaps,
+    position_templates: incomingTemplateOverlaps,
+    role_tags: roleTagOverlaps,
+    inventory_baseline: baselineOverlaps,
+    branding: brandingOverlap,
+  };
+}
+
 function parseExportBundle(text: string): OrganizationExportBundle {
   const parsed = JSON.parse(text) as Partial<OrganizationExportBundle>;
   if (parsed.version !== 'trackit-organization-export-v1') {
@@ -157,6 +235,11 @@ function parseExportBundle(text: string): OrganizationExportBundle {
     organizationId: parsed.organizationId,
     data: normalizeSnapshot(parsed.data),
   };
+}
+
+async function readAndParseBundle(file: File): Promise<OrganizationExportBundle> {
+  const text = await file.text();
+  return parseExportBundle(text);
 }
 
 export async function exportOrganizationBundle(organizationId: string): Promise<OrganizationExportBundle> {
@@ -181,15 +264,62 @@ export async function importOrganizationBundleFromFile(params: {
   organizationId: string;
   file: File;
   strategy: OrganizationImportStrategy;
+  sections?: Partial<OrganizationImportSections>;
 }): Promise<OrganizationAppDataRow | null> {
-  const text = await params.file.text();
-  const parsed = parseExportBundle(text);
+  const parsed = await readAndParseBundle(params.file);
+  const incomingRaw = normalizeSnapshot(parsed.data);
+  const existingRow = await pullOrganizationAppData(params.organizationId);
+  const current = normalizeSnapshot(existingRow ?? undefined);
+  const selectedSections = { ...defaultSections(), ...(params.sections ?? {}) };
+  const incoming = applySectionSelection(current, incomingRaw, selectedSections);
+  const next = applyStrategy(params.strategy, current, incoming);
+  await pushOrganizationSnapshot(params.organizationId, next);
+  if (selectedSections.contacts) {
+    saveCrewContacts(next.contacts as CrewContact[]);
+  }
+  if (selectedSections.position_templates) {
+    savePositionTemplates(next.position_templates as PositionTemplate[]);
+  }
+  return pullOrganizationAppData(params.organizationId);
+}
+
+export async function previewOrganizationImportFromFile(params: {
+  organizationId: string;
+  file: File;
+}): Promise<OrganizationImportPreview> {
+  const parsed = await readAndParseBundle(params.file);
   const incoming = normalizeSnapshot(parsed.data);
   const existingRow = await pullOrganizationAppData(params.organizationId);
   const current = normalizeSnapshot(existingRow ?? undefined);
-  const next = applyStrategy(params.strategy, current, incoming);
-  await pushOrganizationSnapshot(params.organizationId, next);
-  saveCrewContacts(next.contacts as CrewContact[]);
-  savePositionTemplates(next.position_templates as PositionTemplate[]);
-  return pullOrganizationAppData(params.organizationId);
+  return {
+    bundleOrganizationId: parsed.organizationId,
+    exportedAt: parsed.exportedAt,
+    incomingCounts: {
+      contacts: incoming.contacts.length,
+      position_templates: incoming.position_templates.length,
+      role_tags: normalizeArray(incoming.role_tags).length,
+      branding: Object.keys(incoming.branding).length,
+      inventory_baseline: normalizeArray(incoming.inventory_baseline).length,
+    },
+    existingCounts: {
+      contacts: current.contacts.length,
+      position_templates: current.position_templates.length,
+      role_tags: normalizeArray(current.role_tags).length,
+      branding: Object.keys(current.branding).length,
+      inventory_baseline: normalizeArray(current.inventory_baseline).length,
+    },
+    overlapCounts: overlapCounts(current, incoming),
+  };
+}
+
+export async function resetOrganizationLibraryMetadata(organizationId: string): Promise<void> {
+  await pushOrganizationSnapshot(organizationId, {
+    contacts: [],
+    position_templates: [],
+    role_tags: [],
+    branding: {},
+    inventory_baseline: [],
+  });
+  saveCrewContacts([]);
+  savePositionTemplates([]);
 }

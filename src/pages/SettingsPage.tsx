@@ -61,7 +61,10 @@ import { sendAdminSettingsNotification } from '@/lib/supabase/adminNotifications
 import {
   exportOrganizationBundle,
   importOrganizationBundleFromFile,
+  previewOrganizationImportFromFile,
+  resetOrganizationLibraryMetadata,
   type OrganizationImportStrategy,
+  type OrganizationImportSections,
 } from '@/lib/supabase/organizationPortability'
 
 interface SettingsState {
@@ -844,6 +847,7 @@ export default function SettingsPage() {
   const handleImportOrganizationData = async (
     file: File,
     strategy: OrganizationImportStrategy,
+    sections: OrganizationImportSections,
   ): Promise<void> => {
     if (!activeOrganizationId) {
       throw new Error('No active organization selected.');
@@ -852,10 +856,29 @@ export default function SettingsPage() {
       organizationId: activeOrganizationId,
       file,
       strategy,
+      sections,
     });
     toast.success('Organization library import complete', {
       description: `Applied with "${strategy}" strategy.`,
     });
+  };
+
+  const handlePreviewOrganizationImportData = async (file: File) => {
+    if (!activeOrganizationId) {
+      throw new Error('No active organization selected.');
+    }
+    return previewOrganizationImportFromFile({
+      organizationId: activeOrganizationId,
+      file,
+    });
+  };
+
+  const handleResetOrganizationSettings = async (): Promise<void> => {
+    if (!activeOrganizationId) {
+      throw new Error('No active organization selected.');
+    }
+    await resetOrganizationLibraryMetadata(activeOrganizationId);
+    toast.success('Organization settings-only data reset');
   };
 
   const saveUsers = (newUsers: User[]) => {
@@ -2025,7 +2048,9 @@ export default function SettingsPage() {
             onRestoreSettingsSnapshot={handleRestoreSettingsSnapshot}
             onRunGroupInventoryReconcile={handleGroupInventoryReconcile}
             onExportOrganizationData={authBackend === 'supabase' ? handleExportOrganizationData : undefined}
+            onPreviewOrganizationImportData={authBackend === 'supabase' ? handlePreviewOrganizationImportData : undefined}
             onImportOrganizationData={authBackend === 'supabase' ? handleImportOrganizationData : undefined}
+            onResetOrganizationSettings={authBackend === 'supabase' ? handleResetOrganizationSettings : undefined}
             organizationDataLabel={authBackend === 'supabase' ? activeOrganizationName : null}
           />
         </TabsContent>
