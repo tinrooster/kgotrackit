@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { InitialDefaultsDialog } from './components/setup/InitialDefaultsDialog';
 import { applySetupDefaultsChoice, getSetupDefaultsChoice, isFreshSetupState } from './lib/dummyData';
+import { CLOUD_HYDRATED_EVENT } from './lib/cloudSyncEvents';
 import CheckoutPage from './pages/CheckoutPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsService } from './lib/settingsService';
@@ -46,13 +47,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
-    const hasRecordedChoice = getSetupDefaultsChoice() !== null;
-    if (!hasRecordedChoice && isFreshSetupState()) {
-      setShowInitialDefaultsDialog(true);
-    }
+    const evaluateSetupDialog = () => {
+      if (authLoading) {
+        return;
+      }
+      const hasRecordedChoice = getSetupDefaultsChoice() !== null;
+      const shouldShow = !hasRecordedChoice && isFreshSetupState();
+      setShowInitialDefaultsDialog(shouldShow);
+    };
+    evaluateSetupDialog();
+    window.addEventListener(CLOUD_HYDRATED_EVENT, evaluateSetupDialog);
+    return () => window.removeEventListener(CLOUD_HYDRATED_EVENT, evaluateSetupDialog);
   }, [authLoading]);
 
   const handleApplySetupDefaults = (choice: 'blank' | 'starter', includeSampleInventory: boolean) => {

@@ -27,6 +27,7 @@ import {
   setActiveWorkspaceId,
   type WorkspaceSnapshotPayload,
 } from '@/lib/supabase/workspaceData';
+import { dispatchCloudHydrated } from '@/lib/cloudSyncEvents';
 
 export type AuthBackend = 'local' | 'supabase';
 
@@ -227,13 +228,25 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
   };
 }
 
+function normalizeRemoteSettings(raw: unknown): Settings {
+  const source = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  return {
+    categories: Array.isArray(source.categories) ? (source.categories as Settings['categories']) : [],
+    units: Array.isArray(source.units) ? (source.units as Settings['units']) : [],
+    locations: Array.isArray(source.locations) ? (source.locations as Settings['locations']) : [],
+    suppliers: Array.isArray(source.suppliers) ? (source.suppliers as Settings['suppliers']) : [],
+    projects: Array.isArray(source.projects) ? (source.projects as Settings['projects']) : [],
+    expenseCodes: Array.isArray(source.expenseCodes) ? (source.expenseCodes as Settings['expenseCodes']) : [],
+  };
+}
+
 export async function applySnapshotToLocal(row: CloudSnapshotPayload): Promise<void> {
   const rawItems = Array.isArray(row.items) ? row.items : [];
   const items = rawItems.map((item) => parseItemDates(item));
   saveItems(items);
 
   if (row.settings && typeof row.settings === 'object') {
-    saveSettings(row.settings as Settings);
+    saveSettings(normalizeRemoteSettings(row.settings));
   }
 
   const templates = Array.isArray(row.templates) ? row.templates : [];
@@ -324,28 +337,52 @@ async function bootstrapPersonalUserRow(userId: string): Promise<void> {
   }
 }
 
+const EMPTY_WORKSPACE_SNAPSHOT: WorkspaceSnapshotPayload = {
+  items: [],
+  settings: {
+    categories: [],
+    units: [],
+    locations: [],
+    suppliers: [],
+    projects: [],
+    expenseCodes: [],
+  },
+  templates: [],
+  history: [],
+  cabinets: [],
+  financial: { expenseTypes: [], costCenters: [] },
+  ui_defaults: null,
+  general_settings: null,
+  custom_report_definitions: [],
+};
+
 export async function bootstrapCloudData(userId: string): Promise<void> {
-  const client = getSupabase();
-  if (!client) {
-    return;
-  }
-  const wsId = getActiveWorkspaceId();
-  if (wsId) {
-    const role = await fetchWorkspaceMemberRole(wsId, userId);
-    if (!role) {
-      setActiveWorkspaceId(null);
-      await bootstrapPersonalUserRow(userId);
+  try {
+    const client = getSupabase();
+    if (!client) {
       return;
     }
-    const remote = await pullWorkspaceAppData(wsId);
-    if (remote && snapshotHasMeaningfulRemoteData(remote as CloudSnapshotPayload)) {
-      await applySnapshotToLocal(remote as CloudSnapshotPayload);
-    } else {
-      await pushWorkspaceSnapshot(wsId, (await collectLocalSnapshot()) as WorkspaceSnapshotPayload);
+    const wsId = getActiveWorkspaceId();
+    if (wsId) {
+      const role = await fetchWorkspaceMemberRole(wsId, userId);
+      if (!role) {
+        setActiveWorkspaceId(null);
+        await bootstrapPersonalUserRow(userId);
+        return;
+      }
+      const remoteRow = await pullWorkspaceAppData(wsId);
+      if (remoteRow) {
+        await applySnapshotToLocal(remoteRow as CloudSnapshotPayload);
+        return;
+      }
+      await pushWorkspaceSnapshot(wsId, EMPTY_WORKSPACE_SNAPSHOT);
+      await applySnapshotToLocal(EMPTY_WORKSPACE_SNAPSHOT);
+      return;
     }
-    return;
+    await bootstrapPersonalUserRow(userId);
+  } finally {
+    dispatchCloudHydrated();
   }
-  await bootstrapPersonalUserRow(userId);
 }
 
 let pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
