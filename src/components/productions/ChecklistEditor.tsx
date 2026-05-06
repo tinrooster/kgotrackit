@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { InventoryItemPicker } from './InventoryItemPicker';
+import { BulkInventorySelectionDialog, BulkSelectionResult } from './BulkInventorySelectionDialog';
 
 interface ChecklistEditorProps {
   groups: ChecklistGroup[];
@@ -78,6 +79,27 @@ export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnl
         },
       ],
     });
+  };
+
+  const addBulkLinkedItems = (groupId: string, selections: BulkSelectionResult[]) => {
+    if (selections.length === 0) return;
+    const group = groups.find((g) => g.id === groupId)!;
+    const additions: ChecklistItem[] = selections.map(({ item, status }) => ({
+      id: crypto.randomUUID(),
+      label: item.name,
+      completed: status === 'available',
+      quantity: 1,
+      inventoryItemId: item.id,
+      notes:
+        status === 'available'
+          ? 'Available'
+          : status === 'order'
+            ? 'Needs ordering'
+            : status === 'schedule'
+              ? 'Needs scheduling'
+              : 'Needed',
+    }));
+    updateGroup(groupId, { items: [...group.items, ...additions] });
   };
 
   const linkInventoryItem = (groupId: string, itemId: string, inv: InventoryItem) => {
@@ -215,12 +237,19 @@ export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnl
                 <Plus className="h-3.5 w-3.5" />
               </Button>
               {inventoryItems.length > 0 && (
-                <InventoryItemPicker
-                  inventoryItems={inventoryItems}
-                  onSelect={(inv) => addLinkedItem(group.id, inv)}
-                  title="Add inventory item from picker"
-                  triggerClassName="h-7 w-7 shrink-0"
-                />
+                <>
+                  <InventoryItemPicker
+                    inventoryItems={inventoryItems}
+                    onSelect={(inv) => addLinkedItem(group.id, inv)}
+                    title="Add inventory item from picker"
+                    triggerClassName="h-7 w-7 shrink-0"
+                  />
+                  <BulkInventorySelectionDialog
+                    inventoryItems={inventoryItems}
+                    onApply={(items) => addBulkLinkedItems(group.id, items)}
+                    buttonLabel="Bulk Pick"
+                  />
+                </>
               )}
             </div>
           )}

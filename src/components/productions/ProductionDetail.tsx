@@ -23,6 +23,8 @@ import { ProductionForm } from './ProductionForm';
 import { CrewScheduleCalendar } from './CrewScheduleCalendar';
 import { applyProductionInventoryAction, exportProductionPacklistsToPdf } from '@/lib/productionService';
 import { toast } from 'sonner';
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 
 const STATUS_CLASS: Record<ProductionStatus, string> = {
   planning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -62,6 +64,7 @@ export function ProductionDetail({
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'vehicles' | 'crew' | 'schedule'>('overview');
+  const [plannerWindowOpen, setPlannerWindowOpen] = useState(false);
   const scheduleResources = useMemo(() => {
     if (!production) return [];
     const resourceMap = new Map<string, number>();
@@ -145,12 +148,7 @@ export function ProductionDetail({
     <>
       <Sheet open={Boolean(production)} onOpenChange={(open) => { if (!open) onClose(); }}>
         <SheetContent
-          className={cn(
-            'flex w-full flex-col gap-0 p-0',
-            activeTab === 'schedule'
-              ? 'sm:max-w-[min(96vw,1700px)]'
-              : 'sm:max-w-[min(88vw,1200px)]'
-          )}
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-[min(88vw,1200px)]"
           side="right"
         >
           <SheetHeader className="border-b px-6 py-4">
@@ -204,6 +202,14 @@ export function ProductionDetail({
                 onClick={() => exportProductionPacklistsToPdf(production)}
               >
                 Export Packlists PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() => setPlannerWindowOpen(true)}
+              >
+                Open Planner Workspace
               </Button>
               {confirmDelete ? (
                 <>
@@ -362,6 +368,62 @@ export function ProductionDetail({
         onSave={handleEditSave}
         onClose={() => setEditOpen(false)}
       />
+
+      <Dialog open={plannerWindowOpen} onOpenChange={setPlannerWindowOpen}>
+        <DraggableDialogContent
+          dismissOnOutsidePointer
+          className="h-[min(92vh,980px)] w-[min(96vw,1800px)] overflow-hidden p-0"
+        >
+          <DialogHeader className="border-b px-4 py-3">
+            <DialogTitle>{production.name} — Planning Workspace</DialogTitle>
+          </DialogHeader>
+          <div className="h-full overflow-auto p-4">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+              <TabsList className="mb-3">
+                <TabsTrigger value="checklist">Checklist</TabsTrigger>
+                <TabsTrigger value="vehicles">Vehicle Packlists</TabsTrigger>
+                <TabsTrigger value="schedule">Schedule</TabsTrigger>
+                <TabsTrigger value="crew">Crew</TabsTrigger>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="checklist" className="space-y-3">
+                <ChecklistEditor
+                  groups={production.checklistGroups}
+                  onChange={handleChecklistChange}
+                  inventoryItems={inventoryItems}
+                />
+              </TabsContent>
+              <TabsContent value="vehicles" className="space-y-3">
+                <VehiclePacklistEditor
+                  packlists={production.vehiclePacklists}
+                  onChange={handleVehicleChange}
+                  inventoryItems={inventoryItems}
+                />
+              </TabsContent>
+              <TabsContent value="schedule" className="space-y-3">
+                <CrewScheduleCalendar
+                  projectStartDate={production.startDate}
+                  projectEndDate={production.endDate}
+                  resources={scheduleResources}
+                  crewMembers={production.crew}
+                  schedule={production.crewSchedule ?? []}
+                  onChange={handleScheduleChange}
+                />
+              </TabsContent>
+              <TabsContent value="crew">
+                <CrewEditor crew={production.crew} onChange={handleCrewChange} />
+              </TabsContent>
+              <TabsContent value="overview" className="space-y-2 text-sm">
+                <p><span className="text-muted-foreground">Client:</span> {production.client || '—'}</p>
+                <p><span className="text-muted-foreground">Location:</span> {production.location || '—'}</p>
+                <p><span className="text-muted-foreground">Dates:</span> {production.startDate || '—'} {production.endDate ? `to ${production.endDate}` : ''}</p>
+                <p><span className="text-muted-foreground">Status:</span> {PRODUCTION_STATUS_LABELS[production.status]}</p>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </DraggableDialogContent>
+      </Dialog>
     </>
   );
 }
