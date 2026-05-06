@@ -25,6 +25,15 @@ import {
 import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
 import { Users } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { WorkspaceUtilitiesDialog } from '@/components/settings/WorkspaceUtilitiesDialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,7 +54,6 @@ export function WorkspaceTeamTab() {
     useWorkspace();
   const [newName, setNewName] = React.useState('');
   const [busy, setBusy] = React.useState(false);
-  const [targetKind, setTargetKind] = React.useState<'personal' | 'team'>(activeWorkspaceId ? 'team' : 'personal');
   const [targetWorkspaceId, setTargetWorkspaceId] = React.useState<string>(activeWorkspaceId ?? '');
   const [members, setMembers] = React.useState<WorkspaceMemberView[]>([]);
   const [membersLoading, setMembersLoading] = React.useState(false);
@@ -55,10 +63,15 @@ export function WorkspaceTeamTab() {
   const [deleteWorkspaceDialogOpen, setDeleteWorkspaceDialogOpen] = React.useState(false);
   const [confirmWorkspaceName, setConfirmWorkspaceName] = React.useState('');
   const [deletingWorkspace, setDeletingWorkspace] = React.useState(false);
+  const [manageDialogOpen, setManageDialogOpen] = React.useState(false);
+  const [manageWorkspaceId, setManageWorkspaceId] = React.useState<string>('');
+  const [utilitiesDialogOpen, setUtilitiesDialogOpen] = React.useState(false);
+  const [utilitiesWorkspaceId, setUtilitiesWorkspaceId] = React.useState<string>('');
+  const [utilitiesWorkspaceName, setUtilitiesWorkspaceName] = React.useState<string>('');
 
   React.useEffect(() => {
-    setTargetKind(activeWorkspaceId ? 'team' : 'personal');
     setTargetWorkspaceId(activeWorkspaceId ?? '');
+    setManageWorkspaceId(activeWorkspaceId ?? '');
   }, [activeWorkspaceId]);
 
   const formatWorkspaceError = (error: unknown): string => {
@@ -86,7 +99,7 @@ export function WorkspaceTeamTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="h-4 w-4" aria-hidden />
-            Team workspace
+            Workspace
           </CardTitle>
           <CardDescription>
             Shared inventory and roles require Supabase sign-in. With local-only auth, each profile keeps its own data on this device.
@@ -131,9 +144,12 @@ export function WorkspaceTeamTab() {
         custom_report_definitions: [],
       };
       const id = await createWorkspaceWithSnapshot(trimmedName, nextSnapshot);
-      toast.success('Workspace created. Switching…');
+      toast.success('Workspace created');
       setActiveWorkspaceId(id);
-      window.location.reload();
+      setUtilitiesWorkspaceId(id);
+      setUtilitiesWorkspaceName(trimmedName);
+      setUtilitiesDialogOpen(true);
+      await refreshWorkspaces();
     } catch (e) {
       toast.error('Could not create workspace', { description: formatWorkspaceError(e) });
     } finally {
@@ -141,18 +157,13 @@ export function WorkspaceTeamTab() {
     }
   };
 
-  const applyContextSwitch = () => {
-    if (targetKind === 'personal') {
-      setActiveWorkspaceId(null);
-      window.location.reload();
-      return;
-    }
+  const applyWorkspaceSwitch = () => {
     if (!targetWorkspaceId) {
-      toast.error('Select a team workspace first.');
+      toast.error('Select a workspace first.');
       return;
     }
     if (!workspaces.some((workspace) => workspace.workspaceId === targetWorkspaceId)) {
-      toast.error('You can only switch to team workspaces where you are already invited.');
+      toast.error('You can only switch to workspaces where you are already invited.');
       return;
     }
     setActiveWorkspaceId(targetWorkspaceId);
@@ -162,52 +173,56 @@ export function WorkspaceTeamTab() {
   const isWorkspaceOwner = !!activeWorkspaceId && !!currentUser?.id && activeWorkspaceRow?.ownerUserId === currentUser.id;
   const canManageMembers = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
   const canDeleteWorkspace = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
+  const manageableWorkspaces = workspaces.filter((w) => w.role === 'admin' || w.ownerUserId === currentUser?.id);
 
   const loadMembers = React.useCallback(async () => {
-    if (!activeWorkspaceId || !canManageMembers) {
+    const workspaceId = manageDialogOpen ? manageWorkspaceId : activeWorkspaceId;
+    const canLoad = manageDialogOpen ? manageableWorkspaces.some((w) => w.workspaceId === manageWorkspaceId) : canManageMembers;
+    if (!workspaceId || !canLoad) {
       setMembers([]);
       return;
     }
     setMembersLoading(true);
     try {
-      const rows = await listWorkspaceMembers(activeWorkspaceId);
+      const rows = await listWorkspaceMembers(workspaceId);
       setMembers(rows);
     } catch (error) {
       toast.error('Could not load workspace members', { description: formatWorkspaceError(error) });
     } finally {
       setMembersLoading(false);
     }
-  }, [activeWorkspaceId, canManageMembers]);
+  }, [activeWorkspaceId, canManageMembers, manageDialogOpen, manageWorkspaceId, manageableWorkspaces]);
 
   React.useEffect(() => {
+    if (!manageDialogOpen) return;
     void loadMembers();
-  }, [loadMembers]);
+  }, [loadMembers, manageDialogOpen]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Users className="h-5 w-5" aria-hidden />
-          Team workspace
+          Workspace
         </CardTitle>
         <CardDescription>
-          Create a shared workspace, switch between personal and team context, and refresh the available team list.
+          Create and switch between workspaces. All workspaces are cloud-enabled.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-sm">
-          <p className="font-medium text-foreground">Active context</p>
+          <p className="text-sm font-medium text-foreground">Active workspace</p>
           <p className="mt-1 text-muted-foreground">
             {activeWorkspaceId ? (
               <>
-                Team: <span className="font-medium text-foreground">{activeWorkspaceRow?.name ?? 'Workspace'}</span>
+                <span className="font-medium text-foreground">{activeWorkspaceRow?.name ?? 'Workspace'}</span>
                 {activeWorkspaceRole ? ` · your role: ${activeWorkspaceRole}` : ''}
                 <span className="mt-1 block font-mono text-[11px] text-muted-foreground/90" title="Workspace id">
                   {activeWorkspaceId}
                 </span>
               </>
             ) : (
-              <>Personal cloud snapshot (per-user row)</>
+              <>No workspace selected</>
             )}
           </p>
           {currentUser?.id ? (
@@ -221,7 +236,6 @@ export function WorkspaceTeamTab() {
                   try {
                     await bootstrapCloudData(currentUser.id);
                     toast.success('Pulled latest cloud data');
-                    window.location.reload();
                   } catch (error) {
                     toast.error('Could not pull cloud data', { description: formatWorkspaceError(error) });
                   } finally {
@@ -237,6 +251,49 @@ export function WorkspaceTeamTab() {
               </span>
             </div>
           ) : null}
+        </div>
+
+        <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-foreground">Switch workspace</p>
+            <Button type="button" variant="ghost" size="sm" onClick={() => void refreshWorkspaces()}>
+              Refresh list
+            </Button>
+          </div>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {loading ? (
+              <span className="text-xs text-muted-foreground">Loading workspaces…</span>
+            ) : workspaces.length === 0 ? (
+              <span className="text-xs text-muted-foreground">No workspaces yet.</span>
+            ) : (
+              workspaces.map((w) => (
+                <Button
+                  key={w.workspaceId}
+                  type="button"
+                  variant={targetWorkspaceId === w.workspaceId ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => setTargetWorkspaceId(w.workspaceId)}
+                  className={w.workspaceId === activeWorkspaceId ? 'ring-2 ring-primary/30' : undefined}
+                  title={`Role: ${w.role}`}
+                >
+                  {w.name}
+                </Button>
+              ))
+            )}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={applyWorkspaceSwitch}
+              disabled={!targetWorkspaceId || targetWorkspaceId === activeWorkspaceId}
+            >
+              Apply & reload
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Selected: {targetWorkspaceId ? workspaces.find((w) => w.workspaceId === targetWorkspaceId)?.name ?? targetWorkspaceId : '(none)'}
+            </span>
+          </div>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
@@ -256,275 +313,309 @@ export function WorkspaceTeamTab() {
             {busy ? 'Creating…' : 'Create workspace'}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          New workspaces start blank. After creation, the setup dialog lets you apply starter defaults if needed.
-        </p>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Switch context</p>
-          <div className="inline-flex items-center gap-1 rounded-md border border-border/70 p-1">
-            <Button
-              type="button"
-              size="sm"
-              variant={targetKind === 'personal' ? 'secondary' : 'ghost'}
-              onClick={() => setTargetKind('personal')}
-            >
-              Personal
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={targetKind === 'team' ? 'secondary' : 'ghost'}
-              onClick={() => setTargetKind('team')}
-            >
-              Team
-            </Button>
-          </div>
-          {targetKind === 'team' ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              {loading ? (
-                <span className="text-xs text-muted-foreground">Loading workspaces…</span>
-              ) : (
-                workspaces.map((w) => (
-                  <Button
-                    key={w.workspaceId}
-                    type="button"
-                    variant={targetWorkspaceId === w.workspaceId ? 'secondary' : 'outline'}
-                    size="sm"
-                    onClick={() => setTargetWorkspaceId(w.workspaceId)}
-                    title={`Role: ${w.role}`}
-                  >
-                    {w.name}
-                  </Button>
-                ))
-              )}
-              <Button type="button" variant="ghost" size="sm" onClick={() => void refreshWorkspaces()}>
-                Refresh list
-              </Button>
-            </div>
-          ) : null}
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              onClick={applyContextSwitch}
-              disabled={
-                (targetKind === 'personal' && !activeWorkspaceId) ||
-                (targetKind === 'team' && (!targetWorkspaceId || targetWorkspaceId === activeWorkspaceId))
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            New workspaces start empty. After creation, use Workspace utilities to apply starter defaults if needed.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (!activeWorkspaceId || !activeWorkspaceRow) {
+                toast.error('Select an active workspace first.');
+                return;
               }
-            >
-              Apply & reload
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Selected target: {targetKind === 'personal' ? 'Personal data' : `Team ${targetWorkspaceId || '(none)'}`}
-            </span>
-          </div>
+              setUtilitiesWorkspaceId(activeWorkspaceId);
+              setUtilitiesWorkspaceName(activeWorkspaceRow.name);
+              setUtilitiesDialogOpen(true);
+            }}
+            disabled={!activeWorkspaceId}
+          >
+            Workspace utilities
+          </Button>
         </div>
 
-        {canManageMembers ? (
-          <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-foreground">Team member management</p>
-              <Button type="button" variant="ghost" size="sm" onClick={() => void loadMembers()} disabled={membersLoading}>
-                Refresh members
-              </Button>
-            </div>
+        <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-foreground">Workspace administration</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setManageDialogOpen(true)}
+              disabled={manageableWorkspaces.length === 0}
+            >
+              Manage workspaces
+            </Button>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Administer network workspaces: members, roles, and deletion.
+          </p>
+        </div>
+      </CardContent>
 
-            <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_160px_auto] md:items-end">
-              <div className="space-y-1.5">
-                <Label htmlFor="workspace-invite-email">Invite by email</Label>
-                <Input
-                  id="workspace-invite-email"
-                  type="email"
-                  autoComplete="off"
-                  placeholder="name@company.com"
-                  value={inviteEmail}
-                  onChange={(event) => setInviteEmail(event.target.value)}
-                  className="placeholder:text-muted-foreground/40"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Role</Label>
-                <Select value={inviteRole} onValueChange={(value: 'admin' | 'editor' | 'viewer') => setInviteRole(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="editor">Editor</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                type="button"
-                onClick={async () => {
-                  const email = inviteEmail.trim().toLowerCase();
-                  if (!email) {
-                    toast.error('Enter an email address.');
-                    return;
-                  }
-                  setMemberActionBusyUserId('invite');
-                  try {
-                    await inviteWorkspaceMember(activeWorkspaceId!, email, inviteRole);
-                    toast.success('Invite/membership updated');
-                    setInviteEmail('');
-                    await loadMembers();
-                  } catch (error) {
-                    toast.error('Could not invite member', { description: formatWorkspaceError(error) });
-                  } finally {
-                    setMemberActionBusyUserId(null);
-                  }
+      <WorkspaceUtilitiesDialog
+        open={utilitiesDialogOpen}
+        workspaceId={utilitiesWorkspaceId}
+        workspaceName={utilitiesWorkspaceName || 'Workspace'}
+        onClose={() => setUtilitiesDialogOpen(false)}
+        onApplied={async () => {
+          if (currentUser?.id) {
+            await bootstrapCloudData(currentUser.id);
+          }
+          window.location.reload();
+        }}
+      />
+
+      <Dialog open={manageDialogOpen} onOpenChange={setManageDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Manage workspaces</DialogTitle>
+            <DialogDescription>
+              Select a workspace to view members, update roles, invite users, or delete it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Workspace</Label>
+              <Select
+                value={manageWorkspaceId}
+                onValueChange={(value) => {
+                  setManageWorkspaceId(value);
+                  setMemberActionBusyUserId(null);
                 }}
-                disabled={memberActionBusyUserId === 'invite'}
               >
-                {memberActionBusyUserId === 'invite' ? 'Inviting…' : 'Invite'}
-              </Button>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a workspace" />
+                </SelectTrigger>
+                <SelectContent>
+                  {manageableWorkspaces.map((w) => (
+                    <SelectItem key={w.workspaceId} value={w.workspaceId}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-2">
-              {membersLoading ? (
-                <p className="text-xs text-muted-foreground">Loading members…</p>
-              ) : members.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No members found.</p>
-              ) : (
-                members.map((member) => {
-                  const roleBusy = memberActionBusyUserId === `role:${member.userId}`;
-                  const removeBusy = memberActionBusyUserId === `remove:${member.userId}`;
-                  return (
-                    <div
-                      key={member.userId}
-                      className="grid gap-2 rounded-md border border-border/60 bg-background/70 px-3 py-2 md:grid-cols-[minmax(220px,1fr)_160px_auto]"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {member.displayName || member.email}
-                          {member.userId === currentUser?.id ? ' (you)' : ''}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">{member.email}</p>
-                      </div>
-                      <Select
-                        value={member.role}
-                        onValueChange={async (value: 'admin' | 'editor' | 'viewer') => {
-                          if (!activeWorkspaceId) return;
-                          setMemberActionBusyUserId(`role:${member.userId}`);
-                          try {
-                            await updateWorkspaceMemberRole(activeWorkspaceId, member.userId, value);
-                            await loadMembers();
-                            await refreshWorkspaces();
-                            toast.success('Member role updated');
-                          } catch (error) {
-                            toast.error('Could not update role', { description: formatWorkspaceError(error) });
-                          } finally {
-                            setMemberActionBusyUserId(null);
-                          }
-                        }}
-                        disabled={roleBusy}
+            <div className="rounded-md border border-border/60 bg-background/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-foreground">Members</p>
+                <Button type="button" variant="ghost" size="sm" onClick={() => void loadMembers()} disabled={membersLoading}>
+                  Refresh members
+                </Button>
+              </div>
+
+              <div className="mt-3 grid gap-2 md:grid-cols-[minmax(220px,1fr)_160px_auto] md:items-end">
+                <div className="space-y-1.5">
+                  <Label htmlFor="workspace-admin-invite-email">Invite by email</Label>
+                  <Input
+                    id="workspace-admin-invite-email"
+                    type="email"
+                    autoComplete="off"
+                    placeholder="name@company.com"
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                    className="placeholder:text-muted-foreground/40"
+                    disabled={!manageWorkspaceId}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Role</Label>
+                  <Select value={inviteRole} onValueChange={(value: 'admin' | 'editor' | 'viewer') => setInviteRole(value)}>
+                    <SelectTrigger disabled={!manageWorkspaceId}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="editor">Editor</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    const email = inviteEmail.trim().toLowerCase();
+                    if (!email) {
+                      toast.error('Enter an email address.');
+                      return;
+                    }
+                    if (!manageWorkspaceId) return;
+                    setMemberActionBusyUserId('invite');
+                    try {
+                      await inviteWorkspaceMember(manageWorkspaceId, email, inviteRole);
+                      toast.success('Invite/membership updated');
+                      setInviteEmail('');
+                      await loadMembers();
+                    } catch (error) {
+                      toast.error('Could not invite member', { description: formatWorkspaceError(error) });
+                    } finally {
+                      setMemberActionBusyUserId(null);
+                    }
+                  }}
+                  disabled={!manageWorkspaceId || memberActionBusyUserId === 'invite'}
+                >
+                  {memberActionBusyUserId === 'invite' ? 'Inviting…' : 'Invite'}
+                </Button>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {membersLoading ? (
+                  <p className="text-xs text-muted-foreground">Loading members…</p>
+                ) : members.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No members found.</p>
+                ) : (
+                  members.map((member) => {
+                    const roleBusy = memberActionBusyUserId === `role:${member.userId}`;
+                    const removeBusy = memberActionBusyUserId === `remove:${member.userId}`;
+                    return (
+                      <div
+                        key={member.userId}
+                        className="grid gap-2 rounded-md border border-border/60 bg-background/70 px-3 py-2 md:grid-cols-[minmax(220px,1fr)_160px_auto]"
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="editor">Editor</SelectItem>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <div className="flex items-center justify-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={removeBusy || member.userId === currentUser?.id}
-                          onClick={async () => {
-                            if (!activeWorkspaceId) return;
-                            setMemberActionBusyUserId(`remove:${member.userId}`);
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {member.displayName || member.email}
+                            {member.userId === currentUser?.id ? ' (you)' : ''}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+                        </div>
+                        <Select
+                          value={member.role}
+                          onValueChange={async (value: 'admin' | 'editor' | 'viewer') => {
+                            if (!manageWorkspaceId) return;
+                            setMemberActionBusyUserId(`role:${member.userId}`);
                             try {
-                              await removeWorkspaceMember(activeWorkspaceId, member.userId);
+                              await updateWorkspaceMemberRole(manageWorkspaceId, member.userId, value);
                               await loadMembers();
-                              toast.success('Member removed');
+                              await refreshWorkspaces();
+                              toast.success('Member role updated');
                             } catch (error) {
-                              toast.error('Could not remove member', { description: formatWorkspaceError(error) });
+                              toast.error('Could not update role', { description: formatWorkspaceError(error) });
                             } finally {
                               setMemberActionBusyUserId(null);
                             }
                           }}
+                          disabled={roleBusy || !manageWorkspaceId}
                         >
-                          {removeBusy ? 'Removing…' : 'Remove'}
-                        </Button>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="editor">Editor</SelectItem>
+                            <SelectItem value="viewer">Viewer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={removeBusy || member.userId === currentUser?.id || !manageWorkspaceId}
+                            onClick={async () => {
+                              if (!manageWorkspaceId) return;
+                              setMemberActionBusyUserId(`remove:${member.userId}`);
+                              try {
+                                await removeWorkspaceMember(manageWorkspaceId, member.userId);
+                                await loadMembers();
+                                toast.success('Member removed');
+                              } catch (error) {
+                                toast.error('Could not remove member', { description: formatWorkspaceError(error) });
+                              } finally {
+                                setMemberActionBusyUserId(null);
+                              }
+                            }}
+                          >
+                            {removeBusy ? 'Removing…' : 'Remove'}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
+                    );
+                  })
+                )}
+              </div>
             </div>
 
-            {canDeleteWorkspace && activeWorkspaceRow ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
-                <p className="text-sm font-medium text-foreground">Workspace administration</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Delete this workspace and all associated team data. This action cannot be undone.
-                </p>
-                <div className="mt-2">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    disabled={deletingWorkspace}
-                    onClick={() => {
-                      setConfirmWorkspaceName('');
-                      setDeleteWorkspaceDialogOpen(true);
-                    }}
-                  >
-                    Delete workspace
-                  </Button>
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+              <p className="text-sm font-medium text-foreground">Danger zone</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Delete the selected workspace and all associated data. Type the workspace name to confirm.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm-workspace-delete-admin">Workspace name</Label>
+                  <Input
+                    id="confirm-workspace-delete-admin"
+                    value={confirmWorkspaceName}
+                    onChange={(event) => setConfirmWorkspaceName(event.target.value)}
+                    placeholder={manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name || 'Workspace name'}
+                    autoComplete="off"
+                    disabled={!manageWorkspaceId || deletingWorkspace}
+                  />
                 </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={
+                    deletingWorkspace ||
+                    !manageWorkspaceId ||
+                    confirmWorkspaceName.trim() !== (manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name || '')
+                  }
+                  onClick={() => {
+                    setDeleteWorkspaceDialogOpen(true);
+                  }}
+                >
+                  {deletingWorkspace ? 'Deleting…' : 'Delete workspace'}
+                </Button>
               </div>
-            ) : null}
+            </div>
           </div>
-        ) : activeWorkspaceId ? (
-          <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
-            Member management is available to workspace admins.
-          </div>
-        ) : null}
-      </CardContent>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManageDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteWorkspaceDialogOpen} onOpenChange={setDeleteWorkspaceDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete workspace?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently deletes workspace <strong>{activeWorkspaceRow?.name ?? 'Unknown'}</strong>, all member links,
-              and shared workspace data. Type the workspace name to confirm.
+              This permanently deletes workspace{' '}
+              <strong>{manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name ?? activeWorkspaceRow?.name ?? 'Unknown'}</strong>, all member links,
+              and shared workspace data.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="confirm-workspace-delete">Workspace name confirmation</Label>
-            <Input
-              id="confirm-workspace-delete"
-              value={confirmWorkspaceName}
-              onChange={(event) => setConfirmWorkspaceName(event.target.value)}
-              placeholder={activeWorkspaceRow?.name || 'Workspace name'}
-              autoComplete="off"
-            />
-          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deletingWorkspace}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={
                 deletingWorkspace ||
-                !activeWorkspaceId ||
-                !activeWorkspaceRow ||
-                confirmWorkspaceName.trim() !== activeWorkspaceRow.name
+                !(manageWorkspaceId || activeWorkspaceId) ||
+                confirmWorkspaceName.trim() !==
+                  (manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name ||
+                    activeWorkspaceRow?.name ||
+                    '')
               }
               onClick={async (event) => {
                 event.preventDefault();
-                if (!activeWorkspaceId) {
+                const targetDeleteId = manageWorkspaceId || activeWorkspaceId;
+                if (!targetDeleteId) {
                   return;
                 }
                 setDeletingWorkspace(true);
                 try {
-                  await deleteWorkspace(activeWorkspaceId);
-                  setActiveWorkspaceId(null);
+                  await deleteWorkspace(targetDeleteId);
+                  if (activeWorkspaceId === targetDeleteId) {
+                    setActiveWorkspaceId(null);
+                  }
                   await refreshWorkspaces();
                   toast.success('Workspace deleted');
                   setDeleteWorkspaceDialogOpen(false);
