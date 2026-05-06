@@ -70,6 +70,10 @@ import { FinancialCodeEntry, getFinancialSettings } from '@/lib/financialSetting
 import { logger } from '@/lib/logging';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
 import { normalizeLocationValue, normalizeProjectValue } from '@/lib/referenceNormalization';
+import {
+  getInventoryProductionAllocationMap,
+  INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT,
+} from '@/lib/productionService';
 
 function normalizeLocationPath(value: string): string {
   return value.replace(/\s*\/\s*/g, '/').trim();
@@ -300,6 +304,7 @@ export default function InventoryPage() {
   const resizeStateRef = React.useRef<{ column: string; startX: number; startWidth: number } | null>(null);
   const [invUndoAvail, setInvUndoAvail] = useState(false);
   const [invRedoAvail, setInvRedoAvail] = useState(false);
+  const [productionAllocationMap, setProductionAllocationMap] = useState(getInventoryProductionAllocationMap());
 
   const [inventoryUndoEnabled, setInventoryUndoEnabled] = useState(() => {
     const s = SettingsService.loadDefaultSettings();
@@ -325,6 +330,19 @@ export default function InventoryPage() {
     syncMobileUi();
     window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileUi);
     return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileUi);
+  }, []);
+
+  useEffect(() => {
+    const syncProductionAllocations = () => {
+      setProductionAllocationMap(getInventoryProductionAllocationMap());
+    };
+    syncProductionAllocations();
+    window.addEventListener(INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT, syncProductionAllocations);
+    window.addEventListener('focus', syncProductionAllocations);
+    return () => {
+      window.removeEventListener(INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT, syncProductionAllocations);
+      window.removeEventListener('focus', syncProductionAllocations);
+    };
   }, []);
 
   const printAssetSticker = async (item: InventoryItem, layout: 'compact' | 'detailed', codeType: 'qr' | 'barcode' | 'both') => {
@@ -1504,7 +1522,11 @@ export default function InventoryPage() {
                     style={{ width: columnWidths[column] ? `${columnWidths[column]}px` : undefined }}
                     className="align-top whitespace-normal break-words [overflow-wrap:anywhere]"
                   >
-                    <FormatCellValue item={item} column={column} />
+                    <FormatCellValue
+                      item={item}
+                      column={column}
+                      allocation={productionAllocationMap[item.id]}
+                    />
                   </TableCell>
                 ))}
                 <TableCell>

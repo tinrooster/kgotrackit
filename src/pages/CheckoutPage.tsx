@@ -15,6 +15,10 @@ import type { Cabinet } from '@/types/cabinets'
 import { format } from 'date-fns'
 import { logger } from '@/lib/logging'
 import { LogEntry } from '@/lib/logging'
+import {
+  getInventoryProductionAllocationMap,
+  INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT,
+} from '@/lib/productionService'
 
 export default function CheckoutPage() {
   const [items, setItems] = useState<InventoryItem[]>([])
@@ -32,6 +36,7 @@ export default function CheckoutPage() {
     requireCheckoutForSecureCabinets: true
   })
   const [locationAliasById, setLocationAliasById] = useState<Record<string, string>>({})
+  const [productionAllocationMap, setProductionAllocationMap] = useState(getInventoryProductionAllocationMap())
 
   useEffect(() => {
     const loadData = async () => {
@@ -67,6 +72,19 @@ export default function CheckoutPage() {
     return () => {
       window.removeEventListener(SETTINGS_UPDATED_EVENT, handleSettingsUpdated)
       window.removeEventListener('focus', handleSettingsUpdated)
+    }
+  }, [])
+
+  useEffect(() => {
+    const syncAllocations = () => {
+      setProductionAllocationMap(getInventoryProductionAllocationMap())
+    }
+    syncAllocations()
+    window.addEventListener(INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT, syncAllocations)
+    window.addEventListener('focus', syncAllocations)
+    return () => {
+      window.removeEventListener(INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT, syncAllocations)
+      window.removeEventListener('focus', syncAllocations)
     }
   }, [])
 
@@ -124,7 +142,11 @@ export default function CheckoutPage() {
         return
       }
 
-      if (action === 'check-out' && (selectedItem.quantity || 0) < numQuantity) {
+      const allocation = productionAllocationMap[selectedItem.id]
+      const reserved = Number(allocation?.reserved ?? 0)
+      const availableForCheckout = Math.max(0, Number(selectedItem.quantity || 0) - reserved)
+
+      if (action === 'check-out' && availableForCheckout < numQuantity) {
         toast.error('Not enough items available')
         return
       }
@@ -287,7 +309,11 @@ export default function CheckoutPage() {
                   <SelectContent>
                     {(selectedCabinet ? cabinetScopedItems : items).map(item => (
                       <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.quantity || 0} available)
+                        {(() => {
+                          const reserved = Number(productionAllocationMap[item.id]?.reserved ?? 0)
+                          const available = Math.max(0, Number(item.quantity || 0) - reserved)
+                          return `${item.name} (${available} available${reserved > 0 ? `, ${reserved} reserved` : ''})`
+                        })()}
                       </SelectItem>
                     ))}
                   </SelectContent>

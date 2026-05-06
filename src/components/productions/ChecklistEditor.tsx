@@ -163,9 +163,31 @@ export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnl
                       <Link2 className="ml-1 inline h-3 w-3 text-blue-500" />
                     )}
                   </span>
-                  {item.quantity != null && (
-                    <span className="text-xs text-muted-foreground">×{item.quantity}</span>
+                  {!readOnly ? (
+                    <Input
+                      type="number"
+                      min={1}
+                      className="h-7 w-16 text-xs"
+                      value={item.quantity ?? 1}
+                      onChange={(e) =>
+                        updateItem(group.id, item.id, {
+                          quantity: Math.max(1, Number(e.target.value) || 1),
+                        })
+                      }
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">×{item.quantity ?? 1}</span>
                   )}
+                  {item.reservedQuantity ? (
+                    <span className="text-xs text-amber-700 dark:text-amber-300">
+                      reserved {item.reservedQuantity}
+                    </span>
+                  ) : null}
+                  {item.checkedOutQuantity ? (
+                    <span className="text-xs text-blue-700 dark:text-blue-300">
+                      out {item.checkedOutQuantity}
+                    </span>
+                  ) : null}
                   {!readOnly && (
                     <>
                       {inventoryItems.length > 0 && !item.inventoryItemId && (

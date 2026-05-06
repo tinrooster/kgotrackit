@@ -35,7 +35,11 @@ export default function ProductionsPage() {
 
   useEffect(() => {
     const handleUpdate = () => {
-      setProductions(getProductions());
+      const latest = getProductions();
+      setProductions(latest);
+      setSelectedProduction((current) =>
+        current ? latest.find((production) => production.id === current.id) ?? null : null
+      );
     };
     window.addEventListener(PRODUCTIONS_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(PRODUCTIONS_UPDATED_EVENT, handleUpdate);
@@ -69,7 +73,7 @@ export default function ProductionsPage() {
 
   const handleCreate = (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew'>) => {
     createProduction(
-      { ...data, checklistGroups: [], vehiclePacklists: [], crew: [] },
+      { ...data, checklistGroups: [], vehiclePacklists: [], crew: [], crewSchedule: [] },
       currentUser?.id
     );
     setNewFormOpen(false);
@@ -167,6 +171,7 @@ export default function ProductionsPage() {
       <ProductionDetail
         production={selectedProduction}
         inventoryItems={inventoryItems}
+        currentUsername={currentUser?.username || currentUser?.displayName}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
         onClose={() => setSelectedProduction(null)}

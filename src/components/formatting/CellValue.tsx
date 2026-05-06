@@ -14,7 +14,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function FormatCellValue({ item, column }: { item: InventoryItem; column: string }): React.ReactNode {
+interface FormatCellValueProps {
+  item: InventoryItem;
+  column: string;
+  allocation?: { reserved?: number; checkedOut?: number };
+}
+
+export function FormatCellValue({ item, column, allocation }: FormatCellValueProps): React.ReactNode {
   const settings = getSettings();
 
   const getResolvedLabel = (value: string | undefined, source: 'categories' | 'locations' | 'projects') => {
@@ -94,7 +100,20 @@ export function FormatCellValue({ item, column }: { item: InventoryItem; column:
     return formatCurrency(item.quantity * (item.costPerUnit || 0));
   }
   if (column === 'quantity') {
-    return `${item[column]} ${item.unit || ''}`;
+    const quantity = Number(item[column] ?? 0);
+    const reserved = Number(allocation?.reserved ?? 0);
+    const checkedOut = Number(allocation?.checkedOut ?? 0);
+    const available = Math.max(0, quantity - reserved);
+    return (
+      <div className="flex flex-col">
+        <span>{quantity} {item.unit || ''}</span>
+        {(reserved > 0 || checkedOut > 0) ? (
+          <span className="text-xs text-muted-foreground">
+            reserved {reserved} · available {available} · out {checkedOut}
+          </span>
+        ) : null}
+      </div>
+    );
   }
   if (column === 'name') {
     return (

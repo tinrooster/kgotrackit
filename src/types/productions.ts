@@ -5,6 +5,8 @@ export interface ChecklistItem {
   label: string;
   completed: boolean;
   quantity?: number;
+  reservedQuantity?: number;
+  checkedOutQuantity?: number;
   notes?: string;
   /** Optional link to an existing InventoryItem by its id. */
   inventoryItemId?: string;
@@ -30,6 +32,17 @@ export interface ProductionCrewMember {
   notes?: string;
 }
 
+export interface CrewScheduleEntry {
+  id: string;
+  crewMemberId: string;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  role?: string;
+  location?: string;
+  notes?: string;
+}
+
 export interface Production {
   id: string;
   name: string;
@@ -44,6 +57,7 @@ export interface Production {
   checklistGroups: ChecklistGroup[];
   vehiclePacklists: VehiclePacklist[];
   crew: ProductionCrewMember[];
+  crewSchedule?: CrewScheduleEntry[];
   notes?: string;
   /** ISO timestamp. */
   createdAt: string;

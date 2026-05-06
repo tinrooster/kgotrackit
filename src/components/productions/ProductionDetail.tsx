@@ -7,6 +7,7 @@ import {
   ChecklistGroup,
   VehiclePacklist,
   ProductionCrewMember,
+  CrewScheduleEntry,
 } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,9 @@ import { ChecklistEditor } from './ChecklistEditor';
 import { VehiclePacklistEditor } from './VehiclePacklistEditor';
 import { CrewEditor } from './CrewEditor';
 import { ProductionForm } from './ProductionForm';
+import { CrewScheduleCalendar } from './CrewScheduleCalendar';
+import { applyProductionInventoryAction, exportProductionPacklistsToPdf } from '@/lib/productionService';
+import { toast } from 'sonner';
 
 const STATUS_CLASS: Record<ProductionStatus, string> = {
   planning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -41,6 +45,7 @@ function formatDate(d?: string) {
 interface ProductionDetailProps {
   production: Production | null;
   inventoryItems: InventoryItem[];
+  currentUsername?: string;
   onUpdate: (id: string, updates: Partial<Production>) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -49,6 +54,7 @@ interface ProductionDetailProps {
 export function ProductionDetail({
   production,
   inventoryItems,
+  currentUsername,
   onUpdate,
   onDelete,
   onClose,
@@ -70,6 +76,10 @@ export function ProductionDetail({
     onUpdate(production.id, { crew });
   };
 
+  const handleScheduleChange = (crewSchedule: CrewScheduleEntry[]) => {
+    onUpdate(production.id, { crewSchedule });
+  };
+
   const handleEditSave = (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew'>) => {
     onUpdate(production.id, data);
     setEditOpen(false);
@@ -89,6 +99,20 @@ export function ProductionDetail({
     (s, g) => s + g.items.filter((i) => i.completed).length,
     0
   );
+
+  const linkedItemsCount = production.checklistGroups.reduce(
+    (sum, group) => sum + group.items.filter((item) => !!item.inventoryItemId).length,
+    0
+  );
+
+  const runInventoryAction = (action: 'reserve' | 'checkout' | 'checkin') => {
+    const result = applyProductionInventoryAction(production.id, action, currentUsername);
+    if (result.ok) {
+      toast.success(result.message);
+      return;
+    }
+    toast.error(result.message);
+  };
 
   return (
     <>
@@ -138,6 +162,14 @@ export function ProductionDetail({
                 <Pencil className="h-3.5 w-3.5" />
                 Edit
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() => exportProductionPacklistsToPdf(production)}
+              >
+                Export Packlists PDF
+              </Button>
               {confirmDelete ? (
                 <>
                   <Button variant="destructive" size="sm" className="h-7" onClick={handleDelete}>
@@ -158,7 +190,7 @@ export function ProductionDetail({
 
           <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
             <TabsList className="mx-6 mt-3 w-auto justify-start rounded-none border-b bg-transparent p-0">
-              {(['overview', 'checklist', 'vehicles', 'crew'] as const).map((tab) => (
+              {(['overview', 'checklist', 'vehicles', 'crew', 'schedule'] as const).map((tab) => (
                 <TabsTrigger
                   key={tab}
                   value={tab}
@@ -167,7 +199,8 @@ export function ProductionDetail({
                   {tab === 'overview' ? 'Overview'
                     : tab === 'checklist' ? 'Checklist'
                     : tab === 'vehicles' ? 'Vehicle Packlists'
-                    : 'Crew'}
+                    : tab === 'crew' ? 'Crew'
+                    : 'Schedule'}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -217,6 +250,38 @@ export function ProductionDetail({
                 </TabsContent>
 
                 <TabsContent value="checklist" className="mt-0">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      Linked inventory items: {linkedItemsCount}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7"
+                      disabled={linkedItemsCount === 0}
+                      onClick={() => runInventoryAction('reserve')}
+                    >
+                      Reserve
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7"
+                      disabled={linkedItemsCount === 0}
+                      onClick={() => runInventoryAction('checkout')}
+                    >
+                      Checkout Linked
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7"
+                      disabled={linkedItemsCount === 0}
+                      onClick={() => runInventoryAction('checkin')}
+                    >
+                      Check In Linked
+                    </Button>
+                  </div>
                   <ChecklistEditor
                     groups={production.checklistGroups}
                     onChange={handleChecklistChange}
@@ -233,6 +298,14 @@ export function ProductionDetail({
 
                 <TabsContent value="crew" className="mt-0">
                   <CrewEditor crew={production.crew} onChange={handleCrewChange} />
+                </TabsContent>
+
+                <TabsContent value="schedule" className="mt-0">
+                  <CrewScheduleCalendar
+                    crewMembers={production.crew}
+                    schedule={production.crewSchedule ?? []}
+                    onChange={handleScheduleChange}
+                  />
                 </TabsContent>
               </div>
             </ScrollArea>
