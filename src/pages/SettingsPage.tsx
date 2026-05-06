@@ -326,7 +326,7 @@ export default function SettingsPage() {
   const [financialSettings, setFinancialSettings] = useState<{ expenseTypes: FinancialCodeEntry[]; costCenters: FinancialCodeEntry[] }>(() => getFinancialSettings());
   const [settingsTab, setSettingsTab] = useState('general');
   const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>('categories');
-  const [librariesPanel, setLibrariesPanel] = useState<LibrariesPanel>('suppliers');
+  const [librariesPanel, setLibrariesPanel] = useState<LibrariesPanel>('positionTemplates');
   const canManageSharedConfig = activeWorkspaceId
     ? activeWorkspaceRole === 'admin'
     : currentUser?.role === 'admin';

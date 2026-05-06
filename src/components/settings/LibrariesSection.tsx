@@ -5,8 +5,9 @@ import { EditableItemWithSubcategoriesList } from '@/components/EditableItemWith
 import { getItems } from '@/lib/storageService';
 import { TemplatesPage } from '@/pages/TemplatesPage';
 import { DeviceLibraryTab } from '@/components/settings/DeviceLibraryTab';
+import { PositionTemplatesPanel } from '@/components/settings/PositionTemplatesPanel';
 
-export type LibrariesPanel = 'suppliers' | 'templates' | 'deviceLibrary';
+export type LibrariesPanel = 'suppliers' | 'positionTemplates' | 'templates' | 'deviceLibrary';
 
 interface SettingsListsState {
   categories: ItemWithSubcategories[];
@@ -30,6 +31,7 @@ export interface LibrariesSectionProps {
 
 const LIB_NAV: { id: LibrariesPanel; label: string }[] = [
   { id: 'suppliers', label: 'Vendors' },
+  { id: 'positionTemplates', label: 'Position templates' },
   { id: 'templates', label: 'Templates' },
   { id: 'deviceLibrary', label: 'Device library' },
 ];
@@ -98,6 +100,8 @@ export function LibrariesSection({
               </CardContent>
             </Card>
           )}
+
+          {panel === 'positionTemplates' && <PositionTemplatesPanel canDeleteItems={canDeleteItems} />}
 
           {panel === 'templates' && <TemplatesPage />}
 

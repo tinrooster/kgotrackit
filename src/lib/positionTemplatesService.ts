@@ -93,3 +93,57 @@ export function createPositionTemplate(input: {
   savePositionTemplates([...templates, template]);
   return template;
 }
+
+export function updatePositionTemplate(
+  templateId: string,
+  updates: Partial<Pick<PositionTemplate, 'label' | 'defaultRoleTag' | 'defaultLocation'>>,
+): PositionTemplate | null {
+  const templates = getPositionTemplates();
+  const index = templates.findIndex((template) => template.id === templateId);
+  if (index < 0) return null;
+  const existing = templates[index];
+  const nextLabel = updates.label !== undefined ? updates.label.trim() : existing.label;
+  if (!nextLabel) return null;
+  const updated: PositionTemplate = {
+    ...existing,
+    label: nextLabel,
+    defaultRoleTag:
+      updates.defaultRoleTag !== undefined ? updates.defaultRoleTag.trim() || undefined : existing.defaultRoleTag,
+    defaultLocation:
+      updates.defaultLocation !== undefined
+        ? updates.defaultLocation.trim() || undefined
+        : existing.defaultLocation,
+  };
+  templates[index] = updated;
+  savePositionTemplates(templates);
+  return updated;
+}
+
+export function deletePositionTemplate(templateId: string): void {
+  const templates = getPositionTemplates()
+    .filter((template) => template.id !== templateId)
+    .map((template, index) => ({
+      ...template,
+      sortOrder: index,
+    }));
+  savePositionTemplates(templates);
+}
+
+export function reorderPositionTemplates(nextOrderIds: string[]): void {
+  const templates = getPositionTemplates();
+  const byId = new Map(templates.map((template) => [template.id, template]));
+  const orderedTemplates = nextOrderIds
+    .map((id) => byId.get(id))
+    .filter((template): template is PositionTemplate => Boolean(template))
+    .map((template, index) => ({
+      ...template,
+      sortOrder: index,
+    }));
+  const remaining = templates
+    .filter((template) => !nextOrderIds.includes(template.id))
+    .map((template, index) => ({
+      ...template,
+      sortOrder: orderedTemplates.length + index,
+    }));
+  savePositionTemplates([...orderedTemplates, ...remaining]);
+}
