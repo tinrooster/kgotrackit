@@ -7,8 +7,13 @@ import { cn } from "@/lib/utils"
 
 /**
  * Material Design 3-inspired switch.
- * Track: rounded pill, 24×44px, gray when off, primary color when on.
- * Thumb: white circle with shadow, translates smoothly across the track.
+ *
+ * Track colours follow MD3's role-based colour tokens (mapped via CSS variables):
+ *   ON  → --switch-on  (vivid teal accent, readable on any background)
+ *   OFF → neutral zinc  (muted gray, clearly "inactive")
+ *
+ * Track: rounded pill 24×44 px (h-6 w-11), 3 px internal padding.
+ * Thumb: white circle 18×18 px, shadow-md, 200 ms ease-in-out slide.
  */
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
@@ -16,14 +21,14 @@ const Switch = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SwitchPrimitives.Root
     className={cn(
-      // Track: pill shape, MD3 proportions (24h × 44w)
       "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-[3px]",
       "transition-colors duration-200 ease-in-out",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       "disabled:cursor-not-allowed disabled:opacity-40",
-      // Off: neutral zinc gray; On: full primary accent
+      // Off: muted neutral track
       "data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-600",
-      "data-[state=checked]:bg-primary",
+      // On: vivid --switch-on accent (works in light + dark)
+      "data-[state=checked]:bg-[hsl(var(--switch-on))]",
       className
     )}
     {...props}
@@ -31,7 +36,6 @@ const Switch = React.forwardRef<
   >
     <SwitchPrimitives.Thumb
       className={cn(
-        // Thumb: white circle, slightly smaller than track height, with shadow
         "pointer-events-none block h-[18px] w-[18px] rounded-full bg-white shadow-md ring-0",
         "transition-transform duration-200 ease-in-out",
         "data-[state=unchecked]:translate-x-0 data-[state=checked]:translate-x-5"

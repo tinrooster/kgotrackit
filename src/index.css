@@ -33,6 +33,10 @@
     --ring: 45 15% 44%;
  
     --radius: 0.5rem;
+
+    /* MD3-style switch accent — vivid teal that reads clearly on light backgrounds */
+    --switch-on: 172 58% 36%;
+    --switch-on-foreground: 0 0% 100%;
   }
  
   .dark {
@@ -63,6 +67,10 @@
     --border: 220 10% 30%;
     --input: 220 10% 30%;
     --ring: 214 10% 74%;
+
+    /* MD3-style switch accent — brighter teal for dark backgrounds */
+    --switch-on: 172 52% 48%;
+    --switch-on-foreground: 0 0% 100%;
   }
 }
  
