@@ -47,6 +47,9 @@ interface DataBackupTabProps {
   onExportSettingsSnapshot: () => void;
   onRestoreSettingsSnapshot: (file: File) => Promise<void>;
   onRunGroupInventoryReconcile: () => GroupReconcileResult;
+  onExportOrganizationData?: () => Promise<void>;
+  onImportOrganizationData?: (file: File, strategy: 'replace' | 'merge' | 'skip') => Promise<void>;
+  organizationDataLabel?: string | null;
 }
 
 function formatReconcileReport(result: GroupReconcileResult): string {
@@ -90,6 +93,9 @@ export function DataBackupTab({
   onExportSettingsSnapshot,
   onRestoreSettingsSnapshot,
   onRunGroupInventoryReconcile,
+  onExportOrganizationData,
+  onImportOrganizationData,
+  organizationDataLabel,
 }: DataBackupTabProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('import-export');
@@ -106,6 +112,9 @@ export function DataBackupTab({
   const [pendingJsonImportFile, setPendingJsonImportFile] = useState<File | null>(null);
   const [excelImportConfirmOpen, setExcelImportConfirmOpen] = useState(false);
   const [pendingExcelImportFile, setPendingExcelImportFile] = useState<File | null>(null);
+  const [isExportingOrganization, setIsExportingOrganization] = useState(false);
+  const [isImportingOrganization, setIsImportingOrganization] = useState(false);
+  const [organizationImportStrategy, setOrganizationImportStrategy] = useState<'replace' | 'merge' | 'skip'>('merge');
   const [fullRestoreSummary, setFullRestoreSummary] = useState<{ lines: string[]; warnings: string[] } | null>(null);
   const [settingsRestoreSummary, setSettingsRestoreSummary] = useState<{ lines: string[]; warnings: string[] } | null>(
     null
@@ -129,6 +138,43 @@ export function DataBackupTab({
   const excelImportRef = React.useRef<HTMLInputElement>(null);
   const restoreRef = React.useRef<HTMLInputElement>(null);
   const settingsSnapshotRestoreRef = React.useRef<HTMLInputElement>(null);
+  const organizationImportRef = React.useRef<HTMLInputElement>(null);
+
+  const handleOrganizationExport = async () => {
+    if (!onExportOrganizationData) return;
+    try {
+      setIsExportingOrganization(true);
+      await onExportOrganizationData();
+    } catch (error) {
+      toast({
+        title: 'Organization export failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExportingOrganization(false);
+    }
+  };
+
+  const handleOrganizationImportChosen = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (organizationImportRef.current) {
+      organizationImportRef.current.value = '';
+    }
+    if (!file || !onImportOrganizationData) return;
+    try {
+      setIsImportingOrganization(true);
+      await onImportOrganizationData(file, organizationImportStrategy);
+    } catch (error) {
+      toast({
+        title: 'Organization import failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsImportingOrganization(false);
+    }
+  };
 
   const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -569,6 +615,56 @@ export function DataBackupTab({
                   </div>
                 </div>
               </div>
+              {onExportOrganizationData || onImportOrganizationData ? (
+                <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                  <h3 className="text-sm font-medium">Organization Library Portability</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Export/import shared organization libraries (crew contacts, position templates, role tags, branding).
+                    {organizationDataLabel ? ` Active: ${organizationDataLabel}.` : ''}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <select
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                      value={organizationImportStrategy}
+                      onChange={(event) =>
+                        setOrganizationImportStrategy(event.target.value as 'replace' | 'merge' | 'skip')
+                      }
+                      disabled={isImportingOrganization}
+                    >
+                      <option value="merge">Import strategy: Merge</option>
+                      <option value="replace">Import strategy: Replace</option>
+                      <option value="skip">Import strategy: Skip existing</option>
+                    </select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="active:bg-accent"
+                      onClick={() => void handleOrganizationExport()}
+                      disabled={!onExportOrganizationData || isExportingOrganization}
+                    >
+                      {isExportingOrganization ? 'Exporting…' : 'Export organization JSON'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="active:bg-accent"
+                      onClick={() => organizationImportRef.current?.click()}
+                      disabled={!onImportOrganizationData || isImportingOrganization}
+                    >
+                      {isImportingOrganization ? 'Importing…' : 'Import organization JSON'}
+                    </Button>
+                    <input
+                      type="file"
+                      ref={organizationImportRef}
+                      onChange={handleOrganizationImportChosen}
+                      accept=".json,.JSON,application/json"
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>

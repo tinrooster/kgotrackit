@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { useOrganization } from '@/contexts/OrganizationContext'
 import { Label } from "@/components/ui/label"
 import { getPasswordError } from '@/utils/passwordUtils'
 import { v4 as uuidv4 } from 'uuid'
@@ -57,6 +58,11 @@ import {
 } from '@/lib/listReconcileFixes'
 import { parseDeviceLibraryFromBackup, saveDeviceLibrary } from '@/lib/deviceLibraryStorage'
 import { sendAdminSettingsNotification } from '@/lib/supabase/adminNotifications'
+import {
+  exportOrganizationBundle,
+  importOrganizationBundleFromFile,
+  type OrganizationImportStrategy,
+} from '@/lib/supabase/organizationPortability'
 
 interface SettingsState {
   categories: ItemWithSubcategories[];
@@ -274,6 +280,7 @@ function AdminResetPasswordDialog({
 export default function SettingsPage() {
   const { currentUser, authBackend } = useAuth();
   const { activeWorkspaceId, activeWorkspaceRole } = useWorkspace();
+  const { activeOrganizationId, activeOrganizationName } = useOrganization();
   
   // Initialize states from URL parameters
   const [mainTab, setMainTab] = useState(() => {
@@ -816,6 +823,39 @@ export default function SettingsPage() {
       saveItems(nextItems);
     }
     return result;
+  };
+
+  const handleExportOrganizationData = async (): Promise<void> => {
+    if (!activeOrganizationId) {
+      throw new Error('No active organization selected.');
+    }
+    const payload = await exportOrganizationBundle(activeOrganizationId);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const slug = (activeOrganizationName || 'organization').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+    link.download = `trackIT-org-export-${slug || 'organization'}-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Organization library export complete');
+  };
+
+  const handleImportOrganizationData = async (
+    file: File,
+    strategy: OrganizationImportStrategy,
+  ): Promise<void> => {
+    if (!activeOrganizationId) {
+      throw new Error('No active organization selected.');
+    }
+    await importOrganizationBundleFromFile({
+      organizationId: activeOrganizationId,
+      file,
+      strategy,
+    });
+    toast.success('Organization library import complete', {
+      description: `Applied with "${strategy}" strategy.`,
+    });
   };
 
   const saveUsers = (newUsers: User[]) => {
@@ -1984,6 +2024,9 @@ export default function SettingsPage() {
             onExportSettingsSnapshot={() => void handleExportSettingsSnapshot()}
             onRestoreSettingsSnapshot={handleRestoreSettingsSnapshot}
             onRunGroupInventoryReconcile={handleGroupInventoryReconcile}
+            onExportOrganizationData={authBackend === 'supabase' ? handleExportOrganizationData : undefined}
+            onImportOrganizationData={authBackend === 'supabase' ? handleImportOrganizationData : undefined}
+            organizationDataLabel={authBackend === 'supabase' ? activeOrganizationName : null}
           />
         </TabsContent>
 
