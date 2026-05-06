@@ -167,24 +167,24 @@ export function CreateWorkspaceDialog({
           </button>
         </div>
 
-        <div className="rounded-md border p-3">
-          <Label className="text-sm">Optional</Label>
-          <label className="mt-2 flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={includeSampleInventory}
-              onCheckedChange={(checked) => setIncludeSampleInventory(Boolean(checked))}
-              disabled={busy || choice !== 'starter'}
-            />
-            Include sample inventory items (test data)
-          </label>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {choice === 'blank'
-              ? 'Empty workspace selected.'
-              : includeSampleInventory
+        {choice === 'starter' && (
+          <div className="rounded-md border p-3">
+            <Label className="text-sm">Optional</Label>
+            <label className="mt-2 flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={includeSampleInventory}
+                onCheckedChange={(checked) => setIncludeSampleInventory(Boolean(checked))}
+                disabled={busy}
+              />
+              Include sample inventory items (test data)
+            </label>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {includeSampleInventory
                 ? 'Starter lists and sample inventory rows will be created.'
                 : 'Starter lists will be created. Inventory stays empty.'}
-          </p>
-        </div>
+            </p>
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>

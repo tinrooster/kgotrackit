@@ -97,7 +97,10 @@ export function GeneralSettingsTab({
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-md border p-4">
-            <p className="font-medium">Condensed view</p>
+            <div className="space-y-0.5">
+              <p className="font-medium">Condensed view</p>
+              <p className="text-xs text-muted-foreground">Reduce row height and padding in inventory tables.</p>
+            </div>
             <Switch
               checked={settings.condensedView}
               onCheckedChange={(checked) => onSettingsChange({ condensedView: checked })}
@@ -105,7 +108,12 @@ export function GeneralSettingsTab({
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-md border p-4">
-            <p className="font-medium">Mobile / tablet layout</p>
+            <div className="space-y-0.5">
+              <p className="font-medium">Mobile / tablet layout</p>
+              <p className="text-xs text-muted-foreground">
+                Optimise touch targets and navigation for smartphones and tablets.
+              </p>
+            </div>
             <Switch
               checked={settings.mobileTabletUi}
               onCheckedChange={(checked) => onSettingsChange({ mobileTabletUi: checked })}

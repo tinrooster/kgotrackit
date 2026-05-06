@@ -5,13 +5,25 @@ import * as SwitchPrimitives from "@radix-ui/react-switch"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Material Design 3-inspired switch.
+ * Track: rounded pill, 24×44px, gray when off, primary color when on.
+ * Thumb: white circle with shadow, translates smoothly across the track.
+ */
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
 >(({ className, ...props }, ref) => (
   <SwitchPrimitives.Root
     className={cn(
-      "peer inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border border-border/70 bg-muted/70 p-0.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary/60 data-[state=checked]:bg-primary/70 data-[state=unchecked]:bg-muted/70",
+      // Track: pill shape, MD3 proportions (24h × 44w)
+      "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-[3px]",
+      "transition-colors duration-200 ease-in-out",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+      "disabled:cursor-not-allowed disabled:opacity-40",
+      // Off: neutral zinc gray; On: full primary accent
+      "data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-600",
+      "data-[state=checked]:bg-primary",
       className
     )}
     {...props}
@@ -19,7 +31,10 @@ const Switch = React.forwardRef<
   >
     <SwitchPrimitives.Thumb
       className={cn(
-        "pointer-events-none block h-4 w-4 rounded-full bg-card shadow-sm ring-1 ring-border/50 transition-transform duration-200 data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+        // Thumb: white circle, slightly smaller than track height, with shadow
+        "pointer-events-none block h-[18px] w-[18px] rounded-full bg-white shadow-md ring-0",
+        "transition-transform duration-200 ease-in-out",
+        "data-[state=unchecked]:translate-x-0 data-[state=checked]:translate-x-5"
       )}
     />
   </SwitchPrimitives.Root>

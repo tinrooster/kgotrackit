@@ -62,19 +62,18 @@ export function InitialDefaultsDialog({ open, onApply }: InitialDefaultsDialogPr
           </button>
         </div>
 
-        <div className="rounded-md border p-3">
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={includeSampleInventory}
-              onCheckedChange={(checked) => setIncludeSampleInventory(Boolean(checked))}
-              disabled={choice !== 'starter'}
-            />
-            Include sample inventory items (test data)
-          </label>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {choice === 'blank' ? 'Blank setup selected. No sample inventory will be added.' : starterSummary}
-          </p>
-        </div>
+        {choice === 'starter' && (
+          <div className="rounded-md border p-3">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={includeSampleInventory}
+                onCheckedChange={(checked) => setIncludeSampleInventory(Boolean(checked))}
+              />
+              Include sample inventory items (test data)
+            </label>
+            <p className="mt-2 text-xs text-muted-foreground">{starterSummary}</p>
+          </div>
+        )}
 
         <DialogFooter>
           <Button onClick={() => onApply(choice, choice === 'starter' ? includeSampleInventory : false)}>
