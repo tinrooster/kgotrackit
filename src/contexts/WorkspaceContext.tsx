@@ -49,9 +49,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [refreshWorkspaces]);
 
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(() => getActiveWorkspaceId());
+  // Re-sync from localStorage only when the signed-in user identity changes (e.g. user switch).
+  // Do NOT include `workspaces` here — that causes a race: if bootstrapCloudData or any other
+  // caller mutates localStorage before `workspaces` finishes loading, this effect picks up the
+  // stale/cleared value and overwrites the correctly-initialised state.
   useEffect(() => {
     setActiveWorkspaceIdState(getActiveWorkspaceId());
-  }, [workspaces, currentUser?.id]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured() || authBackend !== 'supabase' || !currentUser?.id || loading) {

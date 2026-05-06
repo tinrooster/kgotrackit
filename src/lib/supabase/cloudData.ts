@@ -24,7 +24,6 @@ import {
   getActiveWorkspaceId,
   pullWorkspaceAppData,
   pushWorkspaceSnapshot,
-  setActiveWorkspaceId,
   type WorkspaceSnapshotPayload,
 } from '@/lib/supabase/workspaceData';
 import { dispatchCloudHydrated } from '@/lib/cloudSyncEvents';
@@ -366,7 +365,12 @@ export async function bootstrapCloudData(userId: string): Promise<void> {
     if (wsId) {
       const role = await fetchWorkspaceMemberRole(wsId, userId);
       if (!role) {
-        setActiveWorkspaceId(null);
+        // Do NOT call setActiveWorkspaceId(null) here — WorkspaceContext is the single
+        // authority on workspace selection. Clearing localStorage here races with the
+        // context's own initialisation and causes it to fall back to the wrong workspace.
+        // Instead, silently fall back to personal data for this session; the context will
+        // clear the stored workspace preference if the workspace is genuinely missing from
+        // the membership list after it finishes loading.
         await bootstrapPersonalUserRow(userId);
         return;
       }
