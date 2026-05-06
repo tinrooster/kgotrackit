@@ -398,3 +398,20 @@ flowchart LR
 4. [x] Transparent hint treatment pass outside settings editors (forms/reports/login where applicable).
 5. [x] System-log quality pass: suppress remaining non-actionable validation noise while preserving real failures.
 
+## Session changelog — v1.0.1 (2026-05-06)
+
+### Workspace stability (multi-user / cloud)
+- Fixed active workspace resetting to wrong workspace after creating a new one: `bootstrapCloudData` no longer calls `setActiveWorkspaceId(null)` on any error; `WorkspaceContext` effect no longer re-reads `localStorage` on every workspace list refresh; validation effect never clears the stored workspace when the list loads empty.
+- Fixed `WorkspaceContext` initialising `loading` as `false`, causing the validation effect to fire before the first workspace fetch completed and wipe the new workspace ID.
+- Fixed `listWorkspaceSummariesForUser` returning `[]` on transient RLS/network errors causing the context to fall back to the first workspace in the list.
+
+### Workspace setup dialog loop (unrecoverable)
+- `CreateWorkspaceDialog` now pre-records the setup defaults choice (`blank` or `starter`) for the new workspace ID before calling `onCreated`, so `InitialDefaultsDialog` never fires on reload into a freshly created workspace.
+- `evaluateSetupDialog` in `App.tsx` bails immediately when a team workspace is active — the dialog is only for personal (no-workspace) first-run.
+- `InitialDefaultsDialog` now has `onOpenChange` wired, an X close button, and a **"Use blank setup"** dismiss button as a permanent escape hatch.
+- `WorkspaceContext` validation no longer calls `persistActiveWorkspaceId(null)` when `workspaces.length === 0` — waits for a non-empty load before making any selection decision.
+
+### UI / settings
+- Material Design 3 switch component app-wide: full primary colour on, neutral zinc-gray off, white shadow thumb, 200 ms ease-in-out transition.
+- "Include sample inventory items" section in `CreateWorkspaceDialog` and `InitialDefaultsDialog` now only shown when **Starter defaults** is selected.
+- Condensed view and Mobile/tablet layout toggles in Display Preferences now include descriptive sub-text.
