@@ -6,12 +6,14 @@ import { UserMenu } from '@/components/UserMenu'
 import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { useOrganization } from '@/contexts/OrganizationContext'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
 
 export function Navigation() {
   const location = useLocation()
   const { authBackend } = useAuth()
   const { activeWorkspaceId, workspaces } = useWorkspace()
+  const { activeOrganizationName } = useOrganization()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navContainerRef = useRef<HTMLDivElement | null>(null)
   const [mobileTabletUi, setMobileTabletUi] = useState(
@@ -89,11 +91,13 @@ export function Navigation() {
                 className="truncate rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
                 title={
                   activeWorkspaceId
-                    ? `Team workspace: ${activeWorkspaceName ?? activeWorkspaceId}`
+                    ? `Organization: ${activeOrganizationName ?? 'Organization'} · Team workspace: ${activeWorkspaceName ?? activeWorkspaceId}`
                     : 'Personal inventory (your user_app_data row)'
                 }
               >
-                {activeWorkspaceId ? `Team · ${activeWorkspaceName ?? 'Workspace'}` : 'Personal'}
+                {activeWorkspaceId
+                  ? `${activeOrganizationName ?? 'Organization'} · ${activeWorkspaceName ?? 'Workspace'}`
+                  : 'Personal'}
               </span>
             ) : null}
           </div>

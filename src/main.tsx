@@ -6,6 +6,7 @@ import './index.css'
 import { Toaster } from 'sonner'
 import { AuthProvider } from './contexts/AuthContext'
 import { WorkspaceProvider } from './contexts/WorkspaceContext'
+import { OrganizationProvider } from './contexts/OrganizationContext'
 import { LoginPage } from './components/LoginPage'
 import { SupabaseSyncBridge } from './components/SupabaseSyncBridge'
 
@@ -25,9 +26,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AuthProvider>
       <WorkspaceProvider>
-        <SupabaseSyncBridge>
-          <RouterProvider router={router} />
-        </SupabaseSyncBridge>
+        <OrganizationProvider>
+          <SupabaseSyncBridge>
+            <RouterProvider router={router} />
+          </SupabaseSyncBridge>
+        </OrganizationProvider>
       </WorkspaceProvider>
       <Toaster 
         position="bottom-right"
