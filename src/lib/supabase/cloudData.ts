@@ -42,6 +42,8 @@ export interface UserAppDataRow {
   general_settings: unknown | null;
   /** JSON array of saved custom report definitions (optional on legacy DB rows before migration). */
   custom_report_definitions?: unknown;
+  /** JSON array of production records (optional on legacy DB rows before migration). */
+  productions?: unknown;
   updated_at?: string;
 }
 
@@ -145,6 +147,7 @@ export type CloudSnapshotPayload = Pick<
   | 'ui_defaults'
   | 'general_settings'
   | 'custom_report_definitions'
+  | 'productions'
 >;
 
 export function snapshotHasMeaningfulRemoteData(row: CloudSnapshotPayload): boolean {
@@ -214,6 +217,15 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
     customReportDefinitions = [];
   }
 
+  let productions: unknown[] = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PRODUCTIONS);
+    const parsed = raw ? JSON.parse(raw) : [];
+    productions = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    productions = [];
+  }
+
   return {
     items,
     settings,
@@ -224,6 +236,7 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
     ui_defaults: uiDefaults,
     general_settings: generalSettings,
     custom_report_definitions: customReportDefinitions,
+    productions,
   };
 }
 
@@ -281,6 +294,15 @@ export async function applySnapshotToLocal(row: CloudSnapshotPayload): Promise<v
       // quota or private mode — still notify listeners with in-memory intent
     }
     window.dispatchEvent(new CustomEvent(CUSTOM_REPORT_DEFINITIONS_UPDATED_EVENT, { detail: defs }));
+  }
+
+  if ('productions' in row && row.productions !== undefined) {
+    const prods = Array.isArray(row.productions) ? row.productions : [];
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTIONS, JSON.stringify(prods));
+    } catch {
+      // quota or private mode
+    }
   }
 }
 
@@ -353,6 +375,7 @@ const EMPTY_WORKSPACE_SNAPSHOT: WorkspaceSnapshotPayload = {
   ui_defaults: null,
   general_settings: null,
   custom_report_definitions: [],
+  productions: [],
 };
 
 export async function bootstrapCloudData(userId: string): Promise<void> {

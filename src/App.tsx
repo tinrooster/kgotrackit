@@ -19,6 +19,7 @@ import { SettingsService } from './lib/settingsService';
 import { refreshRackLocationsFromServer } from './lib/rackLocationsConfig';
 import HelpPage from './pages/HelpPage';
 import AboutPage from './pages/AboutPage';
+import ProductionsPage from './pages/ProductionsPage';
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -137,6 +138,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <SettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/productions"
+                element={
+                  <ProtectedRoute>
+                    <ProductionsPage />
                   </ProtectedRoute>
                 }
               />
