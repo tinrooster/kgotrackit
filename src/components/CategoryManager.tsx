@@ -81,7 +81,7 @@ function CategoryItem({ category, onUpdate, onDelete, onAddChild, level }: Categ
           <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
             Edit
           </Button>
-          <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-500 hover:text-red-700">
+          <Button variant="ghost" size="sm" onClick={onDelete} className="delete-action-btn">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>

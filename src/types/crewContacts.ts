@@ -1,8 +1,13 @@
+export type CrewContactType = 'crew' | 'vendor';
+
 export interface CrewContact {
   id: string;
   fullName: string;
+  contactType: CrewContactType;
   roleTags: string[];
   defaultEquipmentItemIds: string[];
+  organizationName?: string;
+  functionalArea?: string;
   preferredVehicle?: string;
   vehicleNotes?: string;
   phone?: string;
@@ -17,8 +22,11 @@ export interface CrewContact {
 
 export interface CrewContactDraft {
   fullName: string;
+  contactType: CrewContactType;
   roleTags: string;
   defaultEquipmentItemIds: string[];
+  organizationName: string;
+  functionalArea: string;
   preferredVehicle: string;
   vehicleNotes: string;
   phone: string;

@@ -110,7 +110,7 @@ function SortableDeviceRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="shrink-0 text-destructive hover:text-destructive"
+        className="delete-action-btn shrink-0"
         title="Remove from library"
         onClick={onDelete}
       >

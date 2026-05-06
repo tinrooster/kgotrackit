@@ -112,11 +112,12 @@ export function UsersTab() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="delete-action-btn"
                       type="button"
                       onClick={() => setUserPendingRemoval(user)}
                       aria-label={`Remove user ${user}`}
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { CrewScheduleEntry, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,10 @@ interface CrewScheduleCalendarProps {
   schedule: CrewScheduleEntry[];
   projectStartDate?: string;
   projectEndDate?: string;
+  projectedWindowStartTime?: string;
+  projectedWindowEndTime?: string;
+  onProjectedWindowChange?: (window: { startTime?: string; endTime?: string }) => void;
+  requireDeleteConfirm?: boolean;
   resources?: Array<{ id: string; label: string; quantity: number }>;
   onChange: (schedule: CrewScheduleEntry[]) => void;
 }
@@ -22,18 +26,23 @@ function resolveCrewLabel(crewMembers: ProductionCrewMember[], crewMemberId: str
   return member ? `${member.name}${member.role ? ` (${member.role})` : ''}` : 'Unassigned';
 }
 
-function parseTimeToMinutes(value?: string): number {
-  if (!value) return 8 * 60;
+function parseTimeToMinutes(value?: string, fallbackMinutes = 0): number {
+  if (!value) return fallbackMinutes;
   const [h, m] = value.split(':').map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return 8 * 60;
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallbackMinutes;
   return Math.max(0, Math.min(24 * 60, h * 60 + m));
 }
 
 function minutesToTime(minutes: number): string {
-  const safe = Math.max(0, Math.min(24 * 60, Math.round(minutes / 5) * 5));
+  const safe = Math.max(0, Math.min(24 * 60, Math.round(minutes / 15) * 15));
   const h = Math.floor(safe / 60);
   const m = safe % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function roundTimeToQuarter(value?: string, fallback = ''): string {
+  if (!value) return fallback;
+  return minutesToTime(parseTimeToMinutes(value));
 }
 
 function colorForCrew(crewMemberId: string): string {
@@ -47,18 +56,44 @@ export function CrewScheduleCalendar({
   schedule,
   projectStartDate,
   projectEndDate,
+  projectedWindowStartTime,
+  projectedWindowEndTime,
+  onProjectedWindowChange,
+  requireDeleteConfirm = false,
   resources = [],
   onChange
 }: CrewScheduleCalendarProps) {
+  const projectedDate = projectStartDate || format(new Date(), 'yyyy-MM-dd');
+  const derivedWindowStart = useMemo(() => {
+    if (projectedWindowStartTime) return roundTimeToQuarter(projectedWindowStartTime);
+    const firstScheduled = schedule.find((entry) => entry.startTime)?.startTime;
+    return firstScheduled ? roundTimeToQuarter(firstScheduled) : '';
+  }, [projectedWindowStartTime, schedule]);
+  const derivedWindowEnd = useMemo(() => {
+    if (projectedWindowEndTime) return roundTimeToQuarter(projectedWindowEndTime);
+    const latestScheduled = [...schedule].reverse().find((entry) => entry.endTime)?.endTime;
+    return latestScheduled ? roundTimeToQuarter(latestScheduled) : '';
+  }, [projectedWindowEndTime, schedule]);
+  const [useProjectedDefaults, setUseProjectedDefaults] = useState(true);
   const [draft, setDraft] = useState<Omit<CrewScheduleEntry, 'id'>>({
     crewMemberId: '',
-    date: '',
-    startTime: '',
-    endTime: '',
+    date: projectedDate,
+    startTime: derivedWindowStart,
+    endTime: derivedWindowEnd,
     role: '',
     location: '',
     notes: '',
   });
+
+  useEffect(() => {
+    if (!useProjectedDefaults) return;
+    setDraft((previous) => ({
+      ...previous,
+      date: previous.date || projectedDate,
+      startTime: previous.startTime || derivedWindowStart,
+      endTime: previous.endTime || derivedWindowEnd,
+    }));
+  }, [useProjectedDefaults, projectedDate, derivedWindowStart, derivedWindowEnd]);
 
   const weekStart = useMemo(() => {
     const baseDate = schedule[0]?.date ? parseISO(schedule[0].date) : new Date();
@@ -74,17 +109,38 @@ export function CrewScheduleCalendar({
         ...draft,
         id: crypto.randomUUID(),
         role: draft.role || undefined,
-        startTime: draft.startTime || undefined,
-        endTime: draft.endTime || undefined,
+        startTime: draft.startTime ? roundTimeToQuarter(draft.startTime) : undefined,
+        endTime: draft.endTime ? roundTimeToQuarter(draft.endTime) : undefined,
         location: draft.location || undefined,
         notes: draft.notes || undefined,
       },
     ]);
-    setDraft({ crewMemberId: '', date: '', startTime: '', endTime: '', role: '', location: '', notes: '' });
+    setDraft({
+      crewMemberId: '',
+      date: useProjectedDefaults ? projectedDate : '',
+      startTime: useProjectedDefaults ? derivedWindowStart : '',
+      endTime: useProjectedDefaults ? derivedWindowEnd : '',
+      role: '',
+      location: '',
+      notes: '',
+    });
   };
 
   const removeEntry = (id: string) => {
     onChange(schedule.filter((entry) => entry.id !== id));
+  };
+
+  const runDeleteAction = (entryId: string) => {
+    if (!requireDeleteConfirm) {
+      removeEntry(entryId);
+      return;
+    }
+    if (pendingDeleteEntryId === entryId) {
+      removeEntry(entryId);
+      setPendingDeleteEntryId(null);
+      return;
+    }
+    setPendingDeleteEntryId(entryId);
   };
 
   const openEditEntry = (entry: CrewScheduleEntry) => {
@@ -108,8 +164,8 @@ export function CrewScheduleCalendar({
           ? {
               ...entry,
               ...editingDraft,
-              startTime: editingDraft.startTime || undefined,
-              endTime: editingDraft.endTime || undefined,
+              startTime: editingDraft.startTime ? roundTimeToQuarter(editingDraft.startTime) : undefined,
+              endTime: editingDraft.endTime ? roundTimeToQuarter(editingDraft.endTime) : undefined,
               role: editingDraft.role || undefined,
               location: editingDraft.location || undefined,
               notes: editingDraft.notes || undefined,
@@ -147,6 +203,7 @@ export function CrewScheduleCalendar({
   } | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<Omit<CrewScheduleEntry, 'id'> | null>(null);
+  const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState<string | null>(null);
 
   const dayEntries = useMemo(
     () =>
@@ -157,8 +214,10 @@ export function CrewScheduleCalendar({
   );
 
   const timelineBlocks = dayEntries.map((entry) => {
-    const startMinutes = parseTimeToMinutes(entry.startTime || '08:00');
-    const endMinutes = Math.max(startMinutes + 30, parseTimeToMinutes(entry.endTime || '17:00'));
+    const defaultStartMinutes = parseTimeToMinutes(derivedWindowStart, 0);
+    const defaultEndMinutes = parseTimeToMinutes(derivedWindowEnd, defaultStartMinutes + 15);
+    const startMinutes = parseTimeToMinutes(entry.startTime, defaultStartMinutes);
+    const endMinutes = Math.max(startMinutes + 15, parseTimeToMinutes(entry.endTime, defaultEndMinutes));
     return {
       entry,
       startMinutes,
@@ -246,10 +305,95 @@ export function CrewScheduleCalendar({
             </SelectContent>
           </Select>
           <Input className="h-8" type="date" value={draft.date} onChange={(event) => setDraft((previous) => ({ ...previous, date: event.target.value }))} />
-          <Input className="h-8" type="time" value={draft.startTime} onChange={(event) => setDraft((previous) => ({ ...previous, startTime: event.target.value }))} />
-          <Input className="h-8" type="time" value={draft.endTime} onChange={(event) => setDraft((previous) => ({ ...previous, endTime: event.target.value }))} />
+          <Input
+            className="h-8"
+            type="time"
+            step={900}
+            value={draft.startTime}
+            onChange={(event) => setDraft((previous) => ({ ...previous, startTime: event.target.value }))}
+            onBlur={() =>
+              setDraft((previous) => ({
+                ...previous,
+                startTime: previous.startTime ? roundTimeToQuarter(previous.startTime) : '',
+              }))
+            }
+          />
+          <Input
+            className="h-8"
+            type="time"
+            step={900}
+            value={draft.endTime}
+            onChange={(event) => setDraft((previous) => ({ ...previous, endTime: event.target.value }))}
+            onBlur={() =>
+              setDraft((previous) => ({
+                ...previous,
+                endTime: previous.endTime ? roundTimeToQuarter(previous.endTime) : '',
+              }))
+            }
+          />
           <Input className="h-8" placeholder="Role override" value={draft.role} onChange={(event) => setDraft((previous) => ({ ...previous, role: event.target.value }))} />
           <Input className="h-8" placeholder="Location" value={draft.location} onChange={(event) => setDraft((previous) => ({ ...previous, location: event.target.value }))} />
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Input
+            className="h-7 w-[130px]"
+            type="time"
+            step={900}
+            value={derivedWindowStart}
+            onChange={(event) =>
+              onProjectedWindowChange?.({
+                startTime: event.target.value ? roundTimeToQuarter(event.target.value) : undefined,
+                endTime: projectedWindowEndTime,
+              })
+            }
+          />
+          <Input
+            className="h-7 w-[130px]"
+            type="time"
+            step={900}
+            value={derivedWindowEnd}
+            onChange={(event) =>
+              onProjectedWindowChange?.({
+                startTime: projectedWindowStartTime,
+                endTime: event.target.value ? roundTimeToQuarter(event.target.value) : undefined,
+              })
+            }
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7"
+            onClick={() =>
+              setDraft((previous) => ({
+                ...previous,
+                date: projectedDate,
+                startTime: derivedWindowStart,
+                endTime: derivedWindowEnd,
+              }))
+            }
+            disabled={!derivedWindowStart && !derivedWindowEnd}
+          >
+            Use Projected Window
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7"
+            onClick={() => setDraft((previous) => ({ ...previous, date: dayFilter }))}
+          >
+            Use Day Board Date
+          </Button>
+          <label className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5"
+              checked={useProjectedDefaults}
+              onChange={(event) => setUseProjectedDefaults(event.target.checked)}
+            />
+            Reset new entry to projected window
+          </label>
         </div>
         <Input className="mt-2 h-8" placeholder="Notes" value={draft.notes} onChange={(event) => setDraft((previous) => ({ ...previous, notes: event.target.value }))} />
         <Button className="mt-2 h-8 gap-1" size="sm" onClick={addEntry} disabled={!draft.crewMemberId || !draft.date}>
@@ -329,14 +473,22 @@ export function CrewScheduleCalendar({
                         </button>
                         <button
                           type="button"
-                          className="rounded border bg-background/80 p-0.5 text-destructive hover:bg-background"
+                          className={`rounded border p-0.5 ${
+                            pendingDeleteEntryId === block.entry.id
+                              ? 'border-red-400/70 bg-red-500/20'
+                              : 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+                          }`}
                           onClick={(event) => {
                             event.stopPropagation();
-                            removeEntry(block.entry.id);
+                            runDeleteAction(block.entry.id);
                           }}
-                          title="Delete block"
+                          title={
+                            pendingDeleteEntryId === block.entry.id
+                              ? 'Click again to confirm delete'
+                              : 'Delete block'
+                          }
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3 text-red-300" />
                         </button>
                       </div>
                       <div
@@ -429,9 +581,17 @@ export function CrewScheduleCalendar({
                             </button>
                             <button
                               type="button"
-                              className="text-destructive hover:text-destructive/80"
-                              onClick={() => removeEntry(entry.id)}
-                              title="Delete shift"
+                              className={`rounded border p-0.5 ${
+                                pendingDeleteEntryId === entry.id
+                                  ? 'border-red-400/70 bg-red-500/20 text-red-200'
+                                  : 'border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20'
+                              }`}
+                              onClick={() => runDeleteAction(entry.id)}
+                              title={
+                                pendingDeleteEntryId === entry.id
+                                  ? 'Click again to confirm delete'
+                                  : 'Delete shift'
+                              }
                             >
                               <Trash2 className="h-3 w-3" />
                             </button>
@@ -499,17 +659,33 @@ export function CrewScheduleCalendar({
               <Input
                 className="h-8"
                 type="time"
+                step={900}
                 value={editingDraft.startTime}
                 onChange={(event) =>
                   setEditingDraft((previous) => (previous ? { ...previous, startTime: event.target.value } : previous))
+                }
+                onBlur={() =>
+                  setEditingDraft((previous) =>
+                    previous
+                      ? { ...previous, startTime: previous.startTime ? roundTimeToQuarter(previous.startTime) : '' }
+                      : previous
+                  )
                 }
               />
               <Input
                 className="h-8"
                 type="time"
+                step={900}
                 value={editingDraft.endTime}
                 onChange={(event) =>
                   setEditingDraft((previous) => (previous ? { ...previous, endTime: event.target.value } : previous))
+                }
+                onBlur={() =>
+                  setEditingDraft((previous) =>
+                    previous
+                      ? { ...previous, endTime: previous.endTime ? roundTimeToQuarter(previous.endTime) : '' }
+                      : previous
+                  )
                 }
               />
               <Input

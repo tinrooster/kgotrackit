@@ -21,8 +21,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 const EMPTY_DRAFT: CrewContactDraft = {
   fullName: '',
+  contactType: 'crew',
   roleTags: '',
   defaultEquipmentItemIds: [],
+  organizationName: '',
+  functionalArea: '',
   preferredVehicle: '',
   vehicleNotes: '',
   phone: '',
@@ -84,7 +87,10 @@ export default function CrewPage() {
     setEditingContactId(contact.id);
     setDraft({
       fullName: contact.fullName,
+      contactType: contact.contactType,
       roleTags: (contact.roleTags ?? []).join(', '),
+      organizationName: contact.organizationName ?? '',
+      functionalArea: contact.functionalArea ?? '',
       phone: contact.phone ?? '',
       email: contact.email ?? '',
       notes: contact.notes ?? '',
@@ -181,6 +187,7 @@ export default function CrewPage() {
                       <Badge variant={contact.isActive ? 'default' : 'outline'}>
                         {contact.isActive ? 'Active' : 'Inactive'}
                       </Badge>
+                      <Badge variant="outline">{contact.contactType === 'vendor' ? 'Vendor' : 'Crew'}</Badge>
                       {(contact.roleTags ?? []).slice(0, 3).map((roleTag) => (
                         <Badge key={`${contact.id}-${roleTag}`} variant="secondary">
                           {roleTag}
@@ -188,7 +195,9 @@ export default function CrewPage() {
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {[contact.phone, contact.email, contact.baseLocation].filter(Boolean).join(' · ')}
+                      {[contact.organizationName, contact.phone, contact.email, contact.baseLocation]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       {contact.preferredVehicle ? (
@@ -242,10 +251,39 @@ export default function CrewPage() {
               value={draft.fullName}
               onChange={(event) => setDraft((prev) => ({ ...prev, fullName: event.target.value }))}
             />
+            <div className="flex items-center gap-2 rounded-md border px-3">
+              <Label htmlFor="contact-type" className="shrink-0 text-xs text-muted-foreground">
+                Type
+              </Label>
+              <select
+                id="contact-type"
+                className="h-9 w-full bg-transparent text-sm outline-none"
+                value={draft.contactType}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    contactType: event.target.value === 'vendor' ? 'vendor' : 'crew',
+                  }))
+                }
+              >
+                <option value="crew">Crew</option>
+                <option value="vendor">Vendor</option>
+              </select>
+            </div>
             <Input
               placeholder="Roles (comma separated)"
               value={draft.roleTags}
               onChange={(event) => setDraft((prev) => ({ ...prev, roleTags: event.target.value }))}
+            />
+            <Input
+              placeholder="Organization"
+              value={draft.organizationName}
+              onChange={(event) => setDraft((prev) => ({ ...prev, organizationName: event.target.value }))}
+            />
+            <Input
+              placeholder="Functional area"
+              value={draft.functionalArea}
+              onChange={(event) => setDraft((prev) => ({ ...prev, functionalArea: event.target.value }))}
             />
             <Input
               placeholder="Phone"

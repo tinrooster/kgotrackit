@@ -25,6 +25,8 @@ type ProductionDraft = {
   location: string;
   startDate: string;
   endDate: string;
+  scheduleDefaultStartTime: string;
+  scheduleDefaultEndTime: string;
   status: ProductionStatus;
   description: string;
   notes: string;
@@ -37,6 +39,8 @@ function toDraft(production?: Production): ProductionDraft {
     location: production?.location ?? '',
     startDate: production?.startDate ?? '',
     endDate: production?.endDate ?? '',
+    scheduleDefaultStartTime: production?.scheduleDefaultStartTime ?? '',
+    scheduleDefaultEndTime: production?.scheduleDefaultEndTime ?? '',
     status: production?.status ?? 'planning',
     description: production?.description ?? '',
     notes: production?.notes ?? '',
@@ -69,6 +73,8 @@ export function ProductionForm({ open, production, onSave, onClose }: Production
       location: draft.location.trim() || undefined,
       startDate: draft.startDate || undefined,
       endDate: draft.endDate || undefined,
+      scheduleDefaultStartTime: draft.scheduleDefaultStartTime || undefined,
+      scheduleDefaultEndTime: draft.scheduleDefaultEndTime || undefined,
       status: draft.status,
       description: draft.description.trim() || undefined,
       notes: draft.notes.trim() || undefined,
@@ -117,6 +123,16 @@ export function ProductionForm({ open, production, onSave, onClose }: Production
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="prod-default-start">Planner default start</Label>
+              <Input id="prod-default-start" type="time" step={900} {...field('scheduleDefaultStartTime')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="prod-default-end">Planner default end</Label>
+              <Input id="prod-default-end" type="time" step={900} {...field('scheduleDefaultEndTime')} />
             </div>
           </div>
           <div className="space-y-1.5">

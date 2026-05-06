@@ -82,7 +82,7 @@ function SortableItem({ id, value, onEdit, onDelete }: SortableItemProps) {
         <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
           <Pencil className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => onDelete(id)} className="text-red-500 hover:text-red-700">
+        <Button variant="ghost" size="sm" onClick={() => onDelete(id)} className="delete-action-btn">
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>

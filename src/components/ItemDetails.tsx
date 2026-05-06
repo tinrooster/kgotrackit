@@ -79,7 +79,7 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
               </Button>
               <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" title="Delete Item">
+                  <Button variant="outline" size="icon" className="delete-action-btn" title="Delete Item">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>

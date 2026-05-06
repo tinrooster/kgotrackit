@@ -1,8 +1,36 @@
 import { STORAGE_KEYS } from '@/lib/storageService';
 import { requestCloudSync } from '@/lib/cloudSyncEvents';
 import { CrewContact, CrewContactDraft } from '@/types/crewContacts';
+import { getActiveOrganizationId } from '@/lib/supabase/organizationData';
 
 export const CREW_CONTACTS_UPDATED_EVENT = 'trackit:crew-contacts-updated';
+
+function getOrganizationScopedCrewContactsStorageKey(): string {
+  const activeOrganizationId = getActiveOrganizationId();
+  if (!activeOrganizationId) {
+    return STORAGE_KEYS.CREW_CONTACTS;
+  }
+  return `${STORAGE_KEYS.CREW_CONTACTS}:org:${activeOrganizationId}`;
+}
+
+function readRawStoredContacts(storageKey: string): unknown[] {
+  try {
+    const electronValue = window.electronStore?.getData?.(storageKey) as unknown;
+    if (Array.isArray(electronValue)) {
+      localStorage.setItem(storageKey, JSON.stringify(electronValue));
+      return electronValue;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 function dispatchCrewContactsUpdated(contacts: CrewContact[]): void {
   window.dispatchEvent(new CustomEvent(CREW_CONTACTS_UPDATED_EVENT, { detail: contacts }));
@@ -31,10 +59,13 @@ function normalizeCrewContact(raw: unknown): CrewContact | null {
   return {
     id: typeof source.id === 'string' && source.id ? source.id : crypto.randomUUID(),
     fullName,
+    contactType: source.contactType === 'vendor' ? 'vendor' : 'crew',
     roleTags: normalizeRoleTags(Array.isArray(source.roleTags) ? source.roleTags : []),
     defaultEquipmentItemIds: Array.isArray(source.defaultEquipmentItemIds)
       ? source.defaultEquipmentItemIds.filter((value): value is string => typeof value === 'string' && value.length > 0)
       : [],
+    organizationName: typeof source.organizationName === 'string' ? source.organizationName : undefined,
+    functionalArea: typeof source.functionalArea === 'string' ? source.functionalArea : undefined,
     preferredVehicle: typeof source.preferredVehicle === 'string' ? source.preferredVehicle : undefined,
     vehicleNotes: typeof source.vehicleNotes === 'string' ? source.vehicleNotes : undefined,
     phone: typeof source.phone === 'string' ? source.phone : undefined,
@@ -49,37 +80,45 @@ function normalizeCrewContact(raw: unknown): CrewContact | null {
 }
 
 export function getCrewContacts(): CrewContact[] {
-  try {
-    const electronValue = window.electronStore?.getData?.(STORAGE_KEYS.CREW_CONTACTS) as CrewContact[] | undefined;
-    if (Array.isArray(electronValue) && electronValue.length > 0) {
-      localStorage.setItem(STORAGE_KEYS.CREW_CONTACTS, JSON.stringify(electronValue));
-      return electronValue;
-    }
-  } catch {
-    // ignore
-  }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CREW_CONTACTS);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed
+  const activeKey = getOrganizationScopedCrewContactsStorageKey();
+  const activeEntries = readRawStoredContacts(activeKey);
+  if (activeEntries.length > 0) {
+    return activeEntries
       .map((entry) => normalizeCrewContact(entry))
       .filter((entry): entry is CrewContact => Boolean(entry));
-  } catch {
-    return [];
   }
+  if (activeKey !== STORAGE_KEYS.CREW_CONTACTS) {
+    const legacyEntries = readRawStoredContacts(STORAGE_KEYS.CREW_CONTACTS);
+    return legacyEntries
+      .map((entry) => normalizeCrewContact(entry))
+      .filter((entry): entry is CrewContact => Boolean(entry));
+  }
+  return [];
 }
 
 export function saveCrewContacts(contacts: CrewContact[]): void {
+  const activeKey = getOrganizationScopedCrewContactsStorageKey();
   try {
-    window.electronStore?.setData?.(STORAGE_KEYS.CREW_CONTACTS, contacts);
+    window.electronStore?.setData?.(activeKey, contacts);
   } catch {
     // ignore
   }
   try {
-    localStorage.setItem(STORAGE_KEYS.CREW_CONTACTS, JSON.stringify(contacts));
+    localStorage.setItem(activeKey, JSON.stringify(contacts));
   } catch {
     // ignore
+  }
+  if (activeKey !== STORAGE_KEYS.CREW_CONTACTS) {
+    try {
+      window.electronStore?.setData?.(STORAGE_KEYS.CREW_CONTACTS, contacts);
+    } catch {
+      // ignore
+    }
+    try {
+      localStorage.setItem(STORAGE_KEYS.CREW_CONTACTS, JSON.stringify(contacts));
+    } catch {
+      // ignore
+    }
   }
   dispatchCrewContactsUpdated(contacts);
   requestCloudSync();
@@ -90,8 +129,11 @@ export function createCrewContact(draft: CrewContactDraft): CrewContact {
   const contact: CrewContact = {
     id: crypto.randomUUID(),
     fullName: draft.fullName.trim(),
+    contactType: draft.contactType,
     roleTags: normalizeRoleTags(draft.roleTags),
     defaultEquipmentItemIds: Array.from(new Set(draft.defaultEquipmentItemIds)),
+    organizationName: draft.organizationName.trim() || undefined,
+    functionalArea: draft.functionalArea.trim() || undefined,
     preferredVehicle: draft.preferredVehicle.trim() || undefined,
     vehicleNotes: draft.vehicleNotes.trim() || undefined,
     phone: draft.phone.trim() || undefined,
@@ -121,6 +163,11 @@ export function updateCrewContact(contactId: string, updates: Partial<CrewContac
       updates.defaultEquipmentItemIds !== undefined
         ? Array.from(new Set(updates.defaultEquipmentItemIds))
         : current.defaultEquipmentItemIds,
+    contactType: updates.contactType !== undefined ? updates.contactType : current.contactType,
+    organizationName:
+      updates.organizationName !== undefined ? updates.organizationName.trim() || undefined : current.organizationName,
+    functionalArea:
+      updates.functionalArea !== undefined ? updates.functionalArea.trim() || undefined : current.functionalArea,
     preferredVehicle:
       updates.preferredVehicle !== undefined ? updates.preferredVehicle.trim() || undefined : current.preferredVehicle,
     vehicleNotes:

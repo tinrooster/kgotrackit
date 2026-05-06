@@ -195,7 +195,7 @@ const CategoryItem: FC<CategoryItemProps> = ({
             size="icon"
             onClick={() => onDelete(category.id)}
             title="Delete category"
-            className="text-destructive"
+            className="delete-action-btn"
           >
             <Trash className="h-4 w-4" />
           </Button>

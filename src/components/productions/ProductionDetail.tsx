@@ -25,6 +25,8 @@ import { applyProductionInventoryAction, exportProductionPacklistsToPdf } from '
 import { toast } from 'sonner';
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const STATUS_CLASS: Record<ProductionStatus, string> = {
   planning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -63,6 +65,7 @@ export function ProductionDetail({
 }: ProductionDetailProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmListDeletes, setConfirmListDeletes] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'vehicles' | 'crew' | 'schedule'>('overview');
   const [plannerWindowOpen, setPlannerWindowOpen] = useState(false);
   const scheduleResources = useMemo(() => {
@@ -103,6 +106,13 @@ export function ProductionDetail({
 
   const handleScheduleChange = (crewSchedule: CrewScheduleEntry[]) => {
     onUpdate(production.id, { crewSchedule });
+  };
+
+  const handleProjectedWindowChange = (window: { startTime?: string; endTime?: string }) => {
+    onUpdate(production.id, {
+      scheduleDefaultStartTime: window.startTime,
+      scheduleDefaultEndTime: window.endTime,
+    });
   };
 
   const handleEditSave = (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew' | 'crewSchedule'>) => {
@@ -221,7 +231,12 @@ export function ProductionDetail({
                   </Button>
                 </>
               ) : (
-                <Button variant="ghost" size="sm" className="h-7 gap-1 text-destructive hover:text-destructive" onClick={handleDelete}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1 border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:text-red-200"
+                  onClick={handleDelete}
+                >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete
                 </Button>
@@ -326,11 +341,22 @@ export function ProductionDetail({
                     >
                       Check In Linked
                     </Button>
+                    <div className="ml-auto inline-flex items-center gap-2 rounded border px-2 py-1">
+                      <Switch
+                        id="confirm-list-delete-toggle"
+                        checked={confirmListDeletes}
+                        onCheckedChange={setConfirmListDeletes}
+                      />
+                      <Label htmlFor="confirm-list-delete-toggle" className="text-xs text-muted-foreground">
+                        Confirm list deletes
+                      </Label>
+                    </div>
                   </div>
                   <ChecklistEditor
                     groups={production.checklistGroups}
                     onChange={handleChecklistChange}
                     inventoryItems={inventoryItems}
+                    requireDeleteConfirm={confirmListDeletes}
                   />
                 </TabsContent>
 
@@ -339,20 +365,29 @@ export function ProductionDetail({
                     packlists={production.vehiclePacklists}
                     onChange={handleVehicleChange}
                     inventoryItems={inventoryItems}
+                    requireDeleteConfirm={confirmListDeletes}
                   />
                 </TabsContent>
 
                 <TabsContent value="crew" className="mt-0">
-                  <CrewEditor crew={production.crew} onChange={handleCrewChange} />
+                  <CrewEditor
+                    crew={production.crew}
+                    onChange={handleCrewChange}
+                    requireDeleteConfirm={confirmListDeletes}
+                  />
                 </TabsContent>
 
                 <TabsContent value="schedule" className="mt-0">
                   <CrewScheduleCalendar
                     projectStartDate={production.startDate}
                     projectEndDate={production.endDate}
+                    projectedWindowStartTime={production.scheduleDefaultStartTime}
+                    projectedWindowEndTime={production.scheduleDefaultEndTime}
+                    onProjectedWindowChange={handleProjectedWindowChange}
                     resources={scheduleResources}
                     crewMembers={production.crew}
                     schedule={production.crewSchedule ?? []}
+                    requireDeleteConfirm={confirmListDeletes}
                     onChange={handleScheduleChange}
                   />
                 </TabsContent>
@@ -392,6 +427,7 @@ export function ProductionDetail({
                   groups={production.checklistGroups}
                   onChange={handleChecklistChange}
                   inventoryItems={inventoryItems}
+                  requireDeleteConfirm={confirmListDeletes}
                 />
               </TabsContent>
               <TabsContent value="vehicles" className="space-y-3">
@@ -399,20 +435,29 @@ export function ProductionDetail({
                   packlists={production.vehiclePacklists}
                   onChange={handleVehicleChange}
                   inventoryItems={inventoryItems}
+                  requireDeleteConfirm={confirmListDeletes}
                 />
               </TabsContent>
               <TabsContent value="schedule" className="space-y-3">
                 <CrewScheduleCalendar
                   projectStartDate={production.startDate}
                   projectEndDate={production.endDate}
+                  projectedWindowStartTime={production.scheduleDefaultStartTime}
+                  projectedWindowEndTime={production.scheduleDefaultEndTime}
+                  onProjectedWindowChange={handleProjectedWindowChange}
                   resources={scheduleResources}
                   crewMembers={production.crew}
                   schedule={production.crewSchedule ?? []}
+                  requireDeleteConfirm={confirmListDeletes}
                   onChange={handleScheduleChange}
                 />
               </TabsContent>
               <TabsContent value="crew">
-                <CrewEditor crew={production.crew} onChange={handleCrewChange} />
+                <CrewEditor
+                  crew={production.crew}
+                  onChange={handleCrewChange}
+                  requireDeleteConfirm={confirmListDeletes}
+                />
               </TabsContent>
               <TabsContent value="overview" className="space-y-2 text-sm">
                 <p><span className="text-muted-foreground">Client:</span> {production.client || '—'}</p>

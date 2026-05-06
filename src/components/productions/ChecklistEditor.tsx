@@ -15,6 +15,7 @@ interface ChecklistEditorProps {
   inventoryItems?: InventoryItem[];
   /** When true, renders compact read-only checkboxes only (no edit controls). */
   readOnly?: boolean;
+  requireDeleteConfirm?: boolean;
 }
 
 function newItem(label: string): ChecklistItem {
@@ -25,9 +26,29 @@ function newGroup(title: string): ChecklistGroup {
   return { id: crypto.randomUUID(), title, items: [] };
 }
 
-export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnly = false }: ChecklistEditorProps) {
+export function ChecklistEditor({
+  groups,
+  onChange,
+  inventoryItems = [],
+  readOnly = false,
+  requireDeleteConfirm = false,
+}: ChecklistEditorProps) {
   const [newGroupTitle, setNewGroupTitle] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
+  const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
+    if (!requireDeleteConfirm) {
+      deleteAction();
+      return;
+    }
+    if (pendingDeleteKey === deleteKey) {
+      deleteAction();
+      setPendingDeleteKey(null);
+      return;
+    }
+    setPendingDeleteKey(deleteKey);
+  };
+
 
   const updateGroup = (groupId: string, updates: Partial<ChecklistGroup>) => {
     onChange(groups.map((g) => (g.id === groupId ? { ...g, ...updates } : g)));
@@ -133,9 +154,10 @@ export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnl
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 shrink-0"
-                onClick={() => removeGroup(group.id)}
+                onClick={() => runDeleteAction(`group:${group.id}`, () => removeGroup(group.id))}
+                title={pendingDeleteKey === `group:${group.id}` ? 'Click again to confirm delete' : 'Delete group'}
               >
-                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                <Trash2 className="h-3.5 w-3.5 text-red-400" />
               </Button>
             )}
           </div>
@@ -206,10 +228,22 @@ export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnl
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 shrink-0"
-                        onClick={() => removeItem(group.id, item.id)}
+                        className={cn(
+                          'h-8 w-8 shrink-0 border',
+                          pendingDeleteKey === `item:${item.id}`
+                            ? 'border-red-400/70 bg-red-500/20'
+                            : 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+                        )}
+                        onClick={() =>
+                          runDeleteAction(`item:${item.id}`, () => removeItem(group.id, item.id))
+                        }
+                        title={
+                          pendingDeleteKey === `item:${item.id}`
+                            ? 'Click again to confirm delete'
+                            : 'Delete item'
+                        }
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        <Trash2 className="h-3.5 w-3.5 text-red-300" />
                       </Button>
                     </>
                   )}

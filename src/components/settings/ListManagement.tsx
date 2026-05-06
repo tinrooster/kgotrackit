@@ -131,7 +131,7 @@ export function ListManagement({
           <Button
             variant="ghost"
             size="sm"
-            className="w-8 h-8 p-0 text-destructive"
+            className="delete-action-btn w-8 h-8 p-0"
             onClick={() => setDeleteDialog({
               open: true,
               item,
@@ -169,7 +169,7 @@ export function ListManagement({
             <Button
               variant="ghost"
               size="sm"
-              className="w-8 h-8 p-0 text-destructive"
+              className="delete-action-btn w-8 h-8 p-0"
               onClick={() => setDeleteDialog({
                 open: true,
                 item,

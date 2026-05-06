@@ -25,6 +25,7 @@ export type WorkspaceMemberRole = 'admin' | 'editor' | 'viewer';
 
 export interface WorkspaceSummary {
   workspaceId: string;
+  organizationId?: string | null;
   name: string;
   ownerUserId: string;
   role: WorkspaceMemberRole;
@@ -67,7 +68,7 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
   const ids = [...new Set(members.map((m: { workspace_id: string }) => m.workspace_id).filter(Boolean))];
   const { data: wsRows, error: wErr } = await client
     .from('workspaces')
-    .select('id, name, owner_user_id, created_at')
+    .select('id, organization_id, name, owner_user_id, created_at')
     .in('id', ids);
   if (wErr || !Array.isArray(wsRows)) {
     if (wErr) console.warn('[workspaceData] workspaces fetch', wErr.message);
@@ -115,6 +116,7 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
     const role = m.role === 'admin' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'viewer';
     out.push({
       workspaceId: w.id,
+      organizationId: (w as { organization_id?: string | null }).organization_id ?? null,
       name: w.name,
       ownerUserId: w.owner_user_id,
       role,
@@ -124,6 +126,19 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
     });
   }
   return out;
+}
+
+export async function fetchWorkspaceOrganizationId(workspaceId: string): Promise<string | null> {
+  const client = getSupabase();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('workspaces')
+    .select('organization_id')
+    .eq('id', workspaceId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const organizationId = (data as { organization_id?: unknown }).organization_id;
+  return typeof organizationId === 'string' && organizationId.length > 0 ? organizationId : null;
 }
 
 export async function fetchWorkspaceMemberRole(

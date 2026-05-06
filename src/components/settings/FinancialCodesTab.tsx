@@ -90,6 +90,7 @@ const FinancialCodeEditor = ({
                 type="button"
                 variant="ghost"
                 size="icon"
+                className="delete-action-btn"
                 onClick={() => setPendingDeleteId(entry.id)}
               >
                 <Trash2 className="h-4 w-4" />

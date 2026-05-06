@@ -128,7 +128,7 @@ function SortableTemplateRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="text-destructive hover:text-destructive"
+          className="delete-action-btn"
           title="Delete"
           onClick={() => onDelete(template.templateId)}
         >

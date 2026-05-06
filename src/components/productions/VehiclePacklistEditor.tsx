@@ -14,6 +14,7 @@ interface VehiclePacklistEditorProps {
   onChange: (packlists: VehiclePacklist[]) => void;
   inventoryItems?: InventoryItem[];
   readOnly?: boolean;
+  requireDeleteConfirm?: boolean;
 }
 
 function newItem(label: string): ChecklistItem {
@@ -24,10 +25,24 @@ export function VehiclePacklistEditor({
   packlists,
   onChange,
   inventoryItems = [],
-  readOnly = false
+  readOnly = false,
+  requireDeleteConfirm = false
 }: VehiclePacklistEditorProps) {
   const [newVehicleName, setNewVehicleName] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
+  const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
+    if (!requireDeleteConfirm) {
+      deleteAction();
+      return;
+    }
+    if (pendingDeleteKey === deleteKey) {
+      deleteAction();
+      setPendingDeleteKey(null);
+      return;
+    }
+    setPendingDeleteKey(deleteKey);
+  };
 
   const updatePacklist = (id: string, updates: Partial<VehiclePacklist>) => {
     onChange(packlists.map((p) => (p.id === id ? { ...p, ...updates } : p)));
@@ -132,9 +147,10 @@ export function VehiclePacklistEditor({
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 shrink-0"
-                onClick={() => removePacklist(packlist.id)}
+                onClick={() => runDeleteAction(`packlist:${packlist.id}`, () => removePacklist(packlist.id))}
+                title={pendingDeleteKey === `packlist:${packlist.id}` ? 'Click again to confirm delete' : 'Delete packlist'}
               >
-                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                <Trash2 className="h-3.5 w-3.5 text-red-400" />
               </Button>
             )}
           </div>
@@ -190,10 +206,16 @@ export function VehiclePacklistEditor({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0"
-                    onClick={() => removeItem(packlist.id, item.id)}
+                    className={cn(
+                      'h-8 w-8 shrink-0 border',
+                      pendingDeleteKey === `item:${item.id}`
+                        ? 'border-red-400/70 bg-red-500/20'
+                        : 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+                    )}
+                    onClick={() => runDeleteAction(`item:${item.id}`, () => removeItem(packlist.id, item.id))}
+                    title={pendingDeleteKey === `item:${item.id}` ? 'Click again to confirm delete' : 'Delete item'}
                   >
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    <Trash2 className="h-3.5 w-3.5 text-red-300" />
                   </Button>
                 )}
               </div>

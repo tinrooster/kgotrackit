@@ -28,7 +28,21 @@ export interface ProductionCrewMember {
   id: string;
   name: string;
   role: string;
+  contactId?: string;
+  positionTemplateId?: string;
+  positionLabel?: string;
   contact?: string;
+  notes?: string;
+  shifts?: CrewAssignmentShift[];
+}
+
+export interface CrewAssignmentShift {
+  id: string;
+  date: string;
+  callTime?: string;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
   notes?: string;
 }
 
@@ -52,6 +66,10 @@ export interface Production {
   startDate?: string;
   /** ISO date string (YYYY-MM-DD). */
   endDate?: string;
+  /** Preferred schedule start time for planners (HH:mm). */
+  scheduleDefaultStartTime?: string;
+  /** Preferred schedule end time for planners (HH:mm). */
+  scheduleDefaultEndTime?: string;
   status: ProductionStatus;
   description?: string;
   checklistGroups: ChecklistGroup[];

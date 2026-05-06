@@ -145,7 +145,7 @@ function RackSlotsEditor({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+            className="delete-action-btn h-8 w-8 shrink-0"
             title="Remove position"
             onClick={() => removeSlot(i)}
           >
@@ -423,7 +423,7 @@ function SortableItem({
             variant="ghost"
             size="sm"
             onClick={() => canDeleteItems && onRequestDeleteParent(item.id)}
-            className="text-muted-foreground hover:text-foreground"
+            className="delete-action-btn"
             disabled={!canDeleteItems}
             title={canDeleteItems ? 'Delete item' : 'Only admins can delete list entries'}
           >
@@ -709,7 +709,7 @@ function SortableItem({
                       variant="ghost"
                       size="sm"
                       onClick={() => canDeleteItems && onRequestDeleteSubcategory(item.id, child.name)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="delete-action-btn"
                       disabled={!canDeleteItems}
                       title={canDeleteItems ? 'Delete subcategory' : 'Only admins can delete list entries'}
                     >

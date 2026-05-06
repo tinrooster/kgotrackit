@@ -11,15 +11,17 @@ interface CrewEditorProps {
   crew: ProductionCrewMember[];
   onChange: (crew: ProductionCrewMember[]) => void;
   readOnly?: boolean;
+  requireDeleteConfirm?: boolean;
 }
 
-const EMPTY_MEMBER: Omit<ProductionCrewMember, 'id'> = { name: '', role: '' };
+const EMPTY_MEMBER: Omit<ProductionCrewMember, 'id'> = { name: '', role: '', positionLabel: '' };
 
-export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps) {
+export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConfirm = false }: CrewEditorProps) {
   const [draft, setDraft] = useState<Omit<ProductionCrewMember, 'id'>>(EMPTY_MEMBER);
   const [masterDialogOpen, setMasterDialogOpen] = useState(false);
   const [masterSearch, setMasterSearch] = useState('');
   const [masterContacts, setMasterContacts] = useState<CrewContact[]>(() => getCrewContacts());
+  const [pendingDeleteMemberId, setPendingDeleteMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     const refresh = () => setMasterContacts(getCrewContacts());
@@ -48,6 +50,19 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
     onChange(crew.filter((m) => m.id !== id));
   };
 
+  const runDeleteAction = (memberId: string) => {
+    if (!requireDeleteConfirm) {
+      removeMember(memberId);
+      return;
+    }
+    if (pendingDeleteMemberId === memberId) {
+      removeMember(memberId);
+      setPendingDeleteMemberId(null);
+      return;
+    }
+    setPendingDeleteMemberId(memberId);
+  };
+
   const addMember = () => {
     if (!draft.name.trim()) return;
     onChange([...crew, { ...draft, id: crypto.randomUUID(), name: draft.name.trim(), role: draft.role.trim() }]);
@@ -65,6 +80,8 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
         id: crypto.randomUUID(),
         name: contact.fullName,
         role: contact.roleTags[0] ?? '',
+        contactId: contact.id,
+        positionLabel: '',
         contact: [contact.phone, contact.email].filter(Boolean).join(' · ') || undefined,
         notes: contact.notes,
       },
@@ -85,6 +102,7 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
               <>
                 <p className="text-sm font-medium">{member.name}</p>
                 {member.role && <p className="text-xs text-muted-foreground">{member.role}</p>}
+                {member.positionLabel && <p className="text-xs text-muted-foreground">{member.positionLabel}</p>}
                 {member.contact && <p className="text-xs text-muted-foreground">{member.contact}</p>}
                 {member.notes && <p className="text-xs text-muted-foreground italic">{member.notes}</p>}
               </>
@@ -109,6 +127,12 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
                   onChange={(e) => updateMember(member.id, { contact: e.target.value })}
                 />
                 <Input
+                  placeholder="Position label"
+                  className="h-7 text-sm"
+                  value={member.positionLabel ?? ''}
+                  onChange={(e) => updateMember(member.id, { positionLabel: e.target.value })}
+                />
+                <Input
                   placeholder="Notes"
                   className="h-7 text-sm"
                   value={member.notes ?? ''}
@@ -121,10 +145,19 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0"
-              onClick={() => removeMember(member.id)}
+              className={`h-8 w-8 shrink-0 border ${
+                pendingDeleteMemberId === member.id
+                  ? 'border-red-400/70 bg-red-500/20'
+                  : 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+              }`}
+              onClick={() => runDeleteAction(member.id)}
+              title={
+                pendingDeleteMemberId === member.id
+                  ? 'Click again to confirm remove'
+                  : 'Remove crew member'
+              }
             >
-              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              <Trash2 className="h-3.5 w-3.5 text-red-300" />
             </Button>
           )}
         </div>
@@ -163,6 +196,12 @@ export function CrewEditor({ crew, onChange, readOnly = false }: CrewEditorProps
               className="h-7 text-sm"
               value={draft.contact ?? ''}
               onChange={(e) => setDraft((d) => ({ ...d, contact: e.target.value }))}
+            />
+            <Input
+              placeholder="Position label"
+              className="h-7 text-sm"
+              value={draft.positionLabel ?? ''}
+              onChange={(e) => setDraft((d) => ({ ...d, positionLabel: e.target.value }))}
             />
             <Input
               placeholder="Notes"
