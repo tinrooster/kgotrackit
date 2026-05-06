@@ -21,12 +21,20 @@ import {
 import { getFinancialSettings, saveFinancialSettings } from '@/lib/financialSettingsService';
 import {
   fetchWorkspaceMemberRole,
+  fetchWorkspaceOrganizationId,
   getActiveWorkspaceId,
   pullWorkspaceAppData,
   pushWorkspaceSnapshot,
   type WorkspaceSnapshotPayload,
 } from '@/lib/supabase/workspaceData';
+import {
+  pullOrganizationAppData,
+  pushOrganizationSnapshot,
+  setActiveOrganizationId,
+  type OrganizationSnapshotPayload,
+} from '@/lib/supabase/organizationData';
 import { dispatchCloudHydrated } from '@/lib/cloudSyncEvents';
+import { getCrewContacts } from '@/lib/crewContactsService';
 
 export type AuthBackend = 'local' | 'supabase';
 
@@ -233,14 +241,7 @@ export async function collectLocalSnapshot(): Promise<Omit<UserAppDataRow, 'user
     productions = [];
   }
 
-  let crewContacts: unknown[] = [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CREW_CONTACTS);
-    const parsed = raw ? JSON.parse(raw) : [];
-    crewContacts = Array.isArray(parsed) ? parsed : [];
-  } catch {
-    crewContacts = [];
-  }
+  const crewContacts: unknown[] = getCrewContacts();
 
   return {
     items,
@@ -344,6 +345,17 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
     if (!role || role === 'viewer') {
       return;
     }
+    const organizationId = await fetchWorkspaceOrganizationId(wsId);
+    if (organizationId) {
+      setActiveOrganizationId(organizationId);
+      await pushOrganizationSnapshot(organizationId, {
+        contacts: snapshot.crew_contacts ?? [],
+        position_templates: [],
+        inventory_baseline: snapshot.items ?? [],
+        role_tags: [],
+        branding: {},
+      } satisfies OrganizationSnapshotPayload);
+    }
     await pushWorkspaceSnapshot(wsId, snapshot as WorkspaceSnapshotPayload);
     return;
   }
@@ -426,13 +438,23 @@ export async function bootstrapCloudData(userId: string): Promise<void> {
       }
       const remoteRow = await pullWorkspaceAppData(wsId);
       if (remoteRow) {
+        const organizationId = await fetchWorkspaceOrganizationId(wsId);
+        if (organizationId) {
+          setActiveOrganizationId(organizationId);
+          const organizationRow = await pullOrganizationAppData(organizationId);
+          if (organizationRow) {
+            remoteRow.crew_contacts = Array.isArray(organizationRow.contacts) ? organizationRow.contacts : [];
+          }
+        }
         await applySnapshotToLocal(remoteRow as CloudSnapshotPayload);
         return;
       }
+      setActiveOrganizationId(null);
       await pushWorkspaceSnapshot(wsId, EMPTY_WORKSPACE_SNAPSHOT);
       await applySnapshotToLocal(EMPTY_WORKSPACE_SNAPSHOT);
       return;
     }
+    setActiveOrganizationId(null);
     await bootstrapPersonalUserRow(userId);
   } finally {
     dispatchCloudHydrated();
