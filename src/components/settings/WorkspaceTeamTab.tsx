@@ -20,6 +20,7 @@ import {
 import { setActiveWorkspaceId } from '@/lib/supabase/workspaceData';
 import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
 import { Key, Users } from 'lucide-react';
+import { logger as durableLogger } from '@/lib/logging';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreateWorkspaceDialog } from '@/components/settings/CreateWorkspaceDialog';
 import {
@@ -112,10 +113,16 @@ export function WorkspaceTeamTab() {
       toast.error('Select a workspace first.');
       return;
     }
-    if (!workspaces.some((workspace) => workspace.workspaceId === targetWorkspaceId)) {
+    const targetWs = workspaces.find((workspace) => workspace.workspaceId === targetWorkspaceId);
+    if (!targetWs) {
       toast.error('You can only switch to workspaces where you are already invited.');
       return;
     }
+    durableLogger.info('audit', 'WORKSPACE_SWITCHED', {
+      workspaceName: targetWs.name,
+      workspaceId: targetWorkspaceId,
+      performedBy: currentUser?.username || 'Unknown',
+    }, 'WorkspaceTeamTab');
     setActiveWorkspaceId(targetWorkspaceId);
     window.location.reload();
   };
@@ -625,7 +632,13 @@ export function WorkspaceTeamTab() {
                 }
                 setDeletingWorkspace(true);
                 try {
+                  const deletedWs = workspaces.find((w) => w.workspaceId === targetDeleteId);
                   await deleteWorkspace(targetDeleteId);
+                  durableLogger.info('audit', 'WORKSPACE_DELETED', {
+                    workspaceName: deletedWs?.name ?? targetDeleteId,
+                    workspaceId: targetDeleteId,
+                    performedBy: currentUser?.username || 'Unknown',
+                  }, 'WorkspaceTeamTab');
                   if (activeWorkspaceId === targetDeleteId) {
                     setActiveWorkspaceId(null);
                   }

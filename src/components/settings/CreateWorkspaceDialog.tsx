@@ -12,6 +12,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { logger as durableLogger } from '@/lib/logging';
+import { useAuth } from '@/contexts/AuthContext';
 import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS, recordSetupChoiceForWorkspace } from '@/lib/dummyData';
 import { STORAGE_KEYS, type Settings } from '@/lib/storageService';
 import { createWorkspaceWithSnapshot, type WorkspaceSnapshotPayload } from '@/lib/supabase/workspaceData';
@@ -33,6 +35,7 @@ export function CreateWorkspaceDialog({
   onClose,
   onCreated,
 }: CreateWorkspaceDialogProps) {
+  const { currentUser } = useAuth();
   const [name, setName] = React.useState('');
   const [choice, setChoice] = React.useState<WorkspaceDefaultsChoice>('blank');
   const [includeSampleInventory, setIncludeSampleInventory] = React.useState(false);
@@ -108,9 +111,13 @@ export function CreateWorkspaceDialog({
       };
 
       const workspaceId = await createWorkspaceWithSnapshot(trimmedName, snapshot);
-      // Pre-record the setup choice for this workspace so InitialDefaultsDialog
-      // never fires when the page reloads into the new workspace context.
       recordSetupChoiceForWorkspace(workspaceId, choice);
+      durableLogger.info('audit', 'WORKSPACE_CREATED', {
+        workspaceName: trimmedName,
+        workspaceId,
+        defaults: choice,
+        performedBy: currentUser?.username || 'Unknown',
+      }, 'CreateWorkspaceDialog');
       toast.success('Workspace created');
       await onCreated(workspaceId);
       onClose();

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
-import { ArrowDownAZ, ArrowUpZA, Download, RotateCcw, Search } from "lucide-react";
+import { ArrowDownAZ, ArrowUpZA, Download, RefreshCw, RotateCcw, Search } from "lucide-react";
 import { getLogs as getStoredLogs, logger } from "@/lib/logging";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -20,62 +20,74 @@ export function SystemLogs() {
   const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedLevel, setSelectedLevel] = React.useState<string>("all");
-  const [selectedType, setSelectedType] = React.useState<string>("audit");
+  const [selectedType, setSelectedType] = React.useState<string>("all");
   const [logs, setLogs] = React.useState<LogEntry[]>([]);
   const [isNewestFirst, setIsNewestFirst] = React.useState(true);
   const [showRawDetails, setShowRawDetails] = React.useState(false);
   const [isCompactView, setIsCompactView] = React.useState(true);
   const [isViewCleared, setIsViewCleared] = React.useState(false);
 
-  React.useEffect(() => {
-    const loadInventoryAuditLogs = (): LogEntry[] => {
-      try {
-        const rawAuditLogs = localStorage.getItem('inventory-audit-log');
-        if (!rawAuditLogs) return [];
-        const parsedAuditLogs = JSON.parse(rawAuditLogs) as Array<{
-          action?: string;
-          itemId?: string;
-          assetId?: string | null;
-          name?: string;
-          timestamp?: string;
-          user?: string;
-        }>;
-        return parsedAuditLogs.map((entry) => ({
-          timestamp: new Date(entry.timestamp || new Date().toISOString()),
-          level: 'info',
-          type: 'audit',
-          message: entry.action ? `INVENTORY_ITEM_${entry.action}` : 'INVENTORY_ITEM_EVENT',
-          details: {
-            itemId: entry.itemId,
-            assetId: entry.assetId ?? null,
-            name: entry.name,
-            user: entry.user,
-          },
-          component: 'InventoryPage',
-        }));
-      } catch {
-        return [];
-      }
-    };
-
-    const refreshLogs = () => {
-      const inMemoryLogs = logger.getLogs() as unknown as LogEntry[];
-      const durableLogs = getStoredLogs() as unknown as LogEntry[];
-      const legacyInventoryLogs = loadInventoryAuditLogs();
-
-      const combinedLogs = [...inMemoryLogs, ...durableLogs, ...legacyInventoryLogs]
-        .filter((entry) => entry?.timestamp && entry?.message)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-      setLogs(combinedLogs);
-    };
-
-    refreshLogs();
-    window.addEventListener('trackit:logs-updated', refreshLogs as EventListener);
-    return () => {
-      window.removeEventListener('trackit:logs-updated', refreshLogs as EventListener);
-    };
+  const loadInventoryAuditLogs = React.useCallback((): LogEntry[] => {
+    try {
+      const rawAuditLogs = localStorage.getItem('inventory-audit-log');
+      if (!rawAuditLogs) return [];
+      const parsedAuditLogs = JSON.parse(rawAuditLogs) as Array<{
+        action?: string;
+        itemId?: string;
+        assetId?: string | null;
+        name?: string;
+        timestamp?: string;
+        user?: string;
+      }>;
+      return parsedAuditLogs.map((entry) => ({
+        timestamp: new Date(entry.timestamp || new Date().toISOString()),
+        level: 'info' as const,
+        type: 'audit' as const,
+        message: entry.action ? `INVENTORY_ITEM_${entry.action}` : 'INVENTORY_ITEM_EVENT',
+        details: {
+          itemId: entry.itemId,
+          assetId: entry.assetId ?? null,
+          name: entry.name,
+          user: entry.user,
+        },
+        component: 'InventoryPage',
+      }));
+    } catch {
+      return [];
+    }
   }, []);
+
+  const loadAndSetLogs = React.useCallback(() => {
+    const inMemoryLogs = logger.getLogs() as unknown as LogEntry[];
+    const durableLogs = getStoredLogs() as unknown as LogEntry[];
+    const legacyInventoryLogs = loadInventoryAuditLogs();
+
+    const seenKeys = new Set<string>();
+    const combinedLogs = [...inMemoryLogs, ...durableLogs, ...legacyInventoryLogs]
+      .filter((entry) => {
+        if (!entry?.timestamp || !entry?.message) return false;
+        const key = `${new Date(entry.timestamp).getTime()}:${entry.message}:${entry.component ?? ''}`;
+        if (seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+      })
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    setLogs(combinedLogs);
+  }, [loadInventoryAuditLogs]);
+
+  const refreshLogs = React.useCallback(() => {
+    loadAndSetLogs();
+    setIsViewCleared(false);
+  }, [loadAndSetLogs]);
+
+  React.useEffect(() => {
+    loadAndSetLogs();
+    window.addEventListener('trackit:logs-updated', loadAndSetLogs);
+    return () => {
+      window.removeEventListener('trackit:logs-updated', loadAndSetLogs);
+    };
+  }, [loadAndSetLogs]);
 
   const filteredLogs = React.useMemo(() => {
     const matchedLogs = logs.filter(log => {
@@ -97,6 +109,9 @@ export function SystemLogs() {
     const itemName = String(details.name ?? details.itemName ?? 'Unknown item');
     const quantity = details.quantity != null ? ` x${String(details.quantity)}` : '';
     const cabinetName = details.cabinetName ? ` in ${String(details.cabinetName)}` : '';
+
+    const usernameDetail = String(details.username ?? details.user ?? details.performedBy ?? actor);
+    const workspaceName = String(details.workspaceName ?? details.workspace ?? '');
 
     switch (log.message) {
       case 'INVENTORY_ITEM_CREATED':
@@ -122,6 +137,34 @@ export function SystemLogs() {
         return `${actor} checked out "${itemName}"${quantity}${cabinetName}`;
       case 'SYSTEM_LOG_PANEL_OPENED':
         return `${actor} opened the system logs panel`;
+      case 'AUTH_LOGIN_SUCCESS':
+        return `${usernameDetail} signed in`;
+      case 'AUTH_LOGIN_FAILED':
+      case 'AUTH_LOGIN_FAILED_USER_NOT_FOUND':
+      case 'AUTH_LOGIN_FAILED_INVALID_PASSWORD':
+        return `Sign-in failed${usernameDetail && usernameDetail !== actor ? ` for ${usernameDetail}` : ''}: ${String(details.error ?? details.reason ?? 'invalid credentials')}`;
+      case 'AUTH_LOGIN_ERROR':
+        return `Sign-in error${usernameDetail && usernameDetail !== actor ? ` for ${usernameDetail}` : ''}: ${String(details.error ?? '')}`;
+      case 'AUTH_LOGOUT':
+        return `${usernameDetail} signed out`;
+      case 'AUTH_PASSWORD_RESET_SUCCESS':
+        return `Password reset successful for ${usernameDetail}`;
+      case 'AUTH_PASSWORD_RESET_FAILED_USER_NOT_FOUND':
+      case 'AUTH_PASSWORD_RESET_FAILED_INCORRECT_SECURITY_ANSWER':
+      case 'AUTH_PASSWORD_RESET_ERROR':
+        return `Password reset failed for ${usernameDetail}`;
+      case 'AUTH_PASSWORD_RESET_EMAIL_REQUESTED':
+        return `Password reset email requested for ${String(details.email ?? usernameDetail)}`;
+      case 'WORKSPACE_CREATED':
+        return `${actor} created workspace "${workspaceName}"`;
+      case 'WORKSPACE_DELETED':
+        return `${actor} deleted workspace "${workspaceName}"`;
+      case 'WORKSPACE_SWITCHED':
+        return `${actor} switched to workspace "${workspaceName}"`;
+      case 'WORKSPACE_MEMBER_INVITED':
+        return `${actor} invited ${String(details.invitedEmail ?? '')} to workspace "${workspaceName}"`;
+      case 'WORKSPACE_MEMBER_REMOVED':
+        return `${actor} removed ${String(details.removedUser ?? '')} from workspace "${workspaceName}"`;
       default:
         return `${actor}: ${log.message}`;
     }
@@ -212,6 +255,14 @@ export function SystemLogs() {
           <Button
             variant="outline"
             size="icon"
+            title="Refresh logs"
+            onClick={refreshLogs}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
             title={isNewestFirst ? "Switch to oldest first" : "Switch to newest first"}
             onClick={() => setIsNewestFirst((previousValue) => !previousValue)}
           >
@@ -242,10 +293,8 @@ export function SystemLogs() {
           <Button
             variant="outline"
             size="icon"
-            title="Clear visible output only (durable logs stay saved)"
-            onClick={() => {
-              setIsViewCleared(true);
-            }}
+            title="Clear visible output (durable logs stay saved)"
+            onClick={() => setIsViewCleared(true)}
           >
             <RotateCcw className="h-4 w-4" />
           </Button>
@@ -291,11 +340,11 @@ export function SystemLogs() {
 
         {isViewCleared && (
           <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Visible output cleared. Durable logs are still stored. Use any filter change or Reload to view them again.
+            Visible output cleared. Durable logs are still stored.
             <Button
               variant="link"
               className="h-auto px-2 py-0 text-xs"
-              onClick={() => setIsViewCleared(false)}
+              onClick={refreshLogs}
             >
               Reload
             </Button>
