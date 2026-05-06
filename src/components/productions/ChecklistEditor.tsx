@@ -64,6 +64,22 @@ export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnl
     setNewItemLabels((prev) => ({ ...prev, [groupId]: '' }));
   };
 
+  const addLinkedItem = (groupId: string, inv: InventoryItem) => {
+    const group = groups.find((g) => g.id === groupId)!;
+    updateGroup(groupId, {
+      items: [
+        ...group.items,
+        {
+          id: crypto.randomUUID(),
+          label: inv.name,
+          completed: false,
+          quantity: 1,
+          inventoryItemId: inv.id,
+        },
+      ],
+    });
+  };
+
   const linkInventoryItem = (groupId: string, itemId: string, inv: InventoryItem) => {
     updateItem(groupId, itemId, { inventoryItemId: inv.id, label: inv.name });
   };
@@ -198,6 +214,14 @@ export function ChecklistEditor({ groups, onChange, inventoryItems = [], readOnl
               <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={() => addItem(group.id)}>
                 <Plus className="h-3.5 w-3.5" />
               </Button>
+              {inventoryItems.length > 0 && (
+                <InventoryItemPicker
+                  inventoryItems={inventoryItems}
+                  onSelect={(inv) => addLinkedItem(group.id, inv)}
+                  title="Add inventory item from picker"
+                  triggerClassName="h-7 w-7 shrink-0"
+                />
+              )}
             </div>
           )}
         </div>

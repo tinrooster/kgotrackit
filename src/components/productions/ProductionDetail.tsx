@@ -61,6 +61,7 @@ export function ProductionDetail({
 }: ProductionDetailProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'vehicles' | 'crew' | 'schedule'>('overview');
   const scheduleResources = useMemo(() => {
     if (!production) return [];
     const resourceMap = new Map<string, number>();
@@ -143,7 +144,15 @@ export function ProductionDetail({
   return (
     <>
       <Sheet open={Boolean(production)} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-2xl" side="right">
+        <SheetContent
+          className={cn(
+            'flex w-full flex-col gap-0 p-0',
+            activeTab === 'schedule'
+              ? 'sm:max-w-[min(96vw,1700px)]'
+              : 'sm:max-w-[min(88vw,1200px)]'
+          )}
+          side="right"
+        >
           <SheetHeader className="border-b px-6 py-4">
             <div className="flex items-start justify-between gap-3 pr-8">
               <div className="min-w-0 flex-1">
@@ -214,7 +223,11 @@ export function ProductionDetail({
             </div>
           </SheetHeader>
 
-          <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as typeof activeTab)}
+            className="flex min-h-0 flex-1 flex-col"
+          >
             <TabsList className="mx-6 mt-3 w-auto justify-start rounded-none border-b bg-transparent p-0">
               {(['overview', 'checklist', 'vehicles', 'crew', 'schedule'] as const).map((tab) => (
                 <TabsTrigger

@@ -63,6 +63,22 @@ export function VehiclePacklistEditor({
     setNewItemLabels((prev) => ({ ...prev, [packlistId]: '' }));
   };
 
+  const addLinkedItem = (packlistId: string, inv: InventoryItem) => {
+    const packlist = packlists.find((p) => p.id === packlistId)!;
+    updatePacklist(packlistId, {
+      items: [
+        ...packlist.items,
+        {
+          id: crypto.randomUUID(),
+          label: inv.name,
+          completed: false,
+          quantity: 1,
+          inventoryItemId: inv.id,
+        },
+      ],
+    });
+  };
+
   const linkInventoryItem = (packlistId: string, itemId: string, inv: InventoryItem) => {
     updateItem(packlistId, itemId, { inventoryItemId: inv.id, label: inv.name });
   };
@@ -183,6 +199,14 @@ export function VehiclePacklistEditor({
               <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={() => addItem(packlist.id)}>
                 <Plus className="h-3.5 w-3.5" />
               </Button>
+              {inventoryItems.length > 0 && (
+                <InventoryItemPicker
+                  inventoryItems={inventoryItems}
+                  onSelect={(inv) => addLinkedItem(packlist.id, inv)}
+                  title="Add inventory item to packlist"
+                  triggerClassName="h-7 w-7 shrink-0"
+                />
+              )}
             </div>
           )}
         </div>

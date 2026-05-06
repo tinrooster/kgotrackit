@@ -7,7 +7,7 @@ import { InventoryItem, CategoryNode, ItemWithSubcategories } from '@/types/inve
 import BatchOperations from '@/components/BatchOperations';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-import { getSettings, saveItems, SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
+import { getSettings, getItems, saveItems, SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
 import {
   applyInventoryState,
   canRedoInventory,
