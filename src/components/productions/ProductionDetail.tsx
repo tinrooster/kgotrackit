@@ -61,6 +61,27 @@ export function ProductionDetail({
 }: ProductionDetailProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const scheduleResources = useMemo(() => {
+    if (!production) return [];
+    const resourceMap = new Map<string, number>();
+    const appendItem = (label: string, quantity?: number) => {
+      const name = label.trim();
+      if (!name) return;
+      const qty = Math.max(1, Number(quantity || 1));
+      resourceMap.set(name, (resourceMap.get(name) || 0) + qty);
+    };
+    production.checklistGroups.forEach((group) => {
+      group.items.forEach((item) => appendItem(item.label, item.quantity));
+    });
+    production.vehiclePacklists.forEach((packlist) => {
+      packlist.items.forEach((item) => appendItem(item.label, item.quantity));
+    });
+    return Array.from(resourceMap.entries()).map(([label, quantity], index) => ({
+      id: `${index}-${label}`,
+      label,
+      quantity,
+    }));
+  }, [production]);
 
   if (!production) return null;
 
@@ -109,27 +130,6 @@ export function ProductionDetail({
       (sum, packlist) => sum + packlist.items.filter((item) => !!item.inventoryItemId).length,
       0
     );
-
-  const scheduleResources = useMemo(() => {
-    const resourceMap = new Map<string, number>();
-    const appendItem = (label: string, quantity?: number) => {
-      const name = label.trim();
-      if (!name) return;
-      const qty = Math.max(1, Number(quantity || 1));
-      resourceMap.set(name, (resourceMap.get(name) || 0) + qty);
-    };
-    production.checklistGroups.forEach((group) => {
-      group.items.forEach((item) => appendItem(item.label, item.quantity));
-    });
-    production.vehiclePacklists.forEach((packlist) => {
-      packlist.items.forEach((item) => appendItem(item.label, item.quantity));
-    });
-    return Array.from(resourceMap.entries()).map(([label, quantity], index) => ({
-      id: `${index}-${label}`,
-      label,
-      quantity,
-    }));
-  }, [production.checklistGroups, production.vehiclePacklists]);
 
   const runInventoryAction = (action: 'reserve' | 'checkout' | 'checkin') => {
     const result = applyProductionInventoryAction(production.id, action, currentUsername);
