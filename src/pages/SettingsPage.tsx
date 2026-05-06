@@ -1889,6 +1889,11 @@ export default function SettingsPage() {
             <span data-settings-tab-long>Data Management</span>
             <span data-settings-tab-short>Data</span>
           </TabsTrigger>
+          <TabsTrigger value="workspaces" title="Workspaces" className="inline-flex items-center gap-1.5">
+            <Wrench className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span data-settings-tab-long>Workspaces</span>
+            <span data-settings-tab-short>Workspaces</span>
+          </TabsTrigger>
           <TabsTrigger value="logs" title="System logs" className="inline-flex items-center gap-1.5">
             <ScrollText className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
             <span data-settings-tab-long>System Logs</span>
@@ -1979,6 +1984,9 @@ export default function SettingsPage() {
             onRestoreSettingsSnapshot={handleRestoreSettingsSnapshot}
             onRunGroupInventoryReconcile={handleGroupInventoryReconcile}
           />
+        </TabsContent>
+
+        <TabsContent value="workspaces" className="space-y-6">
           <WorkspaceTeamTab />
         </TabsContent>
 

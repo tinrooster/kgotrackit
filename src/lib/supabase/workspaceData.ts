@@ -26,6 +26,9 @@ export interface WorkspaceSummary {
   name: string;
   ownerUserId: string;
   role: WorkspaceMemberRole;
+  createdAt?: string;
+  updatedAt?: string;
+  recordCount?: number;
 }
 
 export function getActiveWorkspaceId(): string | null {
@@ -60,12 +63,49 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
     return [];
   }
   const ids = [...new Set(members.map((m: { workspace_id: string }) => m.workspace_id).filter(Boolean))];
-  const { data: wsRows, error: wErr } = await client.from('workspaces').select('id, name, owner_user_id').in('id', ids);
+  const { data: wsRows, error: wErr } = await client
+    .from('workspaces')
+    .select('id, name, owner_user_id, created_at')
+    .in('id', ids);
   if (wErr || !Array.isArray(wsRows)) {
     if (wErr) console.warn('[workspaceData] workspaces fetch', wErr.message);
     return [];
   }
-  const byId = new Map(wsRows.map((w: { id: string; name: string; owner_user_id: string }) => [w.id, w]));
+  const sortedWorkspaces = [...wsRows].sort((left, right) => {
+    const leftCreatedAt = String((left as { created_at?: string }).created_at || '');
+    const rightCreatedAt = String((right as { created_at?: string }).created_at || '');
+    if (leftCreatedAt && rightCreatedAt && leftCreatedAt !== rightCreatedAt) {
+      return leftCreatedAt.localeCompare(rightCreatedAt);
+    }
+    const leftName = String((left as { name?: string }).name || '').toLowerCase();
+    const rightName = String((right as { name?: string }).name || '').toLowerCase();
+    if (leftName !== rightName) {
+      return leftName.localeCompare(rightName);
+    }
+    return String((left as { id?: string }).id || '').localeCompare(String((right as { id?: string }).id || ''));
+  });
+  const byId = new Map(
+    sortedWorkspaces.map((workspace) => [
+      (workspace as { id: string }).id,
+      workspace as { id: string; name: string; owner_user_id: string; created_at?: string },
+    ])
+  );
+
+  const { data: appRows } = await client
+    .from('workspace_app_data')
+    .select('workspace_id, items, updated_at')
+    .in('workspace_id', ids);
+  const appById = new Map(
+    Array.isArray(appRows)
+      ? appRows.map((row: any) => [
+          String(row.workspace_id),
+          {
+            updatedAt: typeof row.updated_at === 'string' ? row.updated_at : undefined,
+            recordCount: Array.isArray(row.items) ? row.items.length : 0,
+          },
+        ])
+      : [],
+  );
   const out: WorkspaceSummary[] = [];
   for (const m of members as { workspace_id: string; role: string }[]) {
     const w = byId.get(m.workspace_id);
@@ -76,6 +116,9 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
       name: w.name,
       ownerUserId: w.owner_user_id,
       role,
+      createdAt: (w as { created_at?: string }).created_at,
+      updatedAt: appById.get(w.id)?.updatedAt,
+      recordCount: appById.get(w.id)?.recordCount,
     });
   }
   return out;

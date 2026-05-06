@@ -8,24 +8,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { bootstrapCloudData } from '@/lib/supabase/cloudData';
-import { type Settings } from '@/lib/storageService';
 import {
   deleteWorkspace,
   inviteWorkspaceMember,
   listWorkspaceMembers,
   removeWorkspaceMember,
+  resetWorkspaceMemberPassword,
   updateWorkspaceMemberRole,
   type WorkspaceMemberView,
 } from '@/lib/supabase/workspaceMemberAdmin';
-import {
-  createWorkspaceWithSnapshot,
-  setActiveWorkspaceId,
-  type WorkspaceSnapshotPayload,
-} from '@/lib/supabase/workspaceData';
+import { setActiveWorkspaceId } from '@/lib/supabase/workspaceData';
 import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
-import { Users } from 'lucide-react';
+import { Key, Users } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { WorkspaceUtilitiesDialog } from '@/components/settings/WorkspaceUtilitiesDialog';
+import { CreateWorkspaceDialog } from '@/components/settings/CreateWorkspaceDialog';
 import {
   Dialog,
   DialogContent,
@@ -52,7 +48,6 @@ export function WorkspaceTeamTab() {
   const { currentUser, authBackend } = useAuth();
   const { workspaces, activeWorkspaceId, activeWorkspaceRole, loading, refreshWorkspaces } =
     useWorkspace();
-  const [newName, setNewName] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [targetWorkspaceId, setTargetWorkspaceId] = React.useState<string>(activeWorkspaceId ?? '');
   const [members, setMembers] = React.useState<WorkspaceMemberView[]>([]);
@@ -65,9 +60,10 @@ export function WorkspaceTeamTab() {
   const [deletingWorkspace, setDeletingWorkspace] = React.useState(false);
   const [manageDialogOpen, setManageDialogOpen] = React.useState(false);
   const [manageWorkspaceId, setManageWorkspaceId] = React.useState<string>('');
-  const [utilitiesDialogOpen, setUtilitiesDialogOpen] = React.useState(false);
-  const [utilitiesWorkspaceId, setUtilitiesWorkspaceId] = React.useState<string>('');
-  const [utilitiesWorkspaceName, setUtilitiesWorkspaceName] = React.useState<string>('');
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [resetPasswordDialogOpenForUserId, setResetPasswordDialogOpenForUserId] = React.useState<string | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = React.useState('');
+  const [resettingPassword, setResettingPassword] = React.useState(false);
 
   React.useEffect(() => {
     setTargetWorkspaceId(activeWorkspaceId ?? '');
@@ -109,53 +105,7 @@ export function WorkspaceTeamTab() {
     );
   }
 
-  const handleCreate = async () => {
-    if (!currentUser?.id) return;
-    const trimmedName = newName.trim();
-    if (!trimmedName) {
-      toast.error('Workspace name is required.');
-      return;
-    }
-    const hasNameConflict = workspaces.some(
-      (workspace) => workspace.name.trim().toLowerCase() === trimmedName.toLowerCase()
-    );
-    if (hasNameConflict) {
-      toast.error('A team with that name already exists. Choose a different name.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const nextSnapshot: WorkspaceSnapshotPayload = {
-        items: [],
-        settings: {
-          categories: [],
-          units: [],
-          locations: [],
-          suppliers: [],
-          projects: [],
-          expenseCodes: [],
-        } as Settings,
-        templates: [],
-        history: [],
-        cabinets: [],
-        financial: { expenseTypes: [], costCenters: [] },
-        ui_defaults: null,
-        general_settings: null,
-        custom_report_definitions: [],
-      };
-      const id = await createWorkspaceWithSnapshot(trimmedName, nextSnapshot);
-      toast.success('Workspace created');
-      setActiveWorkspaceId(id);
-      setUtilitiesWorkspaceId(id);
-      setUtilitiesWorkspaceName(trimmedName);
-      setUtilitiesDialogOpen(true);
-      await refreshWorkspaces();
-    } catch (e) {
-      toast.error('Could not create workspace', { description: formatWorkspaceError(e) });
-    } finally {
-      setBusy(false);
-    }
-  };
+  // Workspace creation is handled by `CreateWorkspaceDialog`.
 
   const applyWorkspaceSwitch = () => {
     if (!targetWorkspaceId) {
@@ -173,11 +123,18 @@ export function WorkspaceTeamTab() {
   const isWorkspaceOwner = !!activeWorkspaceId && !!currentUser?.id && activeWorkspaceRow?.ownerUserId === currentUser.id;
   const canManageMembers = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
   const canDeleteWorkspace = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
-  const manageableWorkspaces = workspaces.filter((w) => w.role === 'admin' || w.ownerUserId === currentUser?.id);
+  const manageableWorkspaces = React.useMemo(
+    () => workspaces.filter((w) => w.role === 'admin' || w.ownerUserId === currentUser?.id),
+    [currentUser?.id, workspaces],
+  );
+  const manageableWorkspaceIdSet = React.useMemo(
+    () => new Set(manageableWorkspaces.map((w) => w.workspaceId)),
+    [manageableWorkspaces],
+  );
 
   const loadMembers = React.useCallback(async () => {
     const workspaceId = manageDialogOpen ? manageWorkspaceId : activeWorkspaceId;
-    const canLoad = manageDialogOpen ? manageableWorkspaces.some((w) => w.workspaceId === manageWorkspaceId) : canManageMembers;
+    const canLoad = manageDialogOpen ? manageableWorkspaceIdSet.has(manageWorkspaceId) : canManageMembers;
     if (!workspaceId || !canLoad) {
       setMembers([]);
       return;
@@ -191,7 +148,7 @@ export function WorkspaceTeamTab() {
     } finally {
       setMembersLoading(false);
     }
-  }, [activeWorkspaceId, canManageMembers, manageDialogOpen, manageWorkspaceId, manageableWorkspaces]);
+  }, [activeWorkspaceId, canManageMembers, manageDialogOpen, manageWorkspaceId, manageableWorkspaceIdSet]);
 
   React.useEffect(() => {
     if (!manageDialogOpen) return;
@@ -255,30 +212,44 @@ export function WorkspaceTeamTab() {
 
         <div className="rounded-md border border-border/60 bg-muted/20 p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-foreground">Switch workspace</p>
+            <p className="text-sm font-medium text-foreground">Change workspace</p>
             <Button type="button" variant="ghost" size="sm" onClick={() => void refreshWorkspaces()}>
               Refresh list
             </Button>
           </div>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <div className="mt-2 space-y-2">
             {loading ? (
               <span className="text-xs text-muted-foreground">Loading workspaces…</span>
             ) : workspaces.length === 0 ? (
               <span className="text-xs text-muted-foreground">No workspaces yet.</span>
             ) : (
-              workspaces.map((w) => (
-                <Button
-                  key={w.workspaceId}
-                  type="button"
-                  variant={targetWorkspaceId === w.workspaceId ? 'secondary' : 'outline'}
-                  size="sm"
-                  onClick={() => setTargetWorkspaceId(w.workspaceId)}
-                  className={w.workspaceId === activeWorkspaceId ? 'ring-2 ring-primary/30' : undefined}
-                  title={`Role: ${w.role}`}
-                >
-                  {w.name}
-                </Button>
-              ))
+              workspaces.map((w) => {
+                const isSelected = targetWorkspaceId === w.workspaceId;
+                const isActive = w.workspaceId === activeWorkspaceId;
+                const createdLabel = w.createdAt ? new Date(w.createdAt).toLocaleDateString() : '—';
+                const recordCount = typeof w.recordCount === 'number' ? w.recordCount : 0;
+                const createdBy = w.ownerUserId === currentUser?.id ? 'you' : w.ownerUserId.slice(0, 8);
+                return (
+                  <button
+                    key={w.workspaceId}
+                    type="button"
+                    onClick={() => setTargetWorkspaceId(w.workspaceId)}
+                    className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+                      isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/30'
+                    } ${isActive ? 'ring-2 ring-primary/20' : ''}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-foreground">{w.name}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          Created {createdLabel} · Owner {createdBy} · Records {recordCount}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{w.role}</div>
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
           <div className="mt-2 flex items-center gap-2">
@@ -296,43 +267,10 @@ export function WorkspaceTeamTab() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <Label htmlFor="workspace-name">New workspace name</Label>
-            <Input
-              id="workspace-name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              autoComplete="off"
-              placeholder="Team inventory"
-              className="placeholder:text-muted-foreground/40"
-              disabled={busy}
-            />
-          </div>
-          <Button type="button" onClick={() => void handleCreate()} disabled={busy || !newName.trim()}>
-            {busy ? 'Creating…' : 'Create workspace'}
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">
-            New workspaces start empty. After creation, use Workspace utilities to apply starter defaults if needed.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (!activeWorkspaceId || !activeWorkspaceRow) {
-                toast.error('Select an active workspace first.');
-                return;
-              }
-              setUtilitiesWorkspaceId(activeWorkspaceId);
-              setUtilitiesWorkspaceName(activeWorkspaceRow.name);
-              setUtilitiesDialogOpen(true);
-            }}
-            disabled={!activeWorkspaceId}
-          >
-            Workspace utilities
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">Create a new workspace with empty or starter defaults.</p>
+          <Button type="button" onClick={() => setCreateDialogOpen(true)} disabled={busy}>
+            Create workspace
           </Button>
         </div>
 
@@ -355,15 +293,13 @@ export function WorkspaceTeamTab() {
         </div>
       </CardContent>
 
-      <WorkspaceUtilitiesDialog
-        open={utilitiesDialogOpen}
-        workspaceId={utilitiesWorkspaceId}
-        workspaceName={utilitiesWorkspaceName || 'Workspace'}
-        onClose={() => setUtilitiesDialogOpen(false)}
-        onApplied={async () => {
-          if (currentUser?.id) {
-            await bootstrapCloudData(currentUser.id);
-          }
+      <CreateWorkspaceDialog
+        open={createDialogOpen}
+        existingWorkspaceNames={workspaces.map((w) => w.name)}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreated={async (workspaceId) => {
+          setActiveWorkspaceId(workspaceId);
+          await refreshWorkspaces();
           window.location.reload();
         }}
       />
@@ -510,7 +446,20 @@ export function WorkspaceTeamTab() {
                             <SelectItem value="viewer">Viewer</SelectItem>
                           </SelectContent>
                         </Select>
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!manageWorkspaceId || resettingPassword}
+                            title="Reset password"
+                            onClick={() => {
+                              setResetPasswordValue('');
+                              setResetPasswordDialogOpenForUserId(member.userId);
+                            }}
+                          >
+                            <Key className="h-4 w-4" aria-hidden />
+                          </Button>
                           <Button
                             type="button"
                             variant="outline"
@@ -578,6 +527,70 @@ export function WorkspaceTeamTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setManageDialogOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={resetPasswordDialogOpenForUserId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResetPasswordDialogOpenForUserId(null);
+            setResetPasswordValue('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>Set a new password for this member.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="workspace-reset-password">New password</Label>
+            <Input
+              id="workspace-reset-password"
+              type="password"
+              value={resetPasswordValue}
+              onChange={(event) => setResetPasswordValue(event.target.value)}
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-muted-foreground">Minimum 8 characters.</p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setResetPasswordDialogOpenForUserId(null)}
+              disabled={resettingPassword}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const userId = resetPasswordDialogOpenForUserId;
+                const password = resetPasswordValue.trim();
+                if (!manageWorkspaceId || !userId) return;
+                if (password.length < 8) {
+                  toast.error('Password must be at least 8 characters.');
+                  return;
+                }
+                setResettingPassword(true);
+                void (async () => {
+                  try {
+                    await resetWorkspaceMemberPassword(manageWorkspaceId, userId, password);
+                    toast.success('Password reset');
+                    setResetPasswordDialogOpenForUserId(null);
+                    setResetPasswordValue('');
+                  } catch (error) {
+                    toast.error('Could not reset password', { description: formatWorkspaceError(error) });
+                  } finally {
+                    setResettingPassword(false);
+                  }
+                })();
+              }}
+              disabled={resettingPassword || resetPasswordValue.trim().length < 8}
+            >
+              {resettingPassword ? 'Saving…' : 'Reset'}
             </Button>
           </DialogFooter>
         </DialogContent>
