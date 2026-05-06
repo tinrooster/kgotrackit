@@ -4,6 +4,9 @@
   "version": "1.0.1",
   "description": "trackIT v2: Electron, Vite, React, TypeScript desktop app",
   "main": "out/main/main.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "node -e \"require(require('path').join(require('path').dirname(process.env.npm_package_json),'package-hooks.cjs')).run('run-electron-vite.cjs', ['dev'])\"",
     "build": "node -e \"require(require('path').join(require('path').dirname(process.env.npm_package_json),'package-hooks.cjs')).run('electron-prod-build.cjs')\"",
