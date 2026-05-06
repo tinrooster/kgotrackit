@@ -10,6 +10,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { bootstrapCloudData } from '@/lib/supabase/cloudData';
 import { type Settings } from '@/lib/storageService';
 import {
+  deleteWorkspace,
   inviteWorkspaceMember,
   listWorkspaceMembers,
   removeWorkspaceMember,
@@ -24,6 +25,16 @@ import {
 import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
 import { Users } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 /**
  * Settings → Data management: switch between personal cloud row and shared workspace payload.
@@ -41,6 +52,9 @@ export function WorkspaceTeamTab() {
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [inviteRole, setInviteRole] = React.useState<'admin' | 'editor' | 'viewer'>('editor');
   const [memberActionBusyUserId, setMemberActionBusyUserId] = React.useState<string | null>(null);
+  const [deleteWorkspaceDialogOpen, setDeleteWorkspaceDialogOpen] = React.useState(false);
+  const [confirmWorkspaceName, setConfirmWorkspaceName] = React.useState('');
+  const [deletingWorkspace, setDeletingWorkspace] = React.useState(false);
 
   React.useEffect(() => {
     setTargetKind(activeWorkspaceId ? 'team' : 'personal');
@@ -147,6 +161,7 @@ export function WorkspaceTeamTab() {
 
   const isWorkspaceOwner = !!activeWorkspaceId && !!currentUser?.id && activeWorkspaceRow?.ownerUserId === currentUser.id;
   const canManageMembers = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
+  const canDeleteWorkspace = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
 
   const loadMembers = React.useCallback(async () => {
     if (!activeWorkspaceId || !canManageMembers) {
@@ -443,6 +458,29 @@ export function WorkspaceTeamTab() {
                 })
               )}
             </div>
+
+            {canDeleteWorkspace && activeWorkspaceRow ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                <p className="text-sm font-medium text-foreground">Workspace administration</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Delete this workspace and all associated team data. This action cannot be undone.
+                </p>
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={deletingWorkspace}
+                    onClick={() => {
+                      setConfirmWorkspaceName('');
+                      setDeleteWorkspaceDialogOpen(true);
+                    }}
+                  >
+                    Delete workspace
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : activeWorkspaceId ? (
           <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
@@ -450,6 +488,59 @@ export function WorkspaceTeamTab() {
           </div>
         ) : null}
       </CardContent>
+      <AlertDialog open={deleteWorkspaceDialogOpen} onOpenChange={setDeleteWorkspaceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete workspace?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes workspace <strong>{activeWorkspaceRow?.name ?? 'Unknown'}</strong>, all member links,
+              and shared workspace data. Type the workspace name to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm-workspace-delete">Workspace name confirmation</Label>
+            <Input
+              id="confirm-workspace-delete"
+              value={confirmWorkspaceName}
+              onChange={(event) => setConfirmWorkspaceName(event.target.value)}
+              placeholder={activeWorkspaceRow?.name || 'Workspace name'}
+              autoComplete="off"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingWorkspace}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={
+                deletingWorkspace ||
+                !activeWorkspaceId ||
+                !activeWorkspaceRow ||
+                confirmWorkspaceName.trim() !== activeWorkspaceRow.name
+              }
+              onClick={async (event) => {
+                event.preventDefault();
+                if (!activeWorkspaceId) {
+                  return;
+                }
+                setDeletingWorkspace(true);
+                try {
+                  await deleteWorkspace(activeWorkspaceId);
+                  setActiveWorkspaceId(null);
+                  await refreshWorkspaces();
+                  toast.success('Workspace deleted');
+                  setDeleteWorkspaceDialogOpen(false);
+                  window.location.reload();
+                } catch (error) {
+                  toast.error('Could not delete workspace', { description: formatWorkspaceError(error) });
+                } finally {
+                  setDeletingWorkspace(false);
+                }
+              }}
+            >
+              {deletingWorkspace ? 'Deleting…' : 'Delete workspace'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

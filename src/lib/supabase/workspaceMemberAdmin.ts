@@ -88,6 +88,13 @@ export async function removeWorkspaceMember(workspaceId: string, userId: string)
   });
 }
 
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  await invokeWorkspaceMemberAdmin({
+    action: 'delete_workspace',
+    workspaceId,
+  });
+}
+
 export async function setWorkspaceMemberDisabled(
   workspaceId: string,
   userId: string,

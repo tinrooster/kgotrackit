@@ -8,6 +8,7 @@ type RequestPayload = {
     | 'invite_member'
     | 'update_member_role'
     | 'remove_member'
+    | 'delete_workspace'
     | 'set_member_status'
     | 'reset_member_password';
   workspaceId?: string;
@@ -298,6 +299,34 @@ Deno.serve(async (request) => {
       });
       if (updateError) {
         return jsonResponse(500, { error: updateError.message });
+      }
+      return jsonResponse(200, { ok: true });
+    }
+
+    if (payload.action === 'delete_workspace') {
+      const { data: workspaceRow, error: workspaceError } = await adminClient
+        .from('workspaces')
+        .select('id, owner_user_id')
+        .eq('id', workspaceId)
+        .maybeSingle();
+      if (workspaceError) {
+        return jsonResponse(500, { error: workspaceError.message });
+      }
+      if (!workspaceRow) {
+        return jsonResponse(404, { error: 'Workspace not found.' });
+      }
+      const isOwner = workspaceRow.owner_user_id === actor.id;
+      const isAdmin = actorMembership.role === 'admin';
+      if (!isOwner && !isAdmin) {
+        return jsonResponse(403, { error: 'Workspace admin role required to delete workspace.' });
+      }
+
+      const { error: deleteWorkspaceError } = await adminClient
+        .from('workspaces')
+        .delete()
+        .eq('id', workspaceId);
+      if (deleteWorkspaceError) {
+        return jsonResponse(500, { error: deleteWorkspaceError.message });
       }
       return jsonResponse(200, { ok: true });
     }
