@@ -278,7 +278,7 @@ body.mt-compact-ui main {
   padding-bottom: 0.85rem !important;
 }
 
-body.mt-compact-ui button:not([role="switch"]),
+body.mt-compact-ui button:not([role="switch"]):not([role="checkbox"]),
 body.mt-compact-ui input:not([type="checkbox"]):not([type="radio"]),
 body.mt-compact-ui select,
 body.mt-compact-ui textarea,

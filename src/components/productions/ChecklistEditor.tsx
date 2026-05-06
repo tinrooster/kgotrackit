@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, GripVertical, Link2, Unlink } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Link2, Unlink, ChevronDown, ChevronRight } from 'lucide-react';
 import { ChecklistGroup, ChecklistItem } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,8 @@ export function ChecklistEditor({
   const [newGroupTitle, setNewGroupTitle] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
   const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<string[]>([]);
+  const [draggingItem, setDraggingItem] = useState<{ groupId: string; itemId: string } | null>(null);
   const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
     if (!requireDeleteConfirm) {
       deleteAction();
@@ -84,6 +86,27 @@ export function ChecklistEditor({
     const group = groups.find((g) => g.id === groupId)!;
     updateGroup(groupId, { items: [...group.items, newItem(label)] });
     setNewItemLabels((prev) => ({ ...prev, [groupId]: '' }));
+  };
+
+  const toggleGroupCollapsed = (groupId: string) => {
+    setCollapsedGroupIds((previous) =>
+      previous.includes(groupId)
+        ? previous.filter((id) => id !== groupId)
+        : [...previous, groupId]
+    );
+  };
+
+  const moveItemInGroup = (groupId: string, sourceItemId: string, targetItemId: string) => {
+    if (sourceItemId === targetItemId) return;
+    const group = groups.find((g) => g.id === groupId);
+    if (!group) return;
+    const sourceIndex = group.items.findIndex((item) => item.id === sourceItemId);
+    const targetIndex = group.items.findIndex((item) => item.id === targetItemId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const reorderedItems = [...group.items];
+    const [moved] = reorderedItems.splice(sourceIndex, 1);
+    reorderedItems.splice(targetIndex, 0, moved);
+    updateGroup(groupId, { items: reorderedItems });
   };
 
   const addLinkedItem = (groupId: string, inv: InventoryItem) => {
@@ -139,6 +162,19 @@ export function ChecklistEditor({
       {groups.map((group) => (
         <div key={group.id} className="rounded-md border">
           <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
+              onClick={() => toggleGroupCollapsed(group.id)}
+              title={collapsedGroupIds.includes(group.id) ? 'Expand section' : 'Collapse section'}
+            >
+              {collapsedGroupIds.includes(group.id) ? (
+                <ChevronRight className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </Button>
             {!readOnly && <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
             {readOnly ? (
               <span className="flex-1 text-sm font-medium">{group.title}</span>
@@ -161,11 +197,27 @@ export function ChecklistEditor({
               </Button>
             )}
           </div>
-          <div className="divide-y">
+          {!collapsedGroupIds.includes(group.id) && <div className="divide-y">
             {group.items.map((item) => {
               const invName = resolveInventoryName(item.inventoryItemId);
               return (
-                <div key={item.id} className="flex items-center gap-2 px-3 py-2">
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 px-3 py-2"
+                  draggable={!readOnly}
+                  onDragStart={() => setDraggingItem({ groupId: group.id, itemId: item.id })}
+                  onDragOver={(event) => {
+                    if (!draggingItem || draggingItem.groupId !== group.id) return;
+                    event.preventDefault();
+                  }}
+                  onDrop={() => {
+                    if (!draggingItem || draggingItem.groupId !== group.id) return;
+                    moveItemInGroup(group.id, draggingItem.itemId, item.id);
+                    setDraggingItem(null);
+                  }}
+                  onDragEnd={() => setDraggingItem(null)}
+                >
+                  {!readOnly && <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground" />}
                   <Checkbox
                     checked={item.completed}
                     onCheckedChange={(checked) =>
@@ -250,7 +302,7 @@ export function ChecklistEditor({
                 </div>
               );
             })}
-          </div>
+          </div>}
           {!readOnly && (
             <div className="flex gap-2 border-t px-3 py-2">
               <Input
