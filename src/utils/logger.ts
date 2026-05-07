@@ -1,13 +1,5 @@
 import { toast } from 'sonner';
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      saveLogs?: (filename: string, content: string) => Promise<{ success: boolean; path?: string; error?: string; }>;
-    }
-  }
-}
-
 export interface Logger {
   log: (message: string) => void;
   error: (message: string) => void;
@@ -19,18 +11,6 @@ export interface Logger {
 class FileLogger implements Logger {
   private logs: string[] = [];
   private context: string = '';
-
-  constructor() {
-    // Log when the logger is initialized
-    console.debug('Logger initialized');
-    
-    // Verify electronAPI is available
-    if (typeof window !== 'undefined') {
-      console.debug('Window is defined');
-      console.debug('electronAPI available:', !!window.electronAPI);
-      console.debug('saveLogs available:', !!(window.electronAPI?.saveLogs));
-    }
-  }
 
   setContext(context: string) {
     this.context = context;
@@ -65,17 +45,6 @@ class FileLogger implements Logger {
 
   async downloadLogs(filenameOverride?: string): Promise<void> {
     try {
-      // Add some debug information
-      console.debug('Starting downloadLogs');
-      console.debug('Current logs count:', this.logs.length);
-      console.debug('electronAPI status:', !!window.electronAPI);
-
-      if (!window.electronAPI?.saveLogs) {
-        toast.error('Electron API not available. Logs will be printed to the console.');
-        console.log('Logs:', this.logs.join('\n'));
-        return;
-      }
-
       let filename: string;
       if (filenameOverride) {
         filename = filenameOverride;
@@ -85,29 +54,17 @@ class FileLogger implements Logger {
         filename = `${date}_${time}_${this.context || 'app'}.log`;
       }
       const content = this.logs.join('\n');
-
-      console.debug('Attempting to save logs...', { filename });
-      const result = await window.electronAPI.saveLogs(filename, content);
-
-      if (result.success) {
-        console.debug('Logs saved successfully at:', result.path);
-        toast.success(`Logs saved to logs/${filename}`);
-      } else {
-        console.error('Failed to save logs:', result.error);
-        toast.error(`Failed to save logs: ${result.error}`);
-      }
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Logs downloaded as ${filename}`);
     } catch (error: any) {
       console.error('Error in downloadLogs:', error);
       toast.error(`Error saving logs: ${error.message}`);
-      
-      // Log additional debug information
-      console.debug('Error details:', {
-        errorType: error.constructor.name,
-        message: error.message,
-        stack: error.stack,
-        electronAPI: !!window.electronAPI,
-        saveLogs: !!(window.electronAPI?.saveLogs)
-      });
     }
   }
 }

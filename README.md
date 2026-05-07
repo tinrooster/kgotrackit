@@ -15,10 +15,9 @@ TEd_trackIT is a production-focused inventory and asset tracking platform built 
 ## Runtime Stack
 
 - React + TypeScript + Vite renderer
-- Electron desktop runtime
 - Tailwind + shadcn/ui components
 - React Hook Form + Zod validation
-- Local storage + Electron store synchronization
+- Local storage + optional Supabase synchronization
 
 ## Quick Start
 
@@ -34,7 +33,7 @@ npm install
 npm run dev
 ```
 
-1. Open the desktop app window started by Electron/Vite.
+1. Open the local web app URL shown by Vite (typically `http://localhost:5173`).
 
 ## Main Routes
 
@@ -51,12 +50,7 @@ npm run dev
 Use the docs index as the canonical entry point:
 
 - [Docs Index](./docs/README.md)
-- [Help Menu Reference](./docs/help-menu.md)
-- [Repository Reference](./docs/repository-reference.md)
-- [Getting Started](./docs/getting-started.md)
-- [User Guide](./docs/user-guide.md)
-- [Technical Documentation](./docs/technical-documentation.md)
-- [Changelog](./docs/changes.md)
+- [Project Structure](./docs/project-structure.md)
 
 ## License
 

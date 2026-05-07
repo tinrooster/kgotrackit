@@ -12,13 +12,9 @@ node_modules
 baseline-reports
 dist
 dist-ssr
-dist-electron
 out
 *.tsbuildinfo
 *.local
-
-# electron-vite bundled config temp (should never be committed)
-electron.vite.config.*.mjs
 
 # Local tooling / generated outputs
 .specstory/

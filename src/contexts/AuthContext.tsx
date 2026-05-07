@@ -45,7 +45,6 @@ export function useAuth() {
 }
 
 function getStore() {
-  if (window.electron?.store) return window.electron.store;
   const electronStore = window.electronStore;
   if (electronStore) return {
     get: async (key: string) => electronStore.getData(key),

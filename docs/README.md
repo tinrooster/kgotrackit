@@ -1,48 +1,59 @@
-# TEd_trackIT Documentation Index
+# trackIT v2 — Documentation
 
-## Purpose
+**Version:** 1.0.1 · **Last reviewed:** 2026-05-06
 
-TEd_trackIT is a production-oriented inventory and asset workflow tool for engineering, maintenance, and remote operations.  
-This docs index is the single entry point for setup, operations, architecture, and troubleshooting.
+trackIT is a broadcast/AV inventory management system delivered as a **web app** (local Vite dev + static deploy targets such as Vercel/Netlify), with shared React/TypeScript source under `src/`.
 
-## Primary Documents
+---
 
-1. [Getting Started](getting-started.md)
-  Install, run, and verify local development workflows.
-2. [User Guide](user-guide.md)
-  Day-to-day usage for Inventory, Check-In/Out, Reports, and Settings.
-3. [Technical Documentation](technical-documentation.md)
-  System architecture, data flows, and implementation details.
-4. [Settings Architecture](settings-architecture.md)
-  Settings data model, propagation behavior, and synchronization rules.
-5. [Framework](framework.md)
-  Application stack, conventions, and core runtime behavior.
-6. [Troubleshooting](troubleshooting.md)
-  Known failure patterns and operational recovery paths.
-7. [Development Status](development-status.md)
-  Current feature maturity and project status notes.
-8. [Production roadmap](production-roadmap.md)
-  In-repo production plan: P0–P3 priorities, data-model notes, and todo status.
-9. [Changes / changelog](changes.md)
-  Notable feature and documentation updates by period.
+## Documents
 
-## Supplemental Guides
+| File | Description |
+|---|---|
+| [project-structure.md](./project-structure.md) | Directory layout, routes, components, services, data model, Supabase schema, storage architecture |
+| [roadmap.md](./roadmap.md) | Shipped work, active priorities, upcoming items, and deferred features |
 
-- [P3: Workspaces, RBAC, auth](p3-workspaces-auth.md)  
-Team `workspace_app_data`, SQL invite snippet, magic link, MFA notes.
-- [Help Menu Reference](help-menu.md)  
-In-app Help content map and where users should go for each workflow.
-- [Logging](logging.md)  
-Logger API, log levels/types, and System Logs behavior.
-- [Repository Reference](repository-reference.md)  
-Directory-level overview of frontend, backend, Electron runtime, and docs.
+---
 
-## High-Level Feature Coverage
+## Runtime modes
 
-- Durable inventory CRUD with per-item auditing
-- Secure cabinet check-in/check-out operations (top nav: **Check-In/Out**)
-- Bulk editing and bulk label-print workflows
-- Production-focused report generation with CSV/XLSX export
-- User-defined taxonomy and financial coding support
-- Security and performance event logging in System Logs
-- Data import/export/backup and restore flows
+| Dimension | Options |
+|---|---|
+| **Platform** | Web (browser) |
+| **Auth** | Supabase magic-link (`signInWithOtp`) · Local username/password (offline) |
+| **Data** | Personal — `user_app_data` (per Supabase user) · Team — `workspace_app_data` (shared by workspace members) |
+| **Storage** | `localStorage` (primary) → IndexedDB (restore points) |
+
+---
+
+## Key entry points
+
+| File | Role |
+|---|---|
+| `src/main.tsx` | React DOM mount; defines `/login` route and wraps `App` |
+| `src/App.tsx` | In-app routes (`/`, `/inventory`, `/checkout`, `/reports`, `/settings`, `/help`, `/about`); theme and condensed-view init |
+| `index.html` | Vite HTML entry |
+
+---
+
+## Quick reference
+
+```
+npm run dev            # Vite dev server (hot-reload)
+npm run build:web      # Static web bundle
+npm run build          # Typecheck + production web build
+npm run lint           # ESLint
+npm run test           # Vitest
+```
+
+Supabase migrations live in `supabase/migrations/` and must be applied in filename order.  
+Edge Functions are in `supabase/functions/` (Deno).
+
+---
+
+## Codebase notes
+
+- **Unused pages:** Several files under `src/pages/` are not wired to any route (`Dashboard.tsx`, `Inventory.tsx`, `ItemDetail.tsx`, `ItemDetailsPage.tsx`, `NotFound.tsx`, `RestockPage.tsx`). See `project-structure.md` for the full list.
+- **Deprecated code:** `src/deprecated/` contains two archived files; do not import from this path.
+- **Stale artefacts:** `InventoryTable.old.tsx`, `MobileQuickAddDialog.v1.tsx`, `DebugInfo.tsx`, `TestComponent.tsx`, `MinimalTest.tsx` are present in `src/components/` but not used in production flows.
+- **Next.js remnants:** `src/app/` and `src/deprecated/settings/page.tsx` are leftover Next.js App Router experiments and are not loaded by the Vite build.
