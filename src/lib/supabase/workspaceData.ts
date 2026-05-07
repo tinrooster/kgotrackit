@@ -61,11 +61,29 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
     .from('workspace_members')
     .select('workspace_id, role')
     .eq('user_id', userId);
-  if (mErr || !Array.isArray(members) || members.length === 0) {
-    if (mErr) console.warn('[workspaceData] listWorkspaceSummariesForUser', mErr.message);
+  if (mErr) {
+    console.warn('[workspaceData] listWorkspaceSummariesForUser', mErr.message);
+  }
+  const memberRows = Array.isArray(members) ? (members as { workspace_id: string; role: string }[]) : [];
+  const { data: ownerRows, error: ownerErr } = await client
+    .from('workspaces')
+    .select('id, organization_id, name, owner_user_id, created_at')
+    .eq('owner_user_id', userId);
+  if (ownerErr) {
+    console.warn('[workspaceData] owner workspace fetch', ownerErr.message);
+  }
+  const ownerWorkspaceRows = Array.isArray(ownerRows)
+    ? (ownerRows as { id: string; organization_id?: string | null; name: string; owner_user_id: string; created_at?: string }[])
+    : [];
+  const ids = [
+    ...new Set([
+      ...memberRows.map((m) => m.workspace_id).filter(Boolean),
+      ...ownerWorkspaceRows.map((w) => w.id).filter(Boolean),
+    ]),
+  ];
+  if (ids.length === 0) {
     return [];
   }
-  const ids = [...new Set(members.map((m: { workspace_id: string }) => m.workspace_id).filter(Boolean))];
   const { data: wsRows, error: wErr } = await client
     .from('workspaces')
     .select('id, organization_id, name, owner_user_id, created_at')
@@ -110,10 +128,20 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
       : [],
   );
   const out: WorkspaceSummary[] = [];
-  for (const m of members as { workspace_id: string; role: string }[]) {
-    const w = byId.get(m.workspace_id);
-    if (!w) continue;
+  const roleByWorkspaceId = new Map<string, WorkspaceMemberRole>();
+  for (const m of memberRows) {
     const role = m.role === 'admin' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'viewer';
+    roleByWorkspaceId.set(m.workspace_id, role);
+  }
+  for (const ownerWorkspace of ownerWorkspaceRows) {
+    if (!roleByWorkspaceId.has(ownerWorkspace.id)) {
+      roleByWorkspaceId.set(ownerWorkspace.id, 'admin');
+    }
+  }
+  for (const id of ids) {
+    const w = byId.get(id);
+    if (!w) continue;
+    const role = roleByWorkspaceId.get(id) ?? 'viewer';
     out.push({
       workspaceId: w.id,
       organizationId: (w as { organization_id?: string | null }).organization_id ?? null,
@@ -153,9 +181,18 @@ export async function fetchWorkspaceMemberRole(
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .maybeSingle();
-  if (error || !data?.role) return null;
-  const r = String(data.role);
-  if (r === 'admin' || r === 'editor' || r === 'viewer') return r;
+  if (!error && data?.role) {
+    const r = String(data.role);
+    if (r === 'admin' || r === 'editor' || r === 'viewer') return r;
+  }
+  const { data: workspaceRow, error: ownerErr } = await client
+    .from('workspaces')
+    .select('owner_user_id')
+    .eq('id', workspaceId)
+    .maybeSingle();
+  if (!ownerErr && workspaceRow && (workspaceRow as { owner_user_id?: string }).owner_user_id === userId) {
+    return 'admin';
+  }
   return null;
 }
 
