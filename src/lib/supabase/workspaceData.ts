@@ -34,6 +34,27 @@ export interface WorkspaceSummary {
   recordCount?: number;
 }
 
+function formatWorkspaceQueryError(error: { message?: string; code?: string } | null | undefined): string {
+  if (!error) return 'Unknown workspace query error.';
+  const rawMessage = typeof error.message === 'string' ? error.message : 'Unknown workspace query error.';
+  const code = typeof error.code === 'string' ? error.code : '';
+  if (code === '42501') {
+    return `${rawMessage} (RLS access blocked. Apply workspace migrations including 20260508120000_workspace_owner_select.sql).`;
+  }
+  return rawMessage;
+}
+
+function isMissingOrganizationIdColumnError(error: { message?: string; code?: string } | null | undefined): boolean {
+  if (!error) return false;
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+  const code = typeof error.code === 'string' ? error.code : '';
+  return (
+    code === '42703' ||
+    (message.includes('organization_id') && message.includes('does not exist')) ||
+    (message.includes('column') && message.includes('organization_id'))
+  );
+}
+
 export function getActiveWorkspaceId(): string | null {
   try {
     return localStorage.getItem(ACTIVE_WORKSPACE_STORAGE_KEY);
@@ -65,10 +86,20 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
     console.warn('[workspaceData] listWorkspaceSummariesForUser', mErr.message);
   }
   const memberRows = Array.isArray(members) ? (members as { workspace_id: string; role: string }[]) : [];
-  const { data: ownerRows, error: ownerErr } = await client
+  const ownerSelectWithOrganizationId = await client
     .from('workspaces')
     .select('id, organization_id, name, owner_user_id, created_at')
     .eq('owner_user_id', userId);
+  const ownerSelectLegacy = isMissingOrganizationIdColumnError(
+    ownerSelectWithOrganizationId.error as { message?: string; code?: string } | null | undefined,
+  )
+    ? await client
+        .from('workspaces')
+        .select('id, name, owner_user_id, created_at')
+        .eq('owner_user_id', userId)
+    : null;
+  const ownerRows = ownerSelectLegacy ? ownerSelectLegacy.data : ownerSelectWithOrganizationId.data;
+  const ownerErr = ownerSelectLegacy ? ownerSelectLegacy.error : ownerSelectWithOrganizationId.error;
   if (ownerErr) {
     console.warn('[workspaceData] owner workspace fetch', ownerErr.message);
   }
@@ -82,15 +113,50 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
     ]),
   ];
   if (ids.length === 0) {
+    if (mErr || ownerErr) {
+      throw new Error(
+        `Could not load workspace memberships. ${formatWorkspaceQueryError(
+          (mErr as { message?: string; code?: string } | null | undefined) ??
+            (ownerErr as { message?: string; code?: string } | null | undefined),
+        )}`,
+      );
+    }
     return [];
   }
-  const { data: wsRows, error: wErr } = await client
+  const missingOwnerMembershipWorkspaceIds = ownerWorkspaceRows
+    .map((workspace) => workspace.id)
+    .filter((workspaceId) => !memberRows.some((member) => member.workspace_id === workspaceId));
+  for (const workspaceId of missingOwnerMembershipWorkspaceIds) {
+    const { error: ensureMembershipError } = await client
+      .from('workspace_members')
+      .upsert(
+        {
+          workspace_id: workspaceId,
+          user_id: userId,
+          role: 'admin',
+        },
+        { onConflict: 'workspace_id,user_id' },
+      );
+    if (ensureMembershipError) {
+      console.warn('[workspaceData] ensure owner membership', ensureMembershipError.message);
+    }
+  }
+  const workspaceSelectWithOrganizationId = await client
     .from('workspaces')
     .select('id, organization_id, name, owner_user_id, created_at')
     .in('id', ids);
+  const workspaceSelectLegacy = isMissingOrganizationIdColumnError(
+    workspaceSelectWithOrganizationId.error as { message?: string; code?: string } | null | undefined,
+  )
+    ? await client
+        .from('workspaces')
+        .select('id, name, owner_user_id, created_at')
+        .in('id', ids)
+    : null;
+  const wsRows = workspaceSelectLegacy ? workspaceSelectLegacy.data : workspaceSelectWithOrganizationId.data;
+  const wErr = workspaceSelectLegacy ? workspaceSelectLegacy.error : workspaceSelectWithOrganizationId.error;
   if (wErr || !Array.isArray(wsRows)) {
-    if (wErr) console.warn('[workspaceData] workspaces fetch', wErr.message);
-    return [];
+    throw new Error(`Could not load workspace rows. ${formatWorkspaceQueryError(wErr as { message?: string; code?: string } | null | undefined)}`);
   }
   const sortedWorkspaces = [...wsRows].sort((left, right) => {
     const leftCreatedAt = String((left as { created_at?: string }).created_at || '');

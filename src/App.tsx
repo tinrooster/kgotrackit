@@ -20,7 +20,6 @@ import { refreshRackLocationsFromServer } from './lib/rackLocationsConfig';
 import HelpPage from './pages/HelpPage';
 import AboutPage from './pages/AboutPage';
 import ProductionsPage from './pages/ProductionsPage';
-import CrewPage from './pages/CrewPage';
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -65,6 +64,33 @@ export default function App() {
     window.addEventListener(CLOUD_HYDRATED_EVENT, evaluateSetupDialog);
     return () => window.removeEventListener(CLOUD_HYDRATED_EVENT, evaluateSetupDialog);
   }, [authLoading]);
+
+  useEffect(() => {
+    const clearOrphanedModalLock = () => {
+      const hasOpenDialog = Boolean(
+        document.querySelector(
+          '[role="dialog"][data-state="open"], [data-radix-dialog-content][data-state="open"], [data-radix-alert-dialog-content][data-state="open"]',
+        ),
+      );
+      if (hasOpenDialog) return;
+
+      // Radix can occasionally leave body lock styles behind after abrupt route changes.
+      document.body.style.removeProperty('pointer-events');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+
+      const staleOverlays = document.querySelectorAll('[data-radix-dialog-overlay], [data-radix-alert-dialog-overlay]');
+      staleOverlays.forEach((overlayNode) => {
+        const element = overlayNode as HTMLElement;
+        if (element.getAttribute('data-state') !== 'open') {
+          element.remove();
+        }
+      });
+    };
+
+    clearOrphanedModalLock();
+    window.setTimeout(clearOrphanedModalLock, 0);
+  }, [location.pathname]);
 
   const handleApplySetupDefaults = (choice: 'blank' | 'starter', includeSampleInventory: boolean) => {
     applySetupDefaultsChoice(choice, includeSampleInventory);
@@ -150,14 +176,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/crew"
-                element={
-                  <ProtectedRoute>
-                    <CrewPage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/crew" element={<Navigate to="/productions" replace />} />
               <Route
                 path="/help"
                 element={

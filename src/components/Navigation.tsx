@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, List, FileText, Settings, ShoppingCart, Clapperboard, Users } from 'lucide-react'
+import { LayoutDashboard, List, FileText, Settings, ShoppingCart, Clapperboard } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { UserMenu } from '@/components/UserMenu'
 import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService'
@@ -67,7 +67,6 @@ export function Navigation() {
     { path: "/inventory", label: "Inventory", icon: List },
     { path: "/productions", label: "Productions", icon: Clapperboard },
     { path: "/checkout", label: "Check-In/Out", icon: ShoppingCart },
-    { path: "/crew", label: "Crew", icon: Users },
     { path: "/reports", label: "Reports", icon: FileText },
     { path: "/settings", label: "Settings", icon: Settings }
   ]

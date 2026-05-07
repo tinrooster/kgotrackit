@@ -1,6 +1,6 @@
 # trackIT v2 — Project Structure
 
-**Version:** 1.0.1 · **Last reviewed:** 2026-05-06
+**Version:** 1.0.1 · **Last reviewed:** 2026-05-07
 
 ---
 
@@ -86,10 +86,12 @@ Routes are defined across two files:
 | `/` | `DashboardPage` | Summary cards, category/location charts, inventory overview |
 | `/inventory` | `InventoryPage` | Full inventory table: CRUD, filters, bulk ops, printing, QR |
 | `/checkout` | `CheckoutPage` | Secure cabinet check-in / check-out workflow |
+| `/productions` | `ProductionsPage` | Event/shoot productions: cards, slide-out detail, checklist, crew, schedule, planner workspace |
 | `/reports` | `ReportsPage` | Standard and custom report runner, CSV/Excel export |
 | `/settings` | `SettingsPage` | All settings tabs (tabbed, see below) |
 | `/help` | `HelpPage` | In-app help reference |
 | `/about` | `AboutPage` | Version info and credits |
+| `/crew` | `Navigate → /productions` | Legacy path; crew is edited per-production, not top-level nav |
 | `*` | `Navigate to /` | Catch-all redirect (no 404 page) |
 
 **Pages present on disk but not wired to any route:**
@@ -107,6 +109,7 @@ These files exist under `src/pages/` but are not imported or routed. They are ca
 
 - `CabinetManagement.tsx` — embedded inside `settings/UserDefinedListsSection`
 - `TemplatesPage.tsx` — embedded inside `settings/LibrariesSection`
+- `CrewPage.tsx` — **not currently routed**; crew contacts CRUD UI on disk (`crewContactsService` is used from Productions crew “Add from master DB”). Legacy `/crew` redirects to `/productions`.
 
 ---
 
@@ -131,7 +134,7 @@ These files exist under `src/pages/` but are not imported or routed. They are ca
 
 | File | Purpose |
 |---|---|
-| `Navigation.tsx` | App shell nav bar, workspace context chip (Personal / Team · {name}), user menu |
+| `Navigation.tsx` | App shell nav bar (Dashboard, Inventory, Productions, Checkout, Reports, Settings); workspace context chip (Personal / Team); no standalone Crew item (`/crew` → Productions) |
 | `LoginPage.tsx` | Full-page login layout (route `/login`) |
 | `LoginForm.tsx` | Sign-in form; handles both local and Supabase auth paths |
 | `UserMenu.tsx` | Account dropdown (logout, etc.) |
@@ -181,6 +184,23 @@ These files exist under `src/pages/` but are not imported or routed. They are ca
 | `ProjectDetailedReport.tsx` | Detailed project report panel |
 | `LowStockItemsTable.tsx` | Table of items at or below reorder level |
 | `CameraSettingsDialog.tsx` | Camera device picker; exports device ID key + update event name |
+
+### Productions (`src/components/productions/`)
+
+| File | Purpose |
+|---|---|
+| `ProductionsPage.tsx` (`pages/`) | `/productions` hub: filters, undo/redo, new production (**blank vs clone-from-existing**) |
+| `ProductionCard.tsx` | Production summary tile |
+| `ProductionDetail.tsx` | Right **Sheet** detail; **Planner Workspace** draggable dialog; outside overlay does **not** dismiss panes (avoids losing unsubmitted edits) |
+| `ProductionForm.tsx` | Create/edit metadata; persists dates via `normalizeDateInputValue` |
+| `ChecklistEditor.tsx` | Checklist groups: collapse, reorder, inventory links |
+| `VehiclePacklistEditor.tsx` | Vehicle packlists tied to checklist |
+| `CrewEditor.tsx` | Crew list by **department** (rename/delete department with icons); phone/email fields; shifts; templates; master DB import |
+| `CrewScheduleCalendar.tsx` | Crew schedule scoped to production date range |
+| `InventoryItemPicker.tsx` | Attach inventory items to checklist lines |
+| `BulkInventorySelectionDialog.tsx` | Multi-select bulk link dialog |
+
+Production date/time normalization: **`src/lib/dateTimeInputs.ts`** (`normalizeDateInputValue`, `normalizeQuarterHourTime`, shared minute helpers) — reuse target for Schedule + crew shifts + metadata dates.
 
 **Stale / test artefacts in `src/components/`** (present on disk, not actively used in production flows):
 
@@ -296,7 +316,7 @@ Exports: `WorkspaceProvider`, `useWorkspace`
 
 | File | Responsibility |
 |---|---|
-| `storageService.ts` | Core read/write for all app data keys. Uses `localStorage` with optional compatibility fallback to legacy `window.electronStore`. Fires `trackit:settings-updated` and `trackit:custom-reports-updated` custom events. Exports `STORAGE_KEYS`, `getItems`, `saveItems`, `getSettings`, `saveSettings`, `getTemplates`, `saveTemplates`, and others. |
+| `storageService.ts` | Core read/write for all app data keys. Uses `localStorage` with an optional legacy bridge fallback. Fires `trackit:settings-updated` and `trackit:custom-reports-updated` custom events. Exports `STORAGE_KEYS`, `getItems`, `saveItems`, `getSettings`, `saveSettings`, `getTemplates`, `saveTemplates`, and others. |
 | `settingsService.ts` | `SettingsService` class + Zod `defaultSettingsSchema` for display preferences (`theme`, `condensedView`, `mobileTabletUi`, column widths, etc.). |
 | `financialSettingsService.ts` | `FinancialCodeEntry` load/save against `localStorage`. |
 | `cloudSyncEvents.ts` | Lightweight custom-event bus: `requestCloudSync`, `dispatchCloudHydrated`, `CLOUD_HYDRATED_EVENT`. |
@@ -330,6 +350,10 @@ Exports: `WorkspaceProvider`, `useWorkspace`
 | `exportUtils.ts` | `exportToExcel`, `exportToCSV` used by export dialog and reports. |
 | `restockIntent.ts` | Target-quantity and package-increment math helpers for restock flows. |
 | `imageNormalization.ts` | Client-side image resize/compression to data URLs before storage. |
+| `productionService.ts` | `getProductions`, `saveProductions`, CRUD, packlist PDF export; `PRODUCTIONS_UPDATED_EVENT` |
+| `productionUndo.ts` | Undo/redo stack for productions list mutations (`ProductionsPage`) |
+| `positionTemplatesService.ts` | Organization-scoped crew position templates (used in `CrewEditor`) |
+| `crewContactsService.ts` | Workspace crew roster read/write keyed for cloud bundle + Productions import |
 
 ### Settings and lookup helpers
 
@@ -354,7 +378,8 @@ Exports: `WorkspaceProvider`, `useWorkspace`
 | `logging.ts` | `FileLogger` / `logger` singleton — durable audit log backed by `localStorage` key `durable-system-audit-logs`. Methods: `info`, `warn`, `error`, `log`, `setContext`, `downloadLogs`. |
 | `dummyData.ts` | `isFreshSetupState`, `applySetupDefaultsChoice`, `getSetupDefaultsChoice`, `recordSetupChoiceForWorkspace`, starter inventory seed. |
 | `utils.ts` | `cn` (clsx + twMerge), `debounce`, `formatCurrency`, `truncateText`, `stringToColor`, `ensureUrlProtocol`. |
-| `ui/collapsibleSectionSurface.ts` | CSS class helper for collapsible section card surfaces. |
+| `dateTimeInputs.ts` | Production flows: `normalizeDateInputValue`, quarter-hour `normalizeQuarterHourTime`, shared minute helpers for schedule/shift/date fields |
+| `ui/collapsibleSectionSurface.ts` | CSS class helper for collapsible section card surfaces |
 
 ---
 
@@ -408,6 +433,8 @@ Exports: `WorkspaceProvider`, `useWorkspace`
 | `cabinets.ts` | `Cabinet` (`id`, `name`, `locationId`, `isSecure`, `allowedCategories[]`, `qrCode`, `description`), `cabinetSchema` (Zod), `CabinetWithItems` |
 | `deviceLibrary.ts` | `DeviceLibraryKind`, `DEVICE_LIBRARY_KIND_PRESETS`, `DeviceLibraryEntry` |
 | `templates.ts` | `ItemTemplate`, `TemplateCategory` |
+| `productions.ts` | `Production`, `ProductionCrewMember` (`department`, `phone`, `email`, templates), checklist/packlists, `CrewScheduleEntry`, status enums |
+| `crewContacts.ts` | `CrewContact`, drafts — roster used when importing crew into productions |
 | `logging.ts` | `LogEntry` — log event interface |
 | `html5-qrcode.d.ts` | `declare module 'html5-qrcode'` — `Html5QrcodeScanner` type declaration |
 
@@ -454,6 +481,7 @@ Apply migrations in filename order via the Supabase SQL editor or `supabase db p
 │    inventory-device-library        DeviceLibraryEntry[]  │
 │    inventory-custom-report-definitions                   │
 │    inventory-general-settings                            │
+│    inventory-productions           Production[]         │
 │    durable-system-audit-logs   ← NOT synced to cloud     │
 │    checkout-recent-activities  ← NOT synced to cloud     │
 │                                                          │

@@ -28,9 +28,12 @@ export interface ProductionCrewMember {
   id: string;
   name: string;
   role: string;
+  department?: string;
   contactId?: string;
   positionTemplateId?: string;
   positionLabel?: string;
+  phone?: string;
+  email?: string;
   contact?: string;
   notes?: string;
   shifts?: CrewAssignmentShift[];

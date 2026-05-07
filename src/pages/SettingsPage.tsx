@@ -282,8 +282,11 @@ function AdminResetPasswordDialog({
 
 export default function SettingsPage() {
   const { currentUser, authBackend } = useAuth();
-  const { activeWorkspaceId, activeWorkspaceRole } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspaceRole, workspaces } = useWorkspace();
   const { activeOrganizationId, activeOrganizationName } = useOrganization();
+  const activeWorkspaceName = activeWorkspaceId
+    ? workspaces.find((workspace) => workspace.workspaceId === activeWorkspaceId)?.name ?? null
+    : null;
   
   // Initialize states from URL parameters
   const [mainTab, setMainTab] = useState(() => {
@@ -2007,6 +2010,7 @@ export default function SettingsPage() {
             activeWorkspaceId ? (
               <SupabaseWorkspaceUsersCard
                 workspaceId={activeWorkspaceId}
+                workspaceName={activeWorkspaceName}
                 currentUserId={currentUser?.id || ''}
                 canManageUsers={canManageSharedConfig}
               />

@@ -18,12 +18,14 @@ import {
 
 interface SupabaseWorkspaceUsersCardProps {
   workspaceId: string;
+  workspaceName?: string | null;
   currentUserId: string;
   canManageUsers: boolean;
 }
 
 export function SupabaseWorkspaceUsersCard({
   workspaceId,
+  workspaceName,
   currentUserId,
   canManageUsers,
 }: SupabaseWorkspaceUsersCardProps) {
@@ -57,10 +59,14 @@ export function SupabaseWorkspaceUsersCard({
   return (
     <Card>
       <CardHeader className="space-y-1">
-        <CardTitle>Supabase User Management</CardTitle>
+        <CardTitle>Workspace User Management</CardTitle>
         <CardDescription>
-          Admins can invite members, set role/status, reset passwords, and remove access for this workspace.
+          Admins can invite members, set role/status, reset passwords, and remove access for the selected workspace.
         </CardDescription>
+        <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          Target workspace: <span className="font-medium text-foreground">{workspaceName || workspaceId}</span>
+          <span className="ml-2 font-mono text-[10px] text-muted-foreground/80">{workspaceId}</span>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {!canManageUsers ? (
@@ -120,6 +126,10 @@ export function SupabaseWorkspaceUsersCard({
                 {busyAction === 'invite' ? 'Inviting…' : 'Invite'}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Invitation emails are sent only when the address is a new auth user and project email delivery is configured.
+              Existing users are added to this workspace immediately without email.
+            </p>
 
             <div className="grid gap-2 rounded-md border border-border/60 bg-muted/20 p-3 md:grid-cols-[minmax(180px,1fr)_minmax(200px,1fr)_auto] md:items-end">
               <div className="space-y-1.5">

@@ -47,7 +47,7 @@ import {
  */
 export function WorkspaceTeamTab() {
   const { currentUser, authBackend } = useAuth();
-  const { workspaces, activeWorkspaceId, activeWorkspaceRole, loading, refreshWorkspaces } =
+  const { workspaces, activeWorkspaceId, activeWorkspaceRole, loading, lastWorkspaceError, refreshWorkspaces } =
     useWorkspace();
   const [busy, setBusy] = React.useState(false);
   const [targetWorkspaceId, setTargetWorkspaceId] = React.useState<string>(activeWorkspaceId ?? '');
@@ -99,7 +99,7 @@ export function WorkspaceTeamTab() {
             Workspace
           </CardTitle>
           <CardDescription>
-            Shared inventory and roles require Supabase sign-in. With local-only auth, each profile keeps its own data on this device.
+            Shared inventory and roles require cloud sign-in. With local-only auth, each profile keeps its own data on this device.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -225,6 +225,11 @@ export function WorkspaceTeamTab() {
             </Button>
           </div>
           <div className="mt-2 space-y-2">
+            {lastWorkspaceError ? (
+              <div className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-200">
+                {lastWorkspaceError}
+              </div>
+            ) : null}
             {loading ? (
               <span className="text-xs text-muted-foreground">Loading workspaces…</span>
             ) : workspaces.length === 0 ? (
@@ -266,7 +271,7 @@ export function WorkspaceTeamTab() {
               onClick={applyWorkspaceSwitch}
               disabled={!targetWorkspaceId || targetWorkspaceId === activeWorkspaceId}
             >
-              Apply & reload
+              Switch to selected workspace
             </Button>
             <span className="text-xs text-muted-foreground">
               Selected: {targetWorkspaceId ? workspaces.find((w) => w.workspaceId === targetWorkspaceId)?.name ?? targetWorkspaceId : '(none)'}
@@ -275,9 +280,9 @@ export function WorkspaceTeamTab() {
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">Create a new workspace with empty or starter defaults.</p>
+          <p className="text-xs text-muted-foreground">Create a separate workspace with empty or starter defaults.</p>
           <Button type="button" onClick={() => setCreateDialogOpen(true)} disabled={busy}>
-            Create workspace
+            New workspace…
           </Button>
         </div>
 

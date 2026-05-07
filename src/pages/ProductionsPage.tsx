@@ -52,6 +52,9 @@ export default function ProductionsPage() {
   const [statusFilter, setStatusFilter] = useState<ProductionStatus | 'all'>('all');
   const [selectedProduction, setSelectedProduction] = useState<Production | null>(null);
   const [newFormOpen, setNewFormOpen] = useState(false);
+  const [createOptionsOpen, setCreateOptionsOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<'blank' | 'clone'>('blank');
+  const [cloneSourceProductionId, setCloneSourceProductionId] = useState<string>('');
   const [undoAvailable, setUndoAvailable] = useState(false);
   const [redoAvailable, setRedoAvailable] = useState(false);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
@@ -168,20 +171,17 @@ export default function ProductionsPage() {
     toast.success('Redone');
   };
 
-  const handleCloneSelected = () => {
-    if (!selectedProduction) {
-      toast.info('Select a production to clone.');
-      return;
-    }
-    setCloneDialogOpen(true);
-  };
+  const cloneSourceProduction = useMemo(
+    () => productions.find((production) => production.id === cloneSourceProductionId) ?? null,
+    [productions, cloneSourceProductionId]
+  );
 
   const confirmCloneSelected = () => {
-    if (!selectedProduction) {
+    if (!cloneSourceProduction) {
       setCloneDialogOpen(false);
       return;
     }
-    const source = selectedProduction;
+    const source = cloneSourceProduction;
     const crewIdMap = new Map<string, string>();
     const clonedCrew = cloneCrew
       ? source.crew.map((member) => {
@@ -257,7 +257,29 @@ export default function ProductionsPage() {
     setRedoAvailable(canRedoProduction());
     setSelectedProduction(clonedProduction);
     setCloneDialogOpen(false);
+    setCreateOptionsOpen(false);
+    setCloneSourceProductionId('');
     toast.success('Production cloned with crew assignments.');
+  };
+
+  const openCreateOptions = () => {
+    setCreateMode('blank');
+    setCloneSourceProductionId(productions[0]?.id ?? '');
+    setCreateOptionsOpen(true);
+  };
+
+  const continueCreate = () => {
+    if (createMode === 'blank') {
+      setCreateOptionsOpen(false);
+      setNewFormOpen(true);
+      return;
+    }
+    if (!cloneSourceProductionId) {
+      toast.info('Select a source production to clone.');
+      return;
+    }
+    setCreateOptionsOpen(false);
+    setCloneDialogOpen(true);
   };
 
   return (
@@ -278,18 +300,9 @@ export default function ProductionsPage() {
             <Redo2 className="h-4 w-4" />
             Redo
           </Button>
-          <Button onClick={() => setNewFormOpen(true)} className="gap-1.5">
+          <Button onClick={openCreateOptions} className="gap-1.5">
             <Plus className="h-4 w-4" />
             New Production
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleCloneSelected}
-            disabled={!selectedProduction}
-            className="gap-1.5"
-          >
-            <Plus className="h-4 w-4" />
-            Clone Selected
           </Button>
         </div>
       </div>
@@ -330,7 +343,7 @@ export default function ProductionsPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Create your first production to start planning equipment and crew.
               </p>
-              <Button className="mt-4 gap-1.5" onClick={() => setNewFormOpen(true)}>
+              <Button className="mt-4 gap-1.5" onClick={openCreateOptions}>
                 <Plus className="h-4 w-4" />
                 New Production
               </Button>
@@ -376,6 +389,51 @@ export default function ProductionsPage() {
         onSave={handleCreate}
         onClose={() => setNewFormOpen(false)}
       />
+      <Dialog open={createOptionsOpen} onOpenChange={setCreateOptionsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Production</DialogTitle>
+            <DialogDescription>
+              Start blank or clone from an existing production.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={createMode === 'blank'} onCheckedChange={() => setCreateMode('blank')} />
+              Start with blank production
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={createMode === 'clone'} onCheckedChange={() => setCreateMode('clone')} />
+              Clone from existing production
+            </label>
+            {createMode === 'clone' ? (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Clone source</p>
+                <Select value={cloneSourceProductionId} onValueChange={setCloneSourceProductionId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select source production" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productions.map((production) => (
+                      <SelectItem key={production.id} value={production.id}>
+                        {production.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOptionsOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={continueCreate}>
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen}>
         <DialogContent>
           <DialogHeader>

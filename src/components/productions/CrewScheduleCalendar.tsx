@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { minutesToTime, normalizeQuarterHourTime, parseTimeToMinutes } from '@/lib/dateTimeInputs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,23 +37,18 @@ function resolveCrewLabel(crewMembers: ProductionCrewMember[], crewMemberId: str
   return member ? `${member.name}${member.role ? ` (${member.role})` : ''}` : 'Unassigned';
 }
 
-function parseTimeToMinutes(value?: string, fallbackMinutes = 0): number {
-  if (!value) return fallbackMinutes;
-  const [h, m] = value.split(':').map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallbackMinutes;
-  return Math.max(0, Math.min(24 * 60, h * 60 + m));
+function clampDateToProjectRange(dateValue: string, projectStartDate?: string, projectEndDate?: string): string {
+  if (!dateValue) return dateValue;
+  if (projectStartDate && dateValue < projectStartDate) return projectStartDate;
+  if (projectEndDate && dateValue > projectEndDate) return projectEndDate;
+  return dateValue;
 }
 
-function minutesToTime(minutes: number): string {
-  const safe = Math.max(0, Math.min(24 * 60, Math.round(minutes / 15) * 15));
-  const h = Math.floor(safe / 60);
-  const m = safe % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function roundTimeToQuarter(value?: string, fallback = ''): string {
-  if (!value) return fallback;
-  return minutesToTime(parseTimeToMinutes(value));
+function isDateWithinProjectRange(dateValue: string, projectStartDate?: string, projectEndDate?: string): boolean {
+  if (!dateValue) return false;
+  if (projectStartDate && dateValue < projectStartDate) return false;
+  if (projectEndDate && dateValue > projectEndDate) return false;
+  return true;
 }
 
 function colorForCrew(crewMemberId: string): string {
@@ -73,16 +69,19 @@ export function CrewScheduleCalendar({
   resources = [],
   onChange
 }: CrewScheduleCalendarProps) {
-  const projectedDate = projectStartDate || format(new Date(), 'yyyy-MM-dd');
+  const projectedDate = useMemo(
+    () => clampDateToProjectRange(projectStartDate || format(new Date(), 'yyyy-MM-dd'), projectStartDate, projectEndDate),
+    [projectStartDate, projectEndDate]
+  );
   const derivedWindowStart = useMemo(() => {
-    if (projectedWindowStartTime) return roundTimeToQuarter(projectedWindowStartTime);
+    if (projectedWindowStartTime) return normalizeQuarterHourTime(projectedWindowStartTime);
     const firstScheduled = schedule.find((entry) => entry.startTime)?.startTime;
-    return firstScheduled ? roundTimeToQuarter(firstScheduled) : '';
+    return firstScheduled ? normalizeQuarterHourTime(firstScheduled) : '';
   }, [projectedWindowStartTime, schedule]);
   const derivedWindowEnd = useMemo(() => {
-    if (projectedWindowEndTime) return roundTimeToQuarter(projectedWindowEndTime);
+    if (projectedWindowEndTime) return normalizeQuarterHourTime(projectedWindowEndTime);
     const latestScheduled = [...schedule].reverse().find((entry) => entry.endTime)?.endTime;
-    return latestScheduled ? roundTimeToQuarter(latestScheduled) : '';
+    return latestScheduled ? normalizeQuarterHourTime(latestScheduled) : '';
   }, [projectedWindowEndTime, schedule]);
   const [useProjectedDefaults, setUseProjectedDefaults] = useState(true);
   const [draft, setDraft] = useState<Omit<CrewScheduleEntry, 'id'>>({
@@ -113,14 +112,15 @@ export function CrewScheduleCalendar({
 
   const addEntry = () => {
     if (!draft.crewMemberId || !draft.date) return;
+    if (!isDateWithinProjectRange(draft.date, projectStartDate, projectEndDate)) return;
     onChange([
       ...schedule,
       {
         ...draft,
         id: crypto.randomUUID(),
         role: draft.role || undefined,
-        startTime: draft.startTime ? roundTimeToQuarter(draft.startTime) : undefined,
-        endTime: draft.endTime ? roundTimeToQuarter(draft.endTime) : undefined,
+        startTime: draft.startTime ? normalizeQuarterHourTime(draft.startTime) : undefined,
+        endTime: draft.endTime ? normalizeQuarterHourTime(draft.endTime) : undefined,
         location: draft.location || undefined,
         notes: draft.notes || undefined,
       },
@@ -163,14 +163,16 @@ export function CrewScheduleCalendar({
 
   const saveEditedEntry = () => {
     if (!editingEntryId || !editingDraft?.crewMemberId || !editingDraft.date) return;
+    if (!isDateWithinProjectRange(editingDraft.date, projectStartDate, projectEndDate)) return;
     onChange(
       schedule.map((entry) =>
         entry.id === editingEntryId
           ? {
               ...entry,
               ...editingDraft,
-              startTime: editingDraft.startTime ? roundTimeToQuarter(editingDraft.startTime) : undefined,
-              endTime: editingDraft.endTime ? roundTimeToQuarter(editingDraft.endTime) : undefined,
+              date: clampDateToProjectRange(editingDraft.date, projectStartDate, projectEndDate),
+              startTime: editingDraft.startTime ? normalizeQuarterHourTime(editingDraft.startTime) : undefined,
+              endTime: editingDraft.endTime ? normalizeQuarterHourTime(editingDraft.endTime) : undefined,
               role: editingDraft.role || undefined,
               location: editingDraft.location || undefined,
               notes: editingDraft.notes || undefined,
@@ -197,7 +199,9 @@ export function CrewScheduleCalendar({
     return format(new Date(), 'yyyy-MM-dd');
   }, [schedule, projectStartDate]);
 
-  const [dayFilter, setDayFilter] = useState(selectedDay);
+  const [dayFilter, setDayFilter] = useState(
+    clampDateToProjectRange(selectedDay, projectStartDate, projectEndDate)
+  );
   const timelineContainerRef = useRef<HTMLDivElement | null>(null);
   const [dragState, setDragState] = useState<{
     entryId: string;
@@ -209,6 +213,10 @@ export function CrewScheduleCalendar({
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<Omit<CrewScheduleEntry, 'id'> | null>(null);
   const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDayFilter((previous) => clampDateToProjectRange(previous || selectedDay, projectStartDate, projectEndDate));
+  }, [selectedDay, projectStartDate, projectEndDate]);
 
   const dayEntries = useMemo(
     () =>
@@ -309,7 +317,19 @@ export function CrewScheduleCalendar({
               ))}
             </SelectContent>
           </Select>
-          <Input className="h-8" type="date" value={draft.date} onChange={(event) => setDraft((previous) => ({ ...previous, date: event.target.value }))} />
+          <Input
+            className="h-8"
+            type="date"
+            min={projectStartDate}
+            max={projectEndDate}
+            value={draft.date}
+            onChange={(event) =>
+              setDraft((previous) => ({
+                ...previous,
+                date: clampDateToProjectRange(event.target.value, projectStartDate, projectEndDate),
+              }))
+            }
+          />
           <Input
             className="h-8"
             type="time"
@@ -319,7 +339,7 @@ export function CrewScheduleCalendar({
             onBlur={() =>
               setDraft((previous) => ({
                 ...previous,
-                startTime: previous.startTime ? roundTimeToQuarter(previous.startTime) : '',
+                startTime: previous.startTime ? normalizeQuarterHourTime(previous.startTime) : '',
               }))
             }
           />
@@ -332,7 +352,7 @@ export function CrewScheduleCalendar({
             onBlur={() =>
               setDraft((previous) => ({
                 ...previous,
-                endTime: previous.endTime ? roundTimeToQuarter(previous.endTime) : '',
+                endTime: previous.endTime ? normalizeQuarterHourTime(previous.endTime) : '',
               }))
             }
           />
@@ -347,7 +367,7 @@ export function CrewScheduleCalendar({
             value={derivedWindowStart}
             onChange={(event) =>
               onProjectedWindowChange?.({
-                startTime: event.target.value ? roundTimeToQuarter(event.target.value) : undefined,
+                startTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : undefined,
                 endTime: projectedWindowEndTime,
               })
             }
@@ -360,7 +380,7 @@ export function CrewScheduleCalendar({
             onChange={(event) =>
               onProjectedWindowChange?.({
                 startTime: projectedWindowStartTime,
-                endTime: event.target.value ? roundTimeToQuarter(event.target.value) : undefined,
+                endTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : undefined,
               })
             }
           />
@@ -419,8 +439,10 @@ export function CrewScheduleCalendar({
             <Input
               className="h-8 w-[180px]"
               type="date"
+              min={projectStartDate}
+              max={projectEndDate}
               value={dayFilter}
-              onChange={(event) => setDayFilter(event.target.value)}
+              onChange={(event) => setDayFilter(clampDateToProjectRange(event.target.value, projectStartDate, projectEndDate))}
             />
             <span className="text-xs text-muted-foreground">
               Graphical day-of blocking by crew/resource time
@@ -636,9 +658,18 @@ export function CrewScheduleCalendar({
               <Input
                 className="h-8"
                 type="date"
+                min={projectStartDate}
+                max={projectEndDate}
                 value={editingDraft.date}
                 onChange={(event) =>
-                  setEditingDraft((previous) => (previous ? { ...previous, date: event.target.value } : previous))
+                  setEditingDraft((previous) =>
+                    previous
+                      ? {
+                          ...previous,
+                          date: clampDateToProjectRange(event.target.value, projectStartDate, projectEndDate),
+                        }
+                      : previous
+                  )
                 }
               />
               <Input
@@ -660,7 +691,7 @@ export function CrewScheduleCalendar({
                 onBlur={() =>
                   setEditingDraft((previous) =>
                     previous
-                      ? { ...previous, startTime: previous.startTime ? roundTimeToQuarter(previous.startTime) : '' }
+                      ? { ...previous, startTime: previous.startTime ? normalizeQuarterHourTime(previous.startTime) : '' }
                       : previous
                   )
                 }
@@ -676,7 +707,7 @@ export function CrewScheduleCalendar({
                 onBlur={() =>
                   setEditingDraft((previous) =>
                     previous
-                      ? { ...previous, endTime: previous.endTime ? roundTimeToQuarter(previous.endTime) : '' }
+                      ? { ...previous, endTime: previous.endTime ? normalizeQuarterHourTime(previous.endTime) : '' }
                       : previous
                   )
                 }

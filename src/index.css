@@ -83,7 +83,37 @@
   }
   input::placeholder,
   textarea::placeholder {
-    opacity: 0.4;
+    opacity: 1;
+  }
+
+  /* Global list formatting: clear hierarchy under headings and nested sublists. */
+  main :is(ul, ol) {
+    margin-top: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-left: 1.25rem;
+    list-style-position: outside;
+  }
+
+  main ul {
+    list-style-type: disc;
+  }
+
+  main ol {
+    list-style-type: decimal;
+  }
+
+  main :is(ul, ol) :is(ul, ol) {
+    margin-top: 0.35rem;
+    margin-bottom: 0.35rem;
+    padding-left: 1.25rem;
+  }
+
+  main :is(h1, h2, h3, h4, h5, h6) + :is(ul, ol) {
+    margin-top: 0.4rem;
+  }
+
+  main :is(ul, ol) > li {
+    margin-top: 0.2rem;
   }
 }
 

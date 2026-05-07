@@ -160,6 +160,8 @@ export function ProductionDetail({
         <SheetContent
           className="flex w-full flex-col gap-0 p-0 sm:max-w-[min(88vw,1200px)]"
           side="right"
+          onPointerDownOutside={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
         >
           <SheetHeader className="border-b px-6 py-4">
             <div className="flex items-start justify-between gap-3 pr-8">
@@ -407,7 +409,7 @@ export function ProductionDetail({
 
       <Dialog open={plannerWindowOpen} onOpenChange={setPlannerWindowOpen}>
         <DraggableDialogContent
-          dismissOnOutsidePointer
+          dismissOnOutsidePointer={false}
           className="h-[min(92vh,980px)] w-[min(96vw,1800px)] overflow-hidden p-0"
         >
           <DialogHeader className="border-b px-4 py-3">

@@ -1,0 +1,20 @@
+# Build outputs - minified/bundled code pollutes the graph with obfuscated names
+dist/
+dist-web/
+dist-ssr/
+dist-electron/
+out/
+release/
+
+# Dependencies
+node_modules/
+
+# Graphify's own output
+graphify-out/
+
+# Test/coverage artifacts
+coverage/
+.nyc_output/
+
+# OS / editor noise
+.git/

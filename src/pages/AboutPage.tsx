@@ -404,10 +404,10 @@ export default function AboutPage() {
           <CardDescription>Current product branch characteristics.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>Desktop runtime: Electron with renderer powered by Vite/React/TypeScript.</p>
+          <p>Runtime: browser-first web app powered by Vite/React/TypeScript.</p>
           <p>Data modes: personal and team workspace context with role-aware editing behavior.</p>
           <p>Theme support: softened light/dark palettes and compact UI controls in General Settings.</p>
-          <p>Persistence: local storage + Electron store, with Supabase cloud sync when enabled.</p>
+          <p>Persistence: local storage with Supabase cloud sync when enabled.</p>
         </CardContent>
       </Card>
 

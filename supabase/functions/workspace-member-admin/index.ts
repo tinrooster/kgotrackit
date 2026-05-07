@@ -24,6 +24,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type EmailMessage = {
+  to: string;
+  subject: string;
+  text: string;
+};
+
 function jsonResponse(status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -44,6 +50,94 @@ function getBearerToken(request: Request): string | null {
   const [scheme, token] = authHeader.split(' ');
   if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
   return token;
+}
+
+function getWorkspaceUserNotifyEmail(): string | null {
+  const configuredAddress = Deno.env.get('WORKSPACE_USER_NOTIFY_EMAIL')?.trim();
+  return configuredAddress ? configuredAddress : null;
+}
+
+async function sendWithResend(message: EmailMessage): Promise<void> {
+  const resendApiKey = Deno.env.get('RESEND_API_KEY');
+  const fromEmail = Deno.env.get('NOTIFY_FROM_EMAIL');
+  if (!resendApiKey || !fromEmail) {
+    throw new Error('Missing RESEND_API_KEY or NOTIFY_FROM_EMAIL.');
+  }
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${resendApiKey}`,
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [message.to],
+      subject: message.subject,
+      text: message.text,
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Resend failed (${response.status}): ${body}`);
+  }
+}
+
+async function sendEmail(message: EmailMessage): Promise<void> {
+  const provider = (Deno.env.get('EMAIL_PROVIDER') || 'resend').toLowerCase();
+  switch (provider) {
+    case 'resend':
+      await sendWithResend(message);
+      return;
+    default:
+      throw new Error(`Unsupported EMAIL_PROVIDER: ${provider}`);
+  }
+}
+
+async function sendWorkspaceUserStatusEmail(params: {
+  action: string;
+  actorEmail: string;
+  workspaceId: string;
+  workspaceName?: string;
+  targetEmail?: string;
+  targetUserId?: string;
+  role?: string;
+  status?: string;
+  extra?: string;
+}): Promise<void> {
+  const notifyEmail = getWorkspaceUserNotifyEmail();
+  if (!notifyEmail) {
+    return;
+  }
+  const timestamp = new Date().toISOString();
+  const subject = `[trackIT] Workspace user update (${params.action})`;
+  const text = [
+    'trackIT workspace user change notification',
+    '',
+    `Action: ${params.action}`,
+    `Workspace: ${params.workspaceName || params.workspaceId}`,
+    `Workspace ID: ${params.workspaceId}`,
+    `Target Email: ${params.targetEmail || '(unknown)'}`,
+    `Target User ID: ${params.targetUserId || '(unknown)'}`,
+    `Role: ${params.role || '(n/a)'}`,
+    `Status: ${params.status || '(n/a)'}`,
+    `By: ${params.actorEmail}`,
+    `At: ${timestamp}`,
+    params.extra ? `Details: ${params.extra}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  try {
+    await sendEmail({
+      to: notifyEmail,
+      subject,
+      text,
+    });
+  } catch (error) {
+    console.warn(
+      '[workspace-member-admin] user status email failed:',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 Deno.serve(async (request) => {
@@ -80,6 +174,12 @@ Deno.serve(async (request) => {
     if (!workspaceId) {
       return jsonResponse(400, { error: 'workspaceId is required.' });
     }
+    const { data: workspaceRow } = await adminClient
+      .from('workspaces')
+      .select('name')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    const workspaceName = typeof workspaceRow?.name === 'string' ? workspaceRow.name : undefined;
 
     const { data: actorMembership, error: actorMembershipError } = await adminClient
       .from('workspace_members')
@@ -152,6 +252,7 @@ Deno.serve(async (request) => {
         (authUser) => String(authUser.email || '').toLowerCase() === email
       );
       targetUserId = matchedUser?.id ?? null;
+      const existingUserMatched = !!matchedUser;
       if (!targetUserId) {
         const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email);
         if (inviteError) {
@@ -175,6 +276,18 @@ Deno.serve(async (request) => {
       if (upsertError) {
         return jsonResponse(500, { error: upsertError.message });
       }
+      await sendWorkspaceUserStatusEmail({
+        action: 'invite_member',
+        actorEmail: actor.email || actor.id,
+        workspaceId,
+        workspaceName,
+        targetEmail: email,
+        targetUserId: targetUserId,
+        role: payload.role,
+        extra: existingUserMatched
+          ? 'Existing auth user matched; membership updated without auth invite email.'
+          : 'New auth invite attempted via inviteUserByEmail.',
+      });
 
       return jsonResponse(200, { ok: true });
     }
@@ -225,6 +338,14 @@ Deno.serve(async (request) => {
       if (updateError) {
         return jsonResponse(500, { error: updateError.message });
       }
+      await sendWorkspaceUserStatusEmail({
+        action: 'update_member_role',
+        actorEmail: actor.email || actor.id,
+        workspaceId,
+        workspaceName,
+        targetUserId,
+        role: payload.role,
+      });
       return jsonResponse(200, { ok: true });
     }
 
@@ -271,6 +392,13 @@ Deno.serve(async (request) => {
       if (deleteError) {
         return jsonResponse(500, { error: deleteError.message });
       }
+      await sendWorkspaceUserStatusEmail({
+        action: 'remove_member',
+        actorEmail: actor.email || actor.id,
+        workspaceId,
+        workspaceName,
+        targetUserId,
+      });
       return jsonResponse(200, { ok: true });
     }
 
@@ -300,13 +428,21 @@ Deno.serve(async (request) => {
       if (updateError) {
         return jsonResponse(500, { error: updateError.message });
       }
+      await sendWorkspaceUserStatusEmail({
+        action: 'set_member_status',
+        actorEmail: actor.email || actor.id,
+        workspaceId,
+        workspaceName,
+        targetUserId,
+        status: disabled ? 'disabled' : 'active',
+      });
       return jsonResponse(200, { ok: true });
     }
 
     if (payload.action === 'delete_workspace') {
       const { data: workspaceRow, error: workspaceError } = await adminClient
         .from('workspaces')
-        .select('id, owner_user_id')
+        .select('id, name, owner_user_id, organization_id')
         .eq('id', workspaceId)
         .maybeSingle();
       if (workspaceError) {
@@ -319,6 +455,37 @@ Deno.serve(async (request) => {
       const isAdmin = actorMembership.role === 'admin';
       if (!isOwner && !isAdmin) {
         return jsonResponse(403, { error: 'Workspace admin role required to delete workspace.' });
+      }
+
+      const [{ count: memberCount }, workspaceDataCheck] = await Promise.all([
+        adminClient
+          .from('workspace_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId),
+        adminClient
+          .from('workspace_app_data')
+          .select('workspace_id')
+          .eq('workspace_id', workspaceId)
+          .maybeSingle(),
+      ]);
+      const memberCountValue = typeof memberCount === 'number' ? memberCount : 0;
+      const hadWorkspaceAppData = !!workspaceDataCheck.data?.workspace_id;
+
+      const { error: auditInsertError } = await adminClient
+        .from('workspace_deletion_audit')
+        .insert({
+          workspace_id: workspaceId,
+          workspace_name: workspaceRow.name || workspaceId,
+          organization_id: workspaceRow.organization_id || null,
+          deleted_by_user_id: actor.id,
+          deleted_by_email: actor.email || null,
+          deleted_by_role: actorMembership.role || null,
+          member_count: memberCountValue,
+          had_workspace_app_data: hadWorkspaceAppData,
+          deletion_source: 'workspace-member-admin',
+        });
+      if (auditInsertError) {
+        return jsonResponse(500, { error: auditInsertError.message });
       }
 
       const { error: deleteWorkspaceError } = await adminClient
@@ -346,6 +513,14 @@ Deno.serve(async (request) => {
       if (updateError) {
         return jsonResponse(500, { error: updateError.message });
       }
+      await sendWorkspaceUserStatusEmail({
+        action: 'reset_member_password',
+        actorEmail: actor.email || actor.id,
+        workspaceId,
+        workspaceName,
+        targetUserId,
+        extra: 'Password was reset by workspace admin action.',
+      });
       return jsonResponse(200, { ok: true });
     }
 

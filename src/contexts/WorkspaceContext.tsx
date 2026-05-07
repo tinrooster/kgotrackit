@@ -16,6 +16,7 @@ interface WorkspaceContextValue {
   /** Role in the active workspace; null when in personal mode. */
   activeWorkspaceRole: WorkspaceSummary['role'] | null;
   loading: boolean;
+  lastWorkspaceError: string | null;
   refreshWorkspaces: () => Promise<void>;
   selectPersonalData: () => void;
   selectWorkspace: (workspaceId: string) => void;
@@ -28,10 +29,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   // Start as true so the validation effect never fires with an empty list before the first load.
   const [loading, setLoading] = useState(true);
+  const [lastWorkspaceError, setLastWorkspaceError] = useState<string | null>(null);
 
   const refreshWorkspaces = useCallback(async () => {
     if (!isSupabaseConfigured() || authBackend !== 'supabase' || !currentUser?.id) {
       setWorkspaces([]);
+      setLastWorkspaceError(null);
       setLoading(false);
       return;
     }
@@ -39,6 +42,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     try {
       const list = await listWorkspaceSummariesForUser(currentUser.id);
       setWorkspaces(list);
+      setLastWorkspaceError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not load workspaces.';
+      setWorkspaces([]);
+      setLastWorkspaceError(message);
     } finally {
       setLoading(false);
     }
@@ -104,6 +112,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       activeWorkspaceId,
       activeWorkspaceRole,
       loading,
+      lastWorkspaceError,
       refreshWorkspaces,
       selectPersonalData,
       selectWorkspace,
@@ -113,6 +122,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       activeWorkspaceId,
       activeWorkspaceRole,
       loading,
+      lastWorkspaceError,
       refreshWorkspaces,
       selectPersonalData,
       selectWorkspace,
