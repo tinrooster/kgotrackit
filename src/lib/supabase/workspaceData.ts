@@ -32,6 +32,27 @@ export interface WorkspaceSummary {
   createdAt?: string;
   updatedAt?: string;
   recordCount?: number;
+  productionCount?: number;
+}
+
+function countEntries(value: unknown): number {
+  if (Array.isArray(value)) return value.length;
+  if (typeof value === 'string') {
+    try {
+      return countEntries(JSON.parse(value));
+    } catch {
+      return 0;
+    }
+  }
+  if (!value || typeof value !== 'object') return 0;
+
+  const record = value as Record<string, unknown>;
+  // Handle historical nested snapshot shapes defensively.
+  if ('items' in record) return countEntries(record.items);
+  if ('productions' in record) return countEntries(record.productions);
+
+  // Fallback for object maps keyed by id.
+  return Object.keys(record).length;
 }
 
 function formatWorkspaceQueryError(error: { message?: string; code?: string } | null | undefined): string {
@@ -52,6 +73,21 @@ function isMissingOrganizationIdColumnError(error: { message?: string; code?: st
     code === '42703' ||
     (message.includes('organization_id') && message.includes('does not exist')) ||
     (message.includes('column') && message.includes('organization_id'))
+  );
+}
+
+function isMissingColumnError(
+  error: { message?: string; code?: string } | null | undefined,
+  columnName: string,
+): boolean {
+  if (!error) return false;
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+  const code = typeof error.code === 'string' ? error.code : '';
+  const target = columnName.toLowerCase();
+  return (
+    code === '42703' ||
+    (message.includes(target) && message.includes('does not exist')) ||
+    (message.includes('column') && message.includes(target))
   );
 }
 
@@ -178,17 +214,28 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
     ])
   );
 
-  const { data: appRows } = await client
+  const appRowsWithProductions = await client
     .from('workspace_app_data')
-    .select('workspace_id, items, updated_at')
+    .select('workspace_id, items, productions, updated_at')
     .in('workspace_id', ids);
+  const appRowsLegacy = isMissingColumnError(
+    appRowsWithProductions.error as { message?: string; code?: string } | null | undefined,
+    'productions',
+  )
+    ? await client
+        .from('workspace_app_data')
+        .select('workspace_id, items, updated_at')
+        .in('workspace_id', ids)
+    : null;
+  const appRows = appRowsLegacy ? appRowsLegacy.data : appRowsWithProductions.data;
   const appById = new Map(
     Array.isArray(appRows)
       ? appRows.map((row: any) => [
           String(row.workspace_id),
           {
             updatedAt: typeof row.updated_at === 'string' ? row.updated_at : undefined,
-            recordCount: Array.isArray(row.items) ? row.items.length : 0,
+            recordCount: countEntries(row.items),
+            productionCount: countEntries(row.productions),
           },
         ])
       : [],
@@ -217,6 +264,7 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
       createdAt: (w as { created_at?: string }).created_at,
       updatedAt: appById.get(w.id)?.updatedAt,
       recordCount: appById.get(w.id)?.recordCount,
+      productionCount: appById.get(w.id)?.productionCount,
     });
   }
   return out;
@@ -277,16 +325,30 @@ export async function pullWorkspaceAppData(workspaceId: string): Promise<Workspa
 export async function pushWorkspaceSnapshot(workspaceId: string, snapshot: WorkspaceSnapshotPayload): Promise<void> {
   const client = getSupabase();
   if (!client) return;
-  const { error } = await client.from('workspace_app_data').upsert(
-    {
-      workspace_id: workspaceId,
-      ...snapshot,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'workspace_id' },
-  );
-  if (error) {
-    throw error;
+  const payloadWithContacts = {
+    workspace_id: workspaceId,
+    ...snapshot,
+    updated_at: new Date().toISOString(),
+  };
+  const { error: firstError } = await client
+    .from('workspace_app_data')
+    .upsert(payloadWithContacts, { onConflict: 'workspace_id' });
+  if (
+    firstError &&
+    isMissingColumnError(firstError as { message?: string; code?: string } | null | undefined, 'crew_contacts')
+  ) {
+    const payloadWithoutContacts = { ...payloadWithContacts } as Record<string, unknown>;
+    delete payloadWithoutContacts.crew_contacts;
+    const { error: retryError } = await client
+      .from('workspace_app_data')
+      .upsert(payloadWithoutContacts, { onConflict: 'workspace_id' });
+    if (retryError) {
+      throw retryError;
+    }
+    return;
+  }
+  if (firstError) {
+    throw firstError;
   }
 }
 

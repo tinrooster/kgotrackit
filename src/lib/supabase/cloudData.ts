@@ -59,6 +59,22 @@ export interface UserAppDataRow {
   updated_at?: string;
 }
 
+function isMissingColumnError(
+  error: { message?: string; code?: string } | null | undefined,
+  columnName: string,
+): boolean {
+  if (!error) return false;
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+  const code = typeof error.code === 'string' ? error.code : '';
+  const target = columnName.toLowerCase();
+  return (
+    code === '42703' ||
+    (message.includes(target) && message.includes('does not exist')) ||
+    (message.includes('column') && message.includes(target)) ||
+    (message.includes(target) && message.includes('schema cache'))
+  );
+}
+
 function readGeneralSettingsRaw(): unknown | null {
   try {
     const electronValue = window.electronStore?.getData?.(STORAGE_KEYS.GENERAL_SETTINGS);
@@ -131,9 +147,11 @@ export interface MappedAppUser {
 
 export function mapSupabaseUserToAppUser(user: SupabaseAuthUser): MappedAppUser {
   const meta = (user.user_metadata || {}) as Record<string, unknown>;
-  const roleRaw = meta.role;
+  const appMeta = (user.app_metadata || {}) as Record<string, unknown>;
+  const roleRaw = (meta.role ?? appMeta.role ?? appMeta.user_role ?? meta.user_role);
+  const normalizedRole = typeof roleRaw === 'string' ? roleRaw.trim().toLowerCase() : '';
   const role =
-    roleRaw === 'admin' || roleRaw === 'user' || roleRaw === 'viewer' ? roleRaw : 'user';
+    normalizedRole === 'admin' || normalizedRole === 'user' || normalizedRole === 'viewer' ? normalizedRole : 'user';
   const email = user.email ?? user.id;
   return {
     id: user.id,
@@ -367,16 +385,30 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
     await pushWorkspaceSnapshot(wsId, snapshot as WorkspaceSnapshotPayload);
     return;
   }
-  const { error } = await client.from('user_app_data').upsert(
-    {
-      user_id: userId,
-      ...snapshot,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'user_id' }
-  );
-  if (error) {
-    throw error;
+  const payloadWithContacts = {
+    user_id: userId,
+    ...snapshot,
+    updated_at: new Date().toISOString(),
+  };
+  const { error: firstError } = await client
+    .from('user_app_data')
+    .upsert(payloadWithContacts, { onConflict: 'user_id' });
+  if (
+    firstError &&
+    isMissingColumnError(firstError as { message?: string; code?: string } | null | undefined, 'crew_contacts')
+  ) {
+    const payloadWithoutContacts = { ...payloadWithContacts } as Record<string, unknown>;
+    delete payloadWithoutContacts.crew_contacts;
+    const { error: retryError } = await client
+      .from('user_app_data')
+      .upsert(payloadWithoutContacts, { onConflict: 'user_id' });
+    if (retryError) {
+      throw retryError;
+    }
+    return;
+  }
+  if (firstError) {
+    throw firstError;
   }
 }
 
