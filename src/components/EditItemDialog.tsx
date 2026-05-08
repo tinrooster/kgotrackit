@@ -28,6 +28,7 @@ interface EditItemDialogProps {
   costCenters?: FinancialCodeEntry[];
   cabinets: Cabinet[];
   existingItems: InventoryItem[];
+  showMaintenanceCutoverCautions?: boolean;
 }
 
 export function EditItemDialog({
@@ -43,7 +44,8 @@ export function EditItemDialog({
   expenseTypes = [],
   costCenters = [],
   cabinets,
-  existingItems
+  existingItems,
+  showMaintenanceCutoverCautions = true,
 }: EditItemDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -199,6 +201,7 @@ export function EditItemDialog({
             cabinets={cabinets}
             isSubmitting={isSubmitting}
             existingItems={existingItems}
+            showMaintenanceCutoverCautions={showMaintenanceCutoverCautions}
           />
         </div>
       </DraggableDialogContent>

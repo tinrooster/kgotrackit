@@ -1,18 +1,17 @@
 "use client";
 
-import * as React from 'react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { InventoryItem } from "@/types/inventory";
 import { getSettings } from "@/lib/storageService";
 import { resolveLocationDisplay } from "@/lib/resolveLocationLabel";
 import { findSupplierProfile } from "@/lib/supplierProfiles";
+import { getDefaultRackSlotForLocationFlatId } from "@/lib/rackLocationsConfig";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
@@ -32,7 +31,6 @@ import {
   Library,
 } from "lucide-react";
 import { InventoryAdjustment } from "@/components/InventoryAdjustment";
-import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface ItemDetailsProps {
@@ -48,10 +46,33 @@ const formatCurrency = (value: number | undefined) => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 };
 
+function formatCutoverForDisplay(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  const hasTime = /[T\s]\d{1,2}:\d{2}/.test(trimmed) || /^\d{4}-\d{2}-\d{2}T/.test(trimmed);
+  const d = new Date(trimmed);
+  if (!Number.isNaN(d.getTime()) && hasTime) {
+    return format(d, 'PPp');
+  }
+  if (!Number.isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return format(d, 'PP');
+  }
+  return trimmed;
+}
+
 export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const settings = getSettings();
   const supplierProfile = findSupplierProfile(settings.suppliers || [], item.supplier);
+  const suggestedRackFromLocation = useMemo(() => {
+    if (!item.location?.trim()) {
+      return "";
+    }
+    if ((item.rackLocation ?? "").trim()) {
+      return "";
+    }
+    return getDefaultRackSlotForLocationFlatId(settings.locations || [], item.location);
+  }, [item.location, item.rackLocation, settings.locations]);
 
   const handleDelete = () => {
     setIsDeleteDialogOpen(false);
@@ -176,6 +197,13 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                   <span className="text-sm font-medium mr-2">Rack:</span>
                   <span className="font-mono text-sm">{item.rackLocation}</span>
                 </div>
+              ) : suggestedRackFromLocation ? (
+                <div className="flex flex-wrap items-center gap-x-2">
+                  <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm font-medium">Rack:</span>
+                  <span className="text-sm text-muted-foreground">Not set — typical for this location:</span>
+                  <span className="font-mono text-sm text-foreground">{suggestedRackFromLocation}</span>
+                </div>
               ) : null}
               {(item.decomEOLDate ||
                 item.decomCutoverDate ||
@@ -193,7 +221,8 @@ export function ItemDetails({ item, onEdit, onDelete, onAdjust }: ItemDetailsPro
                   ) : null}
                   {item.decomCutoverDate ? (
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-foreground">Cut-over:</span> {item.decomCutoverDate}
+                      <span className="font-medium text-foreground">Cut-over:</span>{" "}
+                      {formatCutoverForDisplay(String(item.decomCutoverDate))}
                     </p>
                   ) : null}
                   {item.decomNotes ? (

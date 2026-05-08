@@ -122,6 +122,7 @@ interface EditItemFormProps {
   existingManufacturers?: string[];
   existingSuppliers?: string[];
   existingProjects?: string[];
+  showMaintenanceCutoverCautions?: boolean;
 }
 
 type ComboboxOption = {
@@ -367,6 +368,7 @@ export function EditItemForm({
   existingManufacturers = [],
   existingSuppliers = [],
   existingProjects = [],
+  showMaintenanceCutoverCautions = true,
 }: EditItemFormProps) {
   const [activeTab, setActiveTab] = useState("details");
 
@@ -583,7 +585,7 @@ export function EditItemForm({
           </TabsContent>
 
           <TabsContent value="decommissioning" className="mt-4">
-            <DecommissioningTab form={form} />
+            <DecommissioningTab form={form} showMaintenancePlanning={showMaintenanceCutoverCautions} />
           </TabsContent>
         </Tabs>
 

@@ -12,6 +12,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { flattenProjectOptions } from "@/lib/projectOptions";
 import { formatDistanceToNow } from "date-fns";
 import {
+  getDefaultRackSlotForLocationFlatId,
   getRackOptionsForFlatLocationLabel,
   RACK_LOCATIONS_UPDATED_EVENT,
 } from "@/lib/rackLocationsConfig";
@@ -206,6 +207,22 @@ export function BasicDetailsTab({
     () => rackOptions.map((o) => ({ label: o, value: o })),
     [rackOptions]
   );
+
+  React.useEffect(() => {
+    const loc = watchedLocationId;
+    if (!loc?.trim()) {
+      return;
+    }
+    const rack = (form.getValues("rackLocation") ?? "").trim();
+    if (rack) {
+      return;
+    }
+    const def = getDefaultRackSlotForLocationFlatId(locations, loc);
+    if (def) {
+      form.setValue("rackLocation", def, { shouldDirty: false });
+    }
+  }, [watchedLocationId, locations, form]);
+
   const flattenedProjectOptions = React.useMemo(() => flattenProjectOptions(projects), [projects]);
   const projectComboboxOptions = React.useMemo(
     () => flattenedProjectOptions.map((o) => ({ label: o.name, value: o.id })),
@@ -407,7 +424,7 @@ export function BasicDetailsTab({
                   onChange={(value) => {
                     field.onChange(value);
                     form.setValue("cabinet", "");
-                    form.setValue("rackLocation", "");
+                    form.setValue("rackLocation", getDefaultRackSlotForLocationFlatId(locations, value));
                   }}
                   placeholder="Select location"
                   emptyText="No location matches."

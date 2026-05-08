@@ -3,6 +3,8 @@ import type { FC } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { canViewMaintenanceWindowCautions } from '@/lib/maintenanceCutoverCaution';
 import { InventoryItem, CategoryNode, ItemWithSubcategories } from '@/types/inventory';
 import BatchOperations from '@/components/BatchOperations';
 import { v4 as uuidv4 } from 'uuid';
@@ -205,7 +207,14 @@ export default function InventoryPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { currentUser } = useAuth();
+  const { currentUser, authBackend } = useAuth();
+  const { activeWorkspaceId, activeWorkspaceRole } = useWorkspace();
+  const showMaintenanceCutoverCautions = canViewMaintenanceWindowCautions({
+    authBackend,
+    activeWorkspaceId,
+    activeWorkspaceRole,
+    appUserRole: currentUser?.role,
+  });
   const inventoryPreferenceUserKey = useMemo(
     () => currentUser?.username || currentUser?.displayName || 'admin',
     [currentUser?.username, currentUser?.displayName]
@@ -1994,6 +2003,7 @@ export default function InventoryPage() {
         costCenters={costCenters}
         existingItems={items}
         selectedTemplate={addDialogTemplate}
+        showMaintenanceCutoverCautions={showMaintenanceCutoverCautions}
       />
 
       <MobileQuickAddDialog
@@ -2005,6 +2015,7 @@ export default function InventoryPage() {
         suppliers={suppliers}
         projects={projects}
         onSubmit={handleQuickAddSubmit}
+        showMaintenanceCutoverCautions={showMaintenanceCutoverCautions}
       />
 
       {selectedItem && (
@@ -2023,6 +2034,7 @@ export default function InventoryPage() {
             costCenters={costCenters}
             cabinets={[]}
             existingItems={items}
+            showMaintenanceCutoverCautions={showMaintenanceCutoverCautions}
           />
 
           <DuplicateItemDialog

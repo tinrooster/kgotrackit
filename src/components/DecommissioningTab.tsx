@@ -16,24 +16,30 @@ import {
 } from '@/components/ui/select';
 import { ASSET_STATUS_GROUPS_FOR_EOL_TAB } from '@/lib/decommissioningAssetStatusOptions';
 import { SettingsService, DEFAULT_SETTINGS_CHANGED_EVENT } from '@/lib/settingsService';
+import { computeCutoverMaintenanceCaution } from '@/lib/maintenanceCutoverCaution';
 
 interface DecommissioningTabProps {
   form: UseFormReturn<any>;
+  /** When false, hide ON/OFF-air caution messaging (workspace viewers / personal non-admin). */
+  showMaintenancePlanning?: boolean;
 }
 
 function splitDateTimeLocal(value?: string): { date: string; time: string } {
   if (!value) return { date: '', time: '' };
   const match = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
-  if (!match) return { date: '', time: '' };
-  return { date: match[1], time: match[2] };
+  if (match) return { date: match[1], time: match[2] };
+  const dateOnly = value.match(/^(\d{4}-\d{2}-\d{2})$/);
+  if (dateOnly) return { date: dateOnly[1], time: '00:00' };
+  return { date: '', time: '' };
 }
 
 function combineDateTimeLocal(dateValue: string, timeValue: string): string {
-  if (!dateValue || !timeValue) return '';
-  return `${dateValue}T${timeValue}`;
+  if (!dateValue) return '';
+  const t = timeValue?.trim() ? timeValue : '00:00';
+  return `${dateValue}T${t}`;
 }
 
-export function DecommissioningTab({ form }: DecommissioningTabProps) {
+export function DecommissioningTab({ form, showMaintenancePlanning = true }: DecommissioningTabProps) {
   const [defaultSettings, setDefaultSettings] = React.useState(() => SettingsService.loadDefaultSettings());
   const cutoverDateTimeValue = form.watch('decomCutoverDate') as string | undefined;
 
@@ -44,59 +50,11 @@ export function DecommissioningTab({ form }: DecommissioningTabProps) {
   }, []);
 
   const cutoverCaution = React.useMemo(() => {
-    if (!defaultSettings.maintenanceCautionsEnabled || !cutoverDateTimeValue) {
+    if (!showMaintenancePlanning) {
       return null;
     }
-    const cutoverDate = new Date(cutoverDateTimeValue);
-    if (Number.isNaN(cutoverDate.getTime())) {
-      return null;
-    }
-
-    const dayKeyByNumber: Array<keyof typeof defaultSettings.maintenanceOnAirSchedule> = [
-      'sunday',
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-    ];
-    const dayKey = dayKeyByNumber[cutoverDate.getDay()];
-    const cutoverMinutes = cutoverDate.getHours() * 60 + cutoverDate.getMinutes();
-    const onAirTimes = defaultSettings.maintenanceOnAirSchedule?.[dayKey] ?? [];
-    const blockMinutes = Math.max(15, Number(defaultSettings.maintenanceProgrammingBlockMinutes ?? 60));
-    const isOnAirSlot = onAirTimes.some((timeValue) => {
-      const [hoursPart, minutesPart] = timeValue.split(':');
-      const slotHours = Number(hoursPart);
-      const slotMinutes = Number(minutesPart);
-      if (!Number.isFinite(slotHours) || !Number.isFinite(slotMinutes)) {
-        return false;
-      }
-      const startMinutes = slotHours * 60 + slotMinutes;
-      const endMinutes = startMinutes + blockMinutes;
-      return cutoverMinutes >= startMinutes && cutoverMinutes < endMinutes;
-    });
-    const shouldWarn =
-      defaultSettings.maintenanceCautionMode === 'on-air'
-        ? isOnAirSlot
-        : !isOnAirSlot;
-
-    if (!shouldWarn) {
-      return null;
-    }
-
-    return defaultSettings.maintenanceCautionMode === 'on-air'
-      ? {
-          title: 'ON-AIR caution',
-          detail: `This cut-over time is inside a configured ON-AIR programming block (${blockMinutes} min).`,
-          warning: true,
-        }
-      : {
-          title: 'OFF-AIR caution',
-          detail: `This cut-over time is inside an OFF-AIR block based on the configured ON-AIR schedule (${blockMinutes} min block length).`,
-          warning: true,
-        };
-  }, [cutoverDateTimeValue, defaultSettings]);
+    return computeCutoverMaintenanceCaution(cutoverDateTimeValue, defaultSettings);
+  }, [cutoverDateTimeValue, defaultSettings, showMaintenancePlanning]);
 
   return (
     <div className="mx-auto w-full max-w-[56rem] space-y-4">
@@ -182,7 +140,7 @@ export function DecommissioningTab({ form }: DecommissioningTabProps) {
                   />
                 </FormControl>
               </div>
-              {defaultSettings.maintenanceCautionsEnabled ? (
+              {showMaintenancePlanning && defaultSettings.maintenanceCautionsEnabled ? (
                 cutoverCaution ? (
                   <p className="mt-2 flex items-start gap-2 text-xs font-medium text-amber-500">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

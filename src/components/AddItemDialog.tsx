@@ -29,6 +29,7 @@ interface AddItemDialogProps {
   selectedTemplate?: ItemTemplate | null;
   existingItems: InventoryItem[];
   cabinets?: Cabinet[];
+  showMaintenanceCutoverCautions?: boolean;
 }
 
 function buildValuesFromTemplate(
@@ -90,6 +91,7 @@ export function AddItemDialog({
   selectedTemplate: externalSelectedTemplate,
   existingItems,
   cabinets = [],
+  showMaintenanceCutoverCautions = true,
 }: AddItemDialogProps) {
   const [templates, setTemplates] = useState<ItemTemplate[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -275,6 +277,7 @@ export function AddItemDialog({
               isSubmitting={isSubmitting}
               existingItems={existingItems}
               initialValues={formValues}
+              showMaintenanceCutoverCautions={showMaintenanceCutoverCautions}
             />
           </div>
         </div>

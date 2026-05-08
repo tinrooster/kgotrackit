@@ -6,28 +6,14 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Camera } from 'lucide-react';
-import type { DefaultSettings } from '@/lib/settingsService';
+import {
+  DEMO_BROADCAST_ON_AIR_TEMPLATE,
+  EMPTY_MAINTENANCE_ON_AIR_SCHEDULE,
+  mergeMaintenanceScheduleForApply,
+  normalizeMaintenanceTimeListInput,
+  type DefaultSettings,
+} from '@/lib/settingsService';
 import { CAMERA_DEVICE_ID_KEY, CAMERA_SETTINGS_UPDATED_EVENT } from "@/components/CameraSettingsDialog";
-
-const ORG_BROADCAST_ON_AIR_TEMPLATE: DefaultSettings['maintenanceOnAirSchedule'] = {
-  sunday: ['09:00', '17:00', '18:00', '23:00'],
-  monday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
-  tuesday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
-  wednesday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
-  thursday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
-  friday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
-  saturday: [],
-};
-
-const EMPTY_ON_AIR_TEMPLATE: DefaultSettings['maintenanceOnAirSchedule'] = {
-  sunday: [],
-  monday: [],
-  tuesday: [],
-  wednesday: [],
-  thursday: [],
-  friday: [],
-  saturday: [],
-};
 
 interface GeneralSettingsTabProps {
   onOpenCameraSettings: () => void;
@@ -36,6 +22,9 @@ interface GeneralSettingsTabProps {
   currentUsername: string;
   canEditAssetTagPrefix: boolean;
   canEditAdminNotificationEmail: boolean;
+  /** When set, Apply org template prefers cloud-stored org schedule; otherwise uses {@link DEMO_BROADCAST_ON_AIR_TEMPLATE}. */
+  organizationMaintenanceTemplate?: DefaultSettings['maintenanceOnAirSchedule'] | null;
+  activeOrganizationId?: string | null;
 }
 
 export function GeneralSettingsTab({
@@ -45,7 +34,13 @@ export function GeneralSettingsTab({
   currentUsername,
   canEditAssetTagPrefix,
   canEditAdminNotificationEmail,
+  organizationMaintenanceTemplate = null,
+  activeOrganizationId = null,
 }: GeneralSettingsTabProps) {
+  const scheduleToApplyFromOrg = mergeMaintenanceScheduleForApply(
+    organizationMaintenanceTemplate ?? null,
+    DEMO_BROADCAST_ON_AIR_TEMPLATE,
+  );
   const scheduleDayLabels: Array<{ key: keyof DefaultSettings['maintenanceOnAirSchedule']; label: string }> = [
     { key: 'sunday', label: 'Sunday' },
     { key: 'monday', label: 'Monday' },
@@ -55,19 +50,6 @@ export function GeneralSettingsTab({
     { key: 'friday', label: 'Friday' },
     { key: 'saturday', label: 'Saturday' },
   ];
-
-  const normalizeTimeList = React.useCallback((raw: string): string[] => {
-    const validQuarterHour = /^([01]\d|2[0-3]):(00|15|30|45)$/;
-    return Array.from(
-      new Set(
-        raw
-          .split(',')
-          .map((value) => value.trim())
-          .filter((value) => validQuarterHour.test(value))
-          .sort((left, right) => left.localeCompare(right)),
-      ),
-    );
-  }, []);
 
   const confirmDeletesEnabled = settings.deleteConfirmationByUser?.[currentUsername] ?? true;
   const undoEnabled = settings.undoByUser?.[currentUsername] ?? true;
@@ -264,12 +246,17 @@ export function GeneralSettingsTab({
             <p className="text-xs text-muted-foreground">
               Enter comma-separated times per day in HH:mm (examples: 05:00, 11:00, 23:00). Values are normalized and invalid entries are ignored.
             </p>
+            {activeOrganizationId && !organizationMaintenanceTemplate ? (
+              <p className="text-xs text-amber-700 dark:text-amber-500/90">
+                No organization template saved yet—Apply org template uses the anonymous demo pattern (Settings → Organization).
+              </p>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => onSettingsChange({ maintenanceOnAirSchedule: ORG_BROADCAST_ON_AIR_TEMPLATE })}
+                onClick={() => onSettingsChange({ maintenanceOnAirSchedule: scheduleToApplyFromOrg })}
               >
                 Apply org template
               </Button>
@@ -277,7 +264,7 @@ export function GeneralSettingsTab({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => onSettingsChange({ maintenanceOnAirSchedule: EMPTY_ON_AIR_TEMPLATE })}
+                onClick={() => onSettingsChange({ maintenanceOnAirSchedule: { ...EMPTY_MAINTENANCE_ON_AIR_SCHEDULE } })}
               >
                 Clear all windows
               </Button>
@@ -294,7 +281,7 @@ export function GeneralSettingsTab({
                       onSettingsChange({
                         maintenanceOnAirSchedule: {
                           ...settings.maintenanceOnAirSchedule,
-                          [day.key]: normalizeTimeList(event.target.value),
+                          [day.key]: normalizeMaintenanceTimeListInput(event.target.value),
                         },
                       })
                     }

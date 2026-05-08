@@ -96,6 +96,7 @@ interface AddItemFormProps {
   existingManufacturers?: string[];
   existingSuppliers?: string[];
   existingProjects?: string[];
+  showMaintenanceCutoverCautions?: boolean;
 }
 
 export function AddItemForm({
@@ -114,7 +115,8 @@ export function AddItemForm({
   existingItems = [],
   existingManufacturers = [],
   existingSuppliers = [],
-  existingProjects = []
+  existingProjects = [],
+  showMaintenanceCutoverCautions = true,
 }: AddItemFormProps) {
   const [activeTab, setActiveTab] = useState("details");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -298,7 +300,7 @@ export function AddItemForm({
           </TabsContent>
 
           <TabsContent value="decommissioning" className="mt-4">
-            <DecommissioningTab form={form} />
+            <DecommissioningTab form={form} showMaintenancePlanning={showMaintenanceCutoverCautions} />
           </TabsContent>
         </Tabs>
 

@@ -8,6 +8,7 @@ import { subDays, addDays } from 'date-fns';
 import { STORAGE_KEYS } from "./storageService";
 import { getItems, getSettings, saveItems, saveSettings } from './storageService';
 import { getActiveWorkspaceId } from './supabase/workspaceData';
+import { DEMO_BROADCAST_ON_AIR_TEMPLATE, SettingsService } from '@/lib/settingsService';
 
 const categories = ["Cable", "Connector", "Hardware", "Tool", "Software", "Expendable", "Fiber Optic", "Power", "Networking", "Audio", "Video", "Lighting"];
 const units = ["ft", "each", "box", "spool", "kit", "license", "pair", "meter"];
@@ -208,6 +209,12 @@ export const applySetupDefaultsChoice = (choice: SetupDefaultsChoice, includeSam
       locations: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.LOCATIONS]),
       suppliers: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.SUPPLIERS]),
       projects: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.PROJECTS]),
+    });
+
+    const uiDefaults = SettingsService.loadDefaultSettings();
+    SettingsService.saveDefaultSettings({
+      ...uiDefaults,
+      maintenanceOnAirSchedule: { ...DEMO_BROADCAST_ON_AIR_TEMPLATE },
     });
 
     if (includeSampleInventory) {

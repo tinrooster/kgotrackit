@@ -25,7 +25,6 @@ const SETTINGS_TAB_LABELS: Record<string, string> = {
   general: 'General Settings',
   userDefined: 'Lookup Lists',
   libraries: 'Libraries',
-  masterCrew: 'Master Crew',
   organization: 'Organization',
   users: 'Users',
   data: 'Data Management',
@@ -39,7 +38,6 @@ const SETTINGS_TAB_DEFAULT_SUBLABELS: Record<string, string> = {
   workspaces: 'Workspaces and Invites',
   logs: 'System Logs',
   users: 'Team Members',
-  masterCrew: 'Master Crew',
   general: 'Preferences',
 };
 
@@ -63,7 +61,7 @@ const DATA_PANEL_LABELS: Record<string, string> = {
   'backup-restore': 'Backup & Restore',
 };
 const URL_SYNC_EVENT = 'trackit:url-sync';
-const ADMIN_ONLY_SETTINGS_TABS = new Set(['userDefined', 'libraries', 'masterCrew', 'organization', 'users', 'workspaces', 'logs']);
+const ADMIN_ONLY_SETTINGS_TABS = new Set(['userDefined', 'libraries', 'organization', 'users', 'workspaces', 'logs']);
 
 function titleize(segment: string): string {
   return segment
@@ -105,8 +103,9 @@ export function AppBreadcrumbs() {
     if (location.pathname === '/settings') {
       const search = new URLSearchParams(urlSearch);
       const rawSettingsTab = search.get('st');
+      const normalizedTab = rawSettingsTab === 'masterCrew' ? 'organization' : rawSettingsTab;
       const settingsTab =
-        rawSettingsTab && !canManageSharedConfig && ADMIN_ONLY_SETTINGS_TABS.has(rawSettingsTab) ? 'general' : rawSettingsTab;
+        normalizedTab && !canManageSharedConfig && ADMIN_ONLY_SETTINGS_TABS.has(normalizedTab) ? 'general' : normalizedTab;
       let hasExplicitSublevel = false;
       if (settingsTab && SETTINGS_TAB_LABELS[settingsTab]) {
         baseCrumbs.push({ href: `/settings?st=${settingsTab}`, label: SETTINGS_TAB_LABELS[settingsTab] });
@@ -141,7 +140,12 @@ export function AppBreadcrumbs() {
           });
         }
       }
-      if (settingsTab !== 'libraries' && settingsTab !== 'userDefined' && !hasExplicitSublevel) {
+      if (
+        settingsTab &&
+        settingsTab !== 'libraries' &&
+        settingsTab !== 'userDefined' &&
+        !hasExplicitSublevel
+      ) {
         const defaultSubLabel = SETTINGS_TAB_DEFAULT_SUBLABELS[settingsTab];
         if (defaultSubLabel) {
           baseCrumbs.push({

@@ -6,7 +6,7 @@ import type { DefaultSettings } from '@/lib/settingsService';
 import type { FinancialSettings } from '@/lib/financialSettingsService';
 import type { Settings } from '@/lib/storageService';
 import { getSupabase } from '@/lib/supabase/client';
-import { SettingsService } from '@/lib/settingsService';
+import { parseMaintenanceOnAirScheduleFromUnknown, SettingsService } from '@/lib/settingsService';
 import {
   getItems,
   getSettings,
@@ -380,6 +380,9 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
           existingOrganizationRow?.branding && typeof existingOrganizationRow.branding === 'object'
             ? existingOrganizationRow.branding
             : {},
+        maintenance_on_air_template: parseMaintenanceOnAirScheduleFromUnknown(
+          existingOrganizationRow?.maintenance_on_air_template,
+        ),
       } satisfies OrganizationSnapshotPayload);
     }
     await pushWorkspaceSnapshot(wsId, snapshot as WorkspaceSnapshotPayload);

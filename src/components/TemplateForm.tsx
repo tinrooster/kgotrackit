@@ -89,6 +89,7 @@ interface TemplateFormProps {
   cabinets?: Cabinet[];
   projects?: ItemWithSubcategories[];
   isSubmitting?: boolean;
+  showMaintenanceCutoverCautions?: boolean;
 }
 
 export function TemplateForm({
@@ -102,6 +103,7 @@ export function TemplateForm({
   cabinets = [],
   projects = [],
   isSubmitting = false,
+  showMaintenanceCutoverCautions = true,
 }: TemplateFormProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("details");
@@ -330,7 +332,7 @@ export function TemplateForm({
           </TabsContent>
 
           <TabsContent value="decommissioning" className="mt-0 min-h-[min(22rem,50vh)] space-y-4">
-            <DecommissioningTab form={form} />
+            <DecommissioningTab form={form} showMaintenancePlanning={showMaintenanceCutoverCautions} />
           </TabsContent>
         </Tabs>
 

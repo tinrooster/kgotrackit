@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -29,6 +28,9 @@ import { AddItemDialog } from '@/components/AddItemDialog';
 import { useInventory } from "@/hooks/useInventory";
 import { cn } from "@/lib/utils";
 import { TemplatesSortableList } from "@/components/settings/TemplatesSortableList";
+import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { canViewMaintenanceWindowCautions } from '@/lib/maintenanceCutoverCaution';
 
 export function TemplatesPage() {
   const [templates, setTemplates] = useState<ItemTemplate[]>([]);
@@ -39,6 +41,14 @@ export function TemplatesPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { items: existingItems } = useInventory();
+  const { authBackend, currentUser } = useAuth();
+  const { activeWorkspaceId, activeWorkspaceRole } = useWorkspace();
+  const showMaintenanceCutoverCautions = canViewMaintenanceWindowCautions({
+    authBackend,
+    activeWorkspaceId,
+    activeWorkspaceRole,
+    appUserRole: currentUser?.role,
+  });
 
   const [settings, setSettings] = useState(() => getSettings());
   const { categories, units, locations, suppliers, projects } = settings;
@@ -231,6 +241,7 @@ export function TemplatesPage() {
               locations={locations}
               suppliers={suppliers}
               projects={projects}
+              showMaintenanceCutoverCautions={showMaintenanceCutoverCautions}
             />
           </div>
         </DraggableDialogContent>
@@ -249,6 +260,7 @@ export function TemplatesPage() {
           projects={projects}
           selectedTemplate={selectedTemplate}
           existingItems={existingItems}
+          showMaintenanceCutoverCautions={showMaintenanceCutoverCautions}
         />
       )}
     </div>

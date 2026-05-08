@@ -16,15 +16,105 @@ declare global {
   }
 }
 
-const EMPTY_MAINTENANCE_ON_AIR_SCHEDULE = {
-  sunday: [] as string[],
-  monday: [] as string[],
-  tuesday: [] as string[],
-  wednesday: [] as string[],
-  thursday: [] as string[],
-  friday: [] as string[],
-  saturday: [] as string[],
+const timeHHmmSchema = z.string().regex(/^\d{2}:\d{2}$/);
+
+export const maintenanceOnAirScheduleSchema = z.object({
+  sunday: z.array(timeHHmmSchema).default([]),
+  monday: z.array(timeHHmmSchema).default([]),
+  tuesday: z.array(timeHHmmSchema).default([]),
+  wednesday: z.array(timeHHmmSchema).default([]),
+  thursday: z.array(timeHHmmSchema).default([]),
+  friday: z.array(timeHHmmSchema).default([]),
+  saturday: z.array(timeHHmmSchema).default([]),
+});
+
+export type MaintenanceOnAirSchedule = z.infer<typeof maintenanceOnAirScheduleSchema>;
+
+export const EMPTY_MAINTENANCE_ON_AIR_SCHEDULE: MaintenanceOnAirSchedule = {
+  sunday: [],
+  monday: [],
+  tuesday: [],
+  wednesday: [],
+  thursday: [],
+  friday: [],
+  saturday: [],
 };
+
+/**
+ * Anonymous demo / org-apply fallback ON-AIR start times (15-minute grid).
+ * Saturday 05:00–08:00: hourly program starts covering a 5–9 AM style block; 23:00: late block.
+ * (External labels such as PC2 / PC3 are not persisted—times only.)
+ */
+export const DEMO_BROADCAST_ON_AIR_TEMPLATE: MaintenanceOnAirSchedule = {
+  sunday: ['08:00', '16:00', '17:00', '22:00'],
+  monday: ['04:00', '05:00', '10:00', '14:00', '15:00', '16:00', '17:00', '22:00'],
+  tuesday: ['04:00', '05:00', '10:00', '14:00', '15:00', '16:00', '17:00', '22:00'],
+  wednesday: ['04:00', '05:00', '10:00', '14:00', '15:00', '16:00', '17:00', '22:00'],
+  thursday: ['04:00', '05:00', '10:00', '14:00', '15:00', '16:00', '17:00', '22:00'],
+  friday: ['04:00', '05:00', '10:00', '14:00', '15:00', '16:00', '17:00', '22:00'],
+  saturday: ['05:00', '06:00', '07:00', '08:00', '23:00'],
+};
+
+export function normalizeMaintenanceTimeListInput(raw: string): string[] {
+  const validQuarterHour = /^([01]\d|2[0-3]):(00|15|30|45)$/;
+  return Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => validQuarterHour.test(value))
+        .sort((left, right) => left.localeCompare(right)),
+    ),
+  );
+}
+
+export function parseMaintenanceOnAirScheduleFromUnknown(raw: unknown): MaintenanceOnAirSchedule | null {
+  if (raw == null) {
+    return null;
+  }
+  const parsed = maintenanceOnAirScheduleSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+export function hasMaintenanceScheduleAnyTimes(schedule: MaintenanceOnAirSchedule | null | undefined): boolean {
+  if (!schedule) {
+    return false;
+  }
+  return (Object.keys(schedule) as Array<keyof MaintenanceOnAirSchedule>).some(
+    (day) => (schedule[day]?.length ?? 0) > 0,
+  );
+}
+
+const MAINTENANCE_SCHEDULE_DAY_KEYS: Array<keyof MaintenanceOnAirSchedule> = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+
+/** Per weekday: org times when non-empty, otherwise demo (fills e.g. Saturday when org row omitted that day). */
+export function mergeMaintenanceScheduleForApply(
+  org: MaintenanceOnAirSchedule | null,
+  demo: MaintenanceOnAirSchedule,
+): MaintenanceOnAirSchedule {
+  const out: MaintenanceOnAirSchedule = {
+    sunday: [],
+    monday: [],
+    tuesday: [],
+    wednesday: [],
+    thursday: [],
+    friday: [],
+    saturday: [],
+  };
+  for (const day of MAINTENANCE_SCHEDULE_DAY_KEYS) {
+    const fromOrg = org?.[day];
+    out[day] = fromOrg && fromOrg.length > 0 ? [...fromOrg] : [...(demo[day] ?? [])];
+  }
+  return out;
+}
 
 // Define the settings schema
 export const defaultSettingsSchema = z.object({
@@ -58,15 +148,7 @@ export const defaultSettingsSchema = z.object({
   maintenanceCautionsEnabled: z.boolean().default(true),
   maintenanceCautionMode: z.enum(['on-air', 'off-air']).default('on-air'),
   maintenanceProgrammingBlockMinutes: z.number().int().min(15).max(240).default(60),
-  maintenanceOnAirSchedule: z.object({
-    sunday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
-    monday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
-    tuesday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
-    wednesday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
-    thursday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
-    friday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
-    saturday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
-  }).default(EMPTY_MAINTENANCE_ON_AIR_SCHEDULE),
+  maintenanceOnAirSchedule: maintenanceOnAirScheduleSchema.default(() => maintenanceOnAirScheduleSchema.parse({})),
   deleteConfirmationByUser: z.record(z.string(), z.boolean()).default({}),
   undoByUser: z.record(z.string(), z.boolean()).default({}),
 });
@@ -136,15 +218,7 @@ export class SettingsService {
       maintenanceCautionsEnabled: true,
       maintenanceCautionMode: 'on-air',
       maintenanceProgrammingBlockMinutes: 60,
-      maintenanceOnAirSchedule: {
-        sunday: [],
-        monday: [],
-        tuesday: [],
-        wednesday: [],
-        thursday: [],
-        friday: [],
-        saturday: [],
-      },
+      maintenanceOnAirSchedule: { ...EMPTY_MAINTENANCE_ON_AIR_SCHEDULE },
       deleteConfirmationByUser: {},
       undoByUser: {},
     };

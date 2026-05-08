@@ -221,7 +221,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/crew" element={<Navigate to="/settings?st=masterCrew" replace />} />
+              <Route path="/crew" element={<Navigate to="/settings?st=organization" replace />} />
               <Route
                 path="/help"
                 element={

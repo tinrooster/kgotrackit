@@ -1,4 +1,5 @@
 import { getSupabase } from '@/lib/supabase/client';
+import type { MaintenanceOnAirSchedule } from '@/lib/settingsService';
 
 export const ACTIVE_ORGANIZATION_STORAGE_KEY = 'trackit:active-organization-id';
 
@@ -20,6 +21,7 @@ export type OrganizationAppDataRow = {
   inventory_baseline: unknown;
   role_tags: unknown;
   branding: unknown;
+  maintenance_on_air_template?: MaintenanceOnAirSchedule | null;
   updated_at?: string;
 };
 

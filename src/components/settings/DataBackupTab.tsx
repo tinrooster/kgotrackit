@@ -150,6 +150,7 @@ export function DataBackupTab({
     role_tags: true,
     branding: true,
     inventory_baseline: true,
+    maintenance_on_air_template: true,
   });
   const [isResettingOrganization, setIsResettingOrganization] = useState(false);
   const [organizationImportStrategy, setOrganizationImportStrategy] = useState<'replace' | 'merge' | 'skip'>('merge');
@@ -703,7 +704,7 @@ export function DataBackupTab({
                 <div className="rounded-md border border-border/60 bg-muted/20 p-3">
                   <h3 className="text-sm font-medium">Organization Library Portability</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Export/import shared organization libraries (crew contacts, position templates, role tags, branding).
+                    Export/import shared organization libraries (crew contacts, position templates, role tags, branding, maintenance ON-AIR template).
                     {organizationDataLabel ? ` Active: ${organizationDataLabel}.` : ''}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1055,6 +1056,10 @@ export function DataBackupTab({
                   <li>Role tags: incoming {orgImportPreview.incomingCounts.role_tags}, overlaps {orgImportPreview.overlapCounts.role_tags}</li>
                   <li>Branding keys: incoming {orgImportPreview.incomingCounts.branding}, overlaps {orgImportPreview.overlapCounts.branding}</li>
                   <li>Inventory baseline rows: incoming {orgImportPreview.incomingCounts.inventory_baseline}, overlaps {orgImportPreview.overlapCounts.inventory_baseline}</li>
+                  <li>
+                    Maintenance ON-AIR template: incoming {orgImportPreview.incomingCounts.maintenance_on_air_template},
+                    overlaps {orgImportPreview.overlapCounts.maintenance_on_air_template}
+                  </li>
                 </ul>
               </div>
             ) : null}
@@ -1103,6 +1108,19 @@ export function DataBackupTab({
                 />
                 Inventory baseline
               </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={orgImportSections.maintenance_on_air_template}
+                  onChange={(event) =>
+                    setOrgImportSections((prev) => ({
+                      ...prev,
+                      maintenance_on_air_template: event.target.checked,
+                    }))
+                  }
+                />
+                Maintenance ON-AIR template
+              </label>
             </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1132,7 +1150,8 @@ export function DataBackupTab({
           <AlertDialogHeader>
             <AlertDialogTitle>Reset organization settings-only data?</AlertDialogTitle>
             <AlertDialogDescription>
-              This clears shared library metadata (contacts, position templates, role tags, branding, inventory baseline)
+              This clears shared library metadata (contacts, position templates, role tags, branding, inventory baseline,
+              maintenance ON-AIR template)
               for the active organization. Production and workspace operational records are preserved.
             </AlertDialogDescription>
           </AlertDialogHeader>

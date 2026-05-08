@@ -35,15 +35,21 @@ import {
   Warehouse,
   X,
   Zap,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SimpleBarcodeScanner } from "@/components/SimpleBarcodeScanner";
 import { QuickCapturePhotoDialog } from "@/components/QuickCapturePhotoDialog";
 import {
+  getDefaultRackSlotForLocationFlatId,
   getRackOptionsForFlatLocationLabel,
   getRackOptionsForSubLocationKey,
   RACK_LOCATIONS_UPDATED_EVENT,
 } from "@/lib/rackLocationsConfig";
+import { TimeInput } from "@/components/ui/time-input";
+import { computeCutoverMaintenanceCaution } from "@/lib/maintenanceCutoverCaution";
+import { DEFAULT_SETTINGS_CHANGED_EVENT } from "@/lib/settingsService";
 import { findLocationByFlatId } from "@/lib/locationOptions";
 import { estimateDataUrlBytes, normalizeImageFileToDataUrl } from "@/lib/imageNormalization";
 
@@ -177,6 +183,22 @@ export interface MobileQuickAddDialogProps {
     payload: Omit<InventoryItem, "id" | "lastUpdated">,
     mode: "once" | "next"
   ) => Promise<void>;
+  showMaintenanceCutoverCautions?: boolean;
+}
+
+function splitCutoverDateTime(value: string): { date: string; time: string } {
+  if (!value) return { date: "", time: "" };
+  const m = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  if (m) return { date: m[1], time: m[2] };
+  const d = value.match(/^(\d{4}-\d{2}-\d{2})$/);
+  if (d) return { date: d[1], time: "00:00" };
+  return { date: "", time: "" };
+}
+
+function combineCutoverDateTime(dateValue: string, timeValue: string): string {
+  if (!dateValue) return "";
+  const t = timeValue?.trim() ? timeValue : "00:00";
+  return `${dateValue}T${t}`;
 }
 
 // ─── component ───────────────────────────────────────────────────────────────
@@ -190,6 +212,7 @@ export function MobileQuickAddDialog({
   suppliers,
   projects,
   onSubmit,
+  showMaintenanceCutoverCautions = true,
 }: MobileQuickAddDialogProps) {
   const nameRef = React.useRef<HTMLInputElement>(null);
   const galleryInputRef = React.useRef<HTMLInputElement>(null);
@@ -209,7 +232,11 @@ export function MobileQuickAddDialog({
   const [assetStatus, setAssetStatus] = React.useState<string>("active");
   const [assetTrackingMode, setAssetTrackingMode] = React.useState<"line_item" | "per_unit">("line_item");
   const [rackLocation, setRackLocation] = React.useState("");
+  const [decomEOLDate, setDecomEOLDate] = React.useState("");
+  const [cutoverDatePart, setCutoverDatePart] = React.useState("");
+  const [cutoverTimePart, setCutoverTimePart] = React.useState("");
   const [rackCfgEpoch, setRackCfgEpoch] = React.useState(0);
+  const [uiSettings, setUiSettings] = React.useState(() => SettingsService.loadDefaultSettings());
   const [subPickerParent, setSubPickerParent] = React.useState<ItemWithSubcategories | null>(null);
   const [scannerOpen, setScannerOpen] = React.useState(false);
   const [captureOpen, setCaptureOpen] = React.useState(false);
@@ -278,6 +305,22 @@ export function MobileQuickAddDialog({
     return () => window.removeEventListener(RACK_LOCATIONS_UPDATED_EVENT, onRackCfg);
   }, []);
 
+  React.useEffect(() => {
+    const onSettings = () => setUiSettings(SettingsService.loadDefaultSettings());
+    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, onSettings);
+    return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, onSettings);
+  }, []);
+
+  const cutoverCombined = React.useMemo(
+    () => combineCutoverDateTime(cutoverDatePart, cutoverTimePart),
+    [cutoverDatePart, cutoverTimePart],
+  );
+
+  const quickAddCutoverCaution = React.useMemo(() => {
+    if (!showMaintenanceCutoverCautions) return null;
+    return computeCutoverMaintenanceCaution(cutoverCombined || undefined, uiSettings);
+  }, [cutoverCombined, uiSettings, showMaintenanceCutoverCautions]);
+
   const flatLocationLabelForRack = React.useMemo(() => {
     const resolved = resolveLocationLabel(locationId, locations);
     return resolved ? resolved.replace(/\s*\/\s*/g, "/") : "";
@@ -327,26 +370,29 @@ export function MobileQuickAddDialog({
 
   const applyLocationId = React.useCallback((loc: string) => {
     setLocationId(loc);
-    setRackLocation("");
+    setRackLocation(getDefaultRackSlotForLocationFlatId(locations, loc));
     const parent = findParentForLocationValue(loc, locations);
     setSubPickerParent(parent?.children?.length ? parent : null);
   }, [locations]);
 
   const selectParentLocation = (loc: ItemWithSubcategories) => {
+    let nextId = "";
     if (loc.children?.length) {
       setSubPickerParent(loc);
       const firstSub = loc.children[0];
-      if (firstSub) setLocationId(`${loc.id}/${firstSub.id}`);
+      if (firstSub) nextId = `${loc.id}/${firstSub.id}`;
     } else {
       setSubPickerParent(null);
-      setLocationId(loc.id);
+      nextId = loc.id;
     }
-    setRackLocation("");
+    setLocationId(nextId);
+    setRackLocation(getDefaultRackSlotForLocationFlatId(locations, nextId));
   };
 
   const selectSubLocation = (parent: ItemWithSubcategories, subId: string) => {
-    setLocationId(`${parent.id}/${subId}`);
-    setRackLocation("");
+    const nextId = `${parent.id}/${subId}`;
+    setLocationId(nextId);
+    setRackLocation(getDefaultRackSlotForLocationFlatId(locations, nextId));
   };
 
   const selectParentUnit = React.useCallback((u: ItemWithSubcategories) => {
@@ -400,7 +446,11 @@ export function MobileQuickAddDialog({
     setBarcode("");
     setAssetStatus("active");
     setAssetTrackingMode("line_item");
-    setRackLocation(prefs.rackLocation?.trim() ?? "");
+    const suggestedRack = getDefaultRackSlotForLocationFlatId(locations, loc);
+    setRackLocation(prefs.rackLocation?.trim() || suggestedRack);
+    setDecomEOLDate("");
+    setCutoverDatePart("");
+    setCutoverTimePart("");
 
     if (!loc) setOpenSection("location");
     else if (!cat) setOpenSection("category");
@@ -485,8 +535,28 @@ export function MobileQuickAddDialog({
       deliveryPercentage: 100,
       companyAssetTag: undefined,
       photoUrl: photoUrl.trim() || undefined,
+      decomEOLDate: decomEOLDate.trim() || undefined,
+      decomCutoverDate: cutoverCombined.trim() || undefined,
     };
-  }, [name, notes, quantity, unit, unitSubcategory, category, locationId, project, suppliers, photoUrl, barcode, units, assetStatus, assetTrackingMode, rackLocation]);
+  }, [
+    name,
+    notes,
+    quantity,
+    unit,
+    unitSubcategory,
+    category,
+    locationId,
+    project,
+    suppliers,
+    photoUrl,
+    barcode,
+    units,
+    assetStatus,
+    assetTrackingMode,
+    rackLocation,
+    decomEOLDate,
+    cutoverCombined,
+  ]);
 
   const handleSubmit = async (mode: "once" | "next") => {
     const payload = buildPayload();
@@ -504,6 +574,9 @@ export function MobileQuickAddDialog({
         setPhotoUrl("");
         setBarcode("");
         setRackLocation("");
+        setDecomEOLDate("");
+        setCutoverDatePart("");
+        setCutoverTimePart("");
         requestAnimationFrame(() => nameRef.current?.focus());
       }
     } catch (e) {
@@ -750,6 +823,54 @@ export function MobileQuickAddDialog({
               rows={2}
               className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
             />
+
+            <div className="grid grid-cols-1 gap-2 rounded-md border border-border/50 bg-muted/15 p-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">EOL target date</Label>
+                <Input
+                  type="date"
+                  value={decomEOLDate}
+                  onChange={(e) => setDecomEOLDate(e.target.value)}
+                  className="h-9 text-sm touch-manipulation"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Cut-over scheduled</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    type="date"
+                    value={cutoverDatePart}
+                    onChange={(e) => {
+                      const d = e.target.value;
+                      setCutoverDatePart(d);
+                      if (!d) setCutoverTimePart("");
+                    }}
+                    className="h-9 min-w-0 flex-1 text-sm touch-manipulation"
+                  />
+                  <div className="w-[7.5rem] shrink-0">
+                    <TimeInput
+                      value={cutoverTimePart}
+                      onChange={(ev) => setCutoverTimePart(ev.currentTarget.value)}
+                    />
+                  </div>
+                </div>
+                {showMaintenanceCutoverCautions && uiSettings.maintenanceCautionsEnabled ? (
+                  quickAddCutoverCaution ? (
+                    <p className="flex items-start gap-1.5 text-[10px] font-medium text-amber-500">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span>
+                        {quickAddCutoverCaution.title}: {quickAddCutoverCaution.detail}
+                      </span>
+                    </p>
+                  ) : cutoverDatePart ? (
+                    <p className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                      <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span>No maintenance caution at this selected time.</span>
+                    </p>
+                  ) : null
+                ) : null}
+              </div>
+            </div>
 
             {/* Quick tools row: Qty + icon buttons */}
             <div className="flex items-center gap-1.5">

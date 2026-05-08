@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Library, Building2, Contact, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +40,7 @@ import { DataBackupTab } from "@/components/settings/DataBackupTab"
 import { WorkspaceTeamTab } from '@/components/settings/WorkspaceTeamTab'
 import { SupabaseWorkspaceUsersCard } from '@/components/settings/SupabaseWorkspaceUsersCard'
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
+import { OrgMaintenanceBroadcastTemplateSection } from '@/components/settings/OrgMaintenanceBroadcastTemplateSection'
 import {
   UserDefinedListsSection,
   type UserDefinedPanel,
@@ -65,6 +66,8 @@ import {
   type OrganizationImportStrategy,
   type OrganizationImportSections,
 } from '@/lib/supabase/organizationPortability'
+import { pullOrganizationAppData } from '@/lib/supabase/organizationData'
+import { parseMaintenanceOnAirScheduleFromUnknown, type MaintenanceOnAirSchedule } from '@/lib/settingsService'
 
 interface SettingsState {
   categories: ItemWithSubcategories[];
@@ -283,7 +286,6 @@ const SETTINGS_PRIMARY_TAB_IDS = [
   'general',
   'userDefined',
   'libraries',
-  'masterCrew',
   'organization',
   'users',
   'data',
@@ -294,7 +296,6 @@ type SettingsPrimaryTabId = (typeof SETTINGS_PRIMARY_TAB_IDS)[number];
 const ADMIN_ONLY_SETTINGS_TABS: SettingsPrimaryTabId[] = [
   'userDefined',
   'libraries',
-  'masterCrew',
   'organization',
   'users',
   'workspaces',
@@ -308,6 +309,9 @@ function isAdminOnlySettingsTab(tab: SettingsPrimaryTabId): boolean {
 function readSettingsPrimaryTabFromSearch(): SettingsPrimaryTabId {
   try {
     const raw = new URLSearchParams(window.location.search).get('st');
+    if (raw === 'masterCrew') {
+      return 'organization';
+    }
     if (raw && (SETTINGS_PRIMARY_TAB_IDS as readonly string[]).includes(raw)) {
       return raw as SettingsPrimaryTabId;
     }
@@ -347,7 +351,7 @@ export default function SettingsPage() {
   const location = useLocation();
   const { currentUser, authBackend } = useAuth();
   const { activeWorkspaceId, activeWorkspaceRole, workspaces } = useWorkspace();
-  const { activeOrganizationId, activeOrganizationName } = useOrganization();
+  const { activeOrganizationId, activeOrganizationName, activeOrganizationRole } = useOrganization();
   const activeWorkspaceName = activeWorkspaceId
     ? workspaces.find((workspace) => workspace.workspaceId === activeWorkspaceId)?.name ?? null
     : null;
@@ -401,6 +405,26 @@ export default function SettingsPage() {
   const [resettingUser, setResettingUser] = useState<User | null>(null)
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
   const [defaultSettings, setDefaultSettings] = useState<DefaultSettings>(() => SettingsService.loadDefaultSettings());
+  const [orgMaintenanceTemplateStored, setOrgMaintenanceTemplateStored] = useState<MaintenanceOnAirSchedule | null>(
+    null,
+  );
+
+  const refreshOrgMaintenanceTemplate = useCallback(async () => {
+    if (authBackend !== 'supabase' || !activeOrganizationId) {
+      setOrgMaintenanceTemplateStored(null);
+      return;
+    }
+    try {
+      const row = await pullOrganizationAppData(activeOrganizationId);
+      setOrgMaintenanceTemplateStored(parseMaintenanceOnAirScheduleFromUnknown(row?.maintenance_on_air_template));
+    } catch {
+      setOrgMaintenanceTemplateStored(null);
+    }
+  }, [authBackend, activeOrganizationId]);
+
+  useEffect(() => {
+    void refreshOrgMaintenanceTemplate();
+  }, [refreshOrgMaintenanceTemplate]);
   const [financialSettings, setFinancialSettings] = useState<{ expenseTypes: FinancialCodeEntry[]; costCenters: FinancialCodeEntry[] }>(() => getFinancialSettings());
   const [settingsTab, setSettingsTab] = useState<SettingsPrimaryTabId>(() =>
     readSettingsPrimaryTabFromSearch(),
@@ -444,9 +468,11 @@ export default function SettingsPage() {
   useEffect(() => {
     const search = new URLSearchParams(location.search);
     const stRaw = search.get('st');
-    const requestedSettingsTab = stRaw && (SETTINGS_PRIMARY_TAB_IDS as readonly string[]).includes(stRaw)
-      ? (stRaw as SettingsPrimaryTabId)
-      : 'general';
+    const normalizedSt = stRaw === 'masterCrew' ? 'organization' : stRaw;
+    const requestedSettingsTab =
+      normalizedSt && (SETTINGS_PRIMARY_TAB_IDS as readonly string[]).includes(normalizedSt)
+        ? (normalizedSt as SettingsPrimaryTabId)
+        : 'general';
     const nextSettingsTab =
       !canManageSharedConfig && isAdminOnlySettingsTab(requestedSettingsTab)
         ? 'general'
@@ -2077,13 +2103,6 @@ export default function SettingsPage() {
               </TabsTrigger>
             )}
             {canManageSharedConfig && (
-              <TabsTrigger value="masterCrew" title="Master crew contacts" className="inline-flex items-center gap-1.5">
-                <Contact className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                <span data-settings-tab-long>Master Crew</span>
-                <span data-settings-tab-short>Crew roster</span>
-              </TabsTrigger>
-            )}
-            {canManageSharedConfig && (
               <TabsTrigger value="organization" title="Organization library" className="inline-flex items-center gap-1.5">
                 <Building2 className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
                 <span data-settings-tab-long>Organization</span>
@@ -2136,6 +2155,8 @@ export default function SettingsPage() {
             currentUsername={currentUser?.username ?? 'admin'}
             canEditAssetTagPrefix={canManageSharedConfig}
             canEditAdminNotificationEmail={canManageSharedConfig}
+            organizationMaintenanceTemplate={orgMaintenanceTemplateStored}
+            activeOrganizationId={activeOrganizationId}
           />
         </TabsContent>
 
@@ -2166,15 +2187,6 @@ export default function SettingsPage() {
               onRequestDeleteReconcile={requestListDeleteReconcile}
               canDeleteItems={canManageSharedConfig}
             />
-          </TabsContent>
-        )}
-
-        {canManageSharedConfig && (
-          <TabsContent value="masterCrew" className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Master crew contacts are shared across productions. Each production&apos;s Crew tab assigns people to that shoot; attach names from this roster when building a crew list.
-            </p>
-            <CrewPage />
           </TabsContent>
         )}
 
@@ -2210,6 +2222,24 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-foreground">
+                <Contact className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <h2 className="text-base font-semibold">Master crew</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Master crew contacts are shared across productions. Each production&apos;s Crew tab assigns people to that
+                shoot; attach names from this roster when building a crew list.
+              </p>
+              <CrewPage />
+            </div>
+            <OrgMaintenanceBroadcastTemplateSection
+              organizationId={activeOrganizationId}
+              authBackend={authBackend}
+              storedTemplate={orgMaintenanceTemplateStored}
+              canEdit={activeOrganizationRole === 'admin' || activeOrganizationRole === 'editor'}
+              onAfterSave={() => void refreshOrgMaintenanceTemplate()}
+            />
           </TabsContent>
         )}
 

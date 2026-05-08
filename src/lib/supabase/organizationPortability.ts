@@ -6,6 +6,11 @@ import {
   type OrganizationAppDataRow,
   type OrganizationSnapshotPayload,
 } from '@/lib/supabase/organizationData';
+import {
+  hasMaintenanceScheduleAnyTimes,
+  parseMaintenanceOnAirScheduleFromUnknown,
+  type MaintenanceOnAirSchedule,
+} from '@/lib/settingsService';
 import type { CrewContact } from '@/types/crewContacts';
 import type { PositionTemplate } from '@/types/productions';
 
@@ -15,7 +20,8 @@ export type OrganizationImportSection =
   | 'position_templates'
   | 'role_tags'
   | 'branding'
-  | 'inventory_baseline';
+  | 'inventory_baseline'
+  | 'maintenance_on_air_template';
 
 export type OrganizationImportSections = Record<OrganizationImportSection, boolean>;
 
@@ -27,11 +33,20 @@ export interface OrganizationImportPreview {
   overlapCounts: Record<OrganizationImportSection, number>;
 }
 
+type NormalizedOrganizationSnapshot = {
+  contacts: CrewContact[];
+  position_templates: PositionTemplate[];
+  inventory_baseline: unknown[];
+  role_tags: unknown[];
+  branding: Record<string, unknown>;
+  maintenance_on_air_template: MaintenanceOnAirSchedule | null;
+};
+
 export interface OrganizationExportBundle {
   version: 'trackit-organization-export-v1';
   exportedAt: string;
   organizationId: string;
-  data: OrganizationSnapshotPayload;
+  data: NormalizedOrganizationSnapshot;
 }
 
 function normalizeCrewContact(raw: unknown): CrewContact | null {
@@ -82,7 +97,7 @@ function normalizeObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function normalizeSnapshot(raw: Partial<OrganizationSnapshotPayload> | null | undefined): OrganizationSnapshotPayload {
+function normalizeSnapshot(raw: Partial<OrganizationSnapshotPayload> | null | undefined): NormalizedOrganizationSnapshot {
   const contacts = normalizeArray(raw?.contacts).map((entry) => normalizeCrewContact(entry)).filter(Boolean) as CrewContact[];
   const positionTemplates = normalizeArray(raw?.position_templates)
     .map((entry, index) => normalizePositionTemplate(entry, index))
@@ -93,6 +108,7 @@ function normalizeSnapshot(raw: Partial<OrganizationSnapshotPayload> | null | un
     inventory_baseline: normalizeArray(raw?.inventory_baseline),
     role_tags: normalizeArray(raw?.role_tags),
     branding: normalizeObject(raw?.branding),
+    maintenance_on_air_template: parseMaintenanceOnAirScheduleFromUnknown(raw?.maintenance_on_air_template),
   };
 }
 
@@ -120,9 +136,9 @@ function mergeUnknownArrays(existing: unknown[], incoming: unknown[]): unknown[]
 
 function applyStrategy(
   strategy: OrganizationImportStrategy,
-  current: OrganizationSnapshotPayload,
-  incoming: OrganizationSnapshotPayload,
-): OrganizationSnapshotPayload {
+  current: NormalizedOrganizationSnapshot,
+  incoming: NormalizedOrganizationSnapshot,
+): NormalizedOrganizationSnapshot {
   if (strategy === 'replace') {
     return incoming;
   }
@@ -135,6 +151,9 @@ function applyStrategy(
         current.inventory_baseline.length > 0 ? current.inventory_baseline : incoming.inventory_baseline,
       role_tags: current.role_tags.length > 0 ? current.role_tags : incoming.role_tags,
       branding: Object.keys(current.branding).length > 0 ? current.branding : incoming.branding,
+      maintenance_on_air_template: hasMaintenanceScheduleAnyTimes(current.maintenance_on_air_template)
+        ? current.maintenance_on_air_template
+        : incoming.maintenance_on_air_template,
     };
   }
   const mergedContacts = mergeByKey(
@@ -153,20 +172,25 @@ function applyStrategy(
     inventory_baseline: mergeUnknownArrays(current.inventory_baseline, incoming.inventory_baseline),
     role_tags: mergeUnknownArrays(current.role_tags, incoming.role_tags),
     branding: { ...current.branding, ...incoming.branding },
+    maintenance_on_air_template:
+      incoming.maintenance_on_air_template ?? current.maintenance_on_air_template,
   };
 }
 
 function applySectionSelection(
-  current: OrganizationSnapshotPayload,
-  incoming: OrganizationSnapshotPayload,
+  current: NormalizedOrganizationSnapshot,
+  incoming: NormalizedOrganizationSnapshot,
   sections: OrganizationImportSections,
-): OrganizationSnapshotPayload {
+): NormalizedOrganizationSnapshot {
   return {
     contacts: sections.contacts ? incoming.contacts : current.contacts,
     position_templates: sections.position_templates ? incoming.position_templates : current.position_templates,
     role_tags: sections.role_tags ? incoming.role_tags : current.role_tags,
     branding: sections.branding ? incoming.branding : current.branding,
     inventory_baseline: sections.inventory_baseline ? incoming.inventory_baseline : current.inventory_baseline,
+    maintenance_on_air_template: sections.maintenance_on_air_template
+      ? incoming.maintenance_on_air_template
+      : current.maintenance_on_air_template,
   };
 }
 
@@ -177,12 +201,13 @@ function defaultSections(): OrganizationImportSections {
     role_tags: true,
     branding: true,
     inventory_baseline: true,
+    maintenance_on_air_template: true,
   };
 }
 
 function overlapCounts(
-  current: OrganizationSnapshotPayload,
-  incoming: OrganizationSnapshotPayload,
+  current: NormalizedOrganizationSnapshot,
+  incoming: NormalizedOrganizationSnapshot,
 ): Record<OrganizationImportSection, number> {
   const currentContactKeys = new Set(
     (current.contacts as CrewContact[]).map((contact) =>
@@ -209,12 +234,19 @@ function overlapCounts(
   const brandingOverlap = Object.keys(incoming.branding).filter((key) =>
     Object.prototype.hasOwnProperty.call(current.branding, key),
   ).length;
+  const maintenanceOverlap =
+    hasMaintenanceScheduleAnyTimes(incoming.maintenance_on_air_template) &&
+    hasMaintenanceScheduleAnyTimes(current.maintenance_on_air_template) &&
+    stableJsonKey(current.maintenance_on_air_template) === stableJsonKey(incoming.maintenance_on_air_template)
+      ? 1
+      : 0;
   return {
     contacts: incomingContactOverlaps,
     position_templates: incomingTemplateOverlaps,
     role_tags: roleTagOverlaps,
     inventory_baseline: baselineOverlaps,
     branding: brandingOverlap,
+    maintenance_on_air_template: maintenanceOverlap,
   };
 }
 
@@ -251,6 +283,7 @@ export async function exportOrganizationBundle(organizationId: string): Promise<
     inventory_baseline: normalizedRemote.inventory_baseline,
     role_tags: normalizedRemote.role_tags,
     branding: normalizedRemote.branding,
+    maintenance_on_air_template: normalizedRemote.maintenance_on_air_template,
   });
   return {
     version: 'trackit-organization-export-v1',
@@ -273,7 +306,7 @@ export async function importOrganizationBundleFromFile(params: {
   const selectedSections = { ...defaultSections(), ...(params.sections ?? {}) };
   const incoming = applySectionSelection(current, incomingRaw, selectedSections);
   const next = applyStrategy(params.strategy, current, incoming);
-  await pushOrganizationSnapshot(params.organizationId, next);
+  await pushOrganizationSnapshot(params.organizationId, next as OrganizationSnapshotPayload);
   if (selectedSections.contacts) {
     saveCrewContacts(next.contacts as CrewContact[]);
   }
@@ -300,6 +333,7 @@ export async function previewOrganizationImportFromFile(params: {
       role_tags: normalizeArray(incoming.role_tags).length,
       branding: Object.keys(incoming.branding).length,
       inventory_baseline: normalizeArray(incoming.inventory_baseline).length,
+      maintenance_on_air_template: hasMaintenanceScheduleAnyTimes(incoming.maintenance_on_air_template) ? 1 : 0,
     },
     existingCounts: {
       contacts: current.contacts.length,
@@ -307,6 +341,7 @@ export async function previewOrganizationImportFromFile(params: {
       role_tags: normalizeArray(current.role_tags).length,
       branding: Object.keys(current.branding).length,
       inventory_baseline: normalizeArray(current.inventory_baseline).length,
+      maintenance_on_air_template: hasMaintenanceScheduleAnyTimes(current.maintenance_on_air_template) ? 1 : 0,
     },
     overlapCounts: overlapCounts(current, incoming),
   };
@@ -319,7 +354,20 @@ export async function resetOrganizationLibraryMetadata(organizationId: string): 
     role_tags: [],
     branding: {},
     inventory_baseline: [],
-  });
+    maintenance_on_air_template: null,
+  } as OrganizationSnapshotPayload);
   saveCrewContacts([]);
   savePositionTemplates([]);
+}
+
+export async function saveOrganizationMaintenanceOnAirTemplate(
+  organizationId: string,
+  template: MaintenanceOnAirSchedule | null,
+): Promise<void> {
+  const existingRow = await pullOrganizationAppData(organizationId);
+  const base = normalizeSnapshot(existingRow ?? undefined);
+  await pushOrganizationSnapshot(organizationId, {
+    ...base,
+    maintenance_on_air_template: template,
+  } as OrganizationSnapshotPayload);
 }
