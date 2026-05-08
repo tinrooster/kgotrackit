@@ -6,8 +6,9 @@ import { getItems } from '@/lib/storageService';
 import { TemplatesPage } from '@/pages/TemplatesPage';
 import { DeviceLibraryTab } from '@/components/settings/DeviceLibraryTab';
 import { PositionTemplatesPanel } from '@/components/settings/PositionTemplatesPanel';
+import CabinetManagement from '@/pages/CabinetManagement';
 
-export type LibrariesPanel = 'suppliers' | 'positionTemplates' | 'templates' | 'deviceLibrary';
+export type LibrariesPanel = 'suppliers' | 'positionTemplates' | 'templates' | 'deviceLibrary' | 'cabinets';
 
 interface SettingsListsState {
   categories: ItemWithSubcategories[];
@@ -34,6 +35,7 @@ const LIB_NAV: { id: LibrariesPanel; label: string }[] = [
   { id: 'positionTemplates', label: 'Position templates' },
   { id: 'templates', label: 'Templates' },
   { id: 'deviceLibrary', label: 'Device library' },
+  { id: 'cabinets', label: 'Cab/Storage' },
 ];
 
 export function LibrariesSection({
@@ -106,6 +108,17 @@ export function LibrariesSection({
           {panel === 'templates' && <TemplatesPage />}
 
           {panel === 'deviceLibrary' && <DeviceLibraryTab />}
+
+          {panel === 'cabinets' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Secure cabinet / storage</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CabinetManagement locations={settings.locations.map((loc) => loc.name)} />
+              </CardContent>
+            </Card>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,13 +1,14 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import CabinetManagement from '@/pages/CabinetManagement';
 import { FinancialCodesTab } from '@/components/settings/FinancialCodesTab';
 import { ItemWithSubcategories } from '@/types/inventory';
 import { FinancialCodeEntry, saveFinancialSettings } from '@/lib/financialSettingsService';
 import { logger } from '@/lib/logging';
 import { EditableItemWithSubcategoriesList } from '@/components/EditableItemWithSubcategoriesList';
 import { getItems } from '@/lib/storageService';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useHorizontalScrollHints } from '@/components/ui/useHorizontalScrollHints';
 
 export type UserDefinedPanel =
   | 'overview'
@@ -15,8 +16,7 @@ export type UserDefinedPanel =
   | 'units'
   | 'locations'
   | 'projects'
-  | 'financial'
-  | 'cabinets';
+  | 'financial';
 
 interface SettingsListsState {
   categories: ItemWithSubcategories[];
@@ -34,7 +34,6 @@ const LIST_NAV: { id: Exclude<UserDefinedPanel, 'overview'>; label: string }[] =
   { id: 'units', label: 'Units' },
   { id: 'locations', label: 'Locations' },
   { id: 'projects', label: 'Projects' },
-  { id: 'cabinets', label: 'Cab/Storage' },
   { id: 'financial', label: 'Expense Codes' },
 ];
 
@@ -65,39 +64,73 @@ export function UserDefinedListsSection({
   onNormalizeRackIds,
   canDeleteItems = true,
 }: UserDefinedListsSectionProps) {
+  const lookupPanelCardClassName = 'lookup-panel-card';
+  const lookupPanelCardHeaderClassName = 'lookup-panel-card-header';
+  const lookupPanelCardContentClassName = 'lookup-panel-card-content';
+  const {
+    scrollRef: listNavRef,
+    isOverflowing: isListNavOverflowing,
+    canScrollLeft: listNavCanScrollLeft,
+    canScrollRight: listNavCanScrollRight,
+    shouldPulseRightHint: shouldPulseListNavHint,
+  } = useHorizontalScrollHints<HTMLElement>({
+    pulseStorageKey: 'lookup-list-nav-hint-pulsed',
+  });
+
   const requestReconcile = (type: string, value: string, affectedCount: number) => {
     onRequestDeleteReconcile({ type, value, affectedCount });
   };
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="lookup-lists-shell-card">
         <CardHeader className="pb-2">
           <CardTitle>Lookup Lists</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <nav className="flex flex-wrap gap-2" aria-label="Lookup list type">
-            {LIST_NAV.map(({ id, label }) => (
-              <Button
-                key={id}
-                type="button"
-                size="sm"
-                variant={panel === id ? 'secondary' : 'outline'}
-                onClick={() => onPanelChange(id)}
-              >
-                {label}
-              </Button>
-            ))}
-          </nav>
+        <CardContent className="lookup-lists-mobile-compact space-y-3 sm:space-y-4">
+          <div
+            className="lookup-lists-nav-shell relative"
+            data-overflowing={isListNavOverflowing ? 'true' : 'false'}
+            data-can-scroll-left={listNavCanScrollLeft ? 'true' : 'false'}
+            data-can-scroll-right={listNavCanScrollRight ? 'true' : 'false'}
+          >
+            <nav
+              ref={listNavRef}
+              className="flex flex-nowrap gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              aria-label="Lookup list type"
+            >
+              {LIST_NAV.map(({ id, label }) => (
+                <Button
+                  key={id}
+                  type="button"
+                  size="sm"
+                  variant={panel === id ? 'secondary' : 'outline'}
+                  className="shrink-0"
+                  onClick={() => onPanelChange(id)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </nav>
+            <div className="settings-tabs-scroll-hint settings-tabs-scroll-hint-left" aria-hidden>
+              <ChevronLeft className="h-4 w-4" />
+            </div>
+            <div
+              className={`settings-tabs-scroll-hint settings-tabs-scroll-hint-right${shouldPulseListNavHint ? ' settings-tabs-scroll-hint-pulse-once' : ''}`}
+              aria-hidden
+            >
+              <ChevronRight className="h-4 w-4" />
+            </div>
+          </div>
 
           {panel === 'overview' && null}
 
           {panel === 'categories' && (
-            <Card>
-              <CardHeader>
+            <Card className={lookupPanelCardClassName}>
+              <CardHeader className={lookupPanelCardHeaderClassName}>
                 <CardTitle>Categories</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className={lookupPanelCardContentClassName}>
                 <EditableItemWithSubcategoriesList
                   hideListTitle
                   items={settings.categories}
@@ -120,11 +153,11 @@ export function UserDefinedListsSection({
           )}
 
           {panel === 'units' && (
-            <Card>
-              <CardHeader>
+            <Card className={lookupPanelCardClassName}>
+              <CardHeader className={lookupPanelCardHeaderClassName}>
                 <CardTitle>Units</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className={lookupPanelCardContentClassName}>
                 <EditableItemWithSubcategoriesList
                   hideListTitle
                   items={settings.units}
@@ -146,8 +179,8 @@ export function UserDefinedListsSection({
           )}
 
           {panel === 'locations' && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <Card className={lookupPanelCardClassName}>
+              <CardHeader className={`${lookupPanelCardHeaderClassName} flex flex-row items-center justify-between gap-2`}>
                 <CardTitle>Locations</CardTitle>
                 {onNormalizeRackIds ? (
                   <Button type="button" size="sm" variant="outline" onClick={onNormalizeRackIds}>
@@ -155,7 +188,7 @@ export function UserDefinedListsSection({
                   </Button>
                 ) : null}
               </CardHeader>
-              <CardContent>
+              <CardContent className={lookupPanelCardContentClassName}>
                 <EditableItemWithSubcategoriesList
                   hideListTitle
                   items={settings.locations}
@@ -180,11 +213,11 @@ export function UserDefinedListsSection({
           )}
 
           {panel === 'projects' && (
-            <Card>
-              <CardHeader>
+            <Card className={lookupPanelCardClassName}>
+              <CardHeader className={lookupPanelCardHeaderClassName}>
                 <CardTitle>Projects</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className={lookupPanelCardContentClassName}>
                 <EditableItemWithSubcategoriesList
                   hideListTitle
                   items={settings.projects}
@@ -252,16 +285,6 @@ export function UserDefinedListsSection({
             />
           )}
 
-          {panel === 'cabinets' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Secure cabinet / storage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CabinetManagement locations={settings.locations.map((loc) => loc.name)} />
-              </CardContent>
-            </Card>
-          )}
         </CardContent>
       </Card>
     </div>

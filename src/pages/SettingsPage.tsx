@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Library } from 'lucide-react'
+import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Library, Building2, Contact, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useOrganization } from '@/contexts/OrganizationContext'
+import { useLocation } from 'react-router-dom'
 import { Label } from "@/components/ui/label"
 import { getPasswordError } from '@/utils/passwordUtils'
 import { v4 as uuidv4 } from 'uuid'
@@ -51,13 +52,11 @@ import * as XLSX from 'xlsx'
 import { SystemLogs } from '@/components/settings/SystemLogs'
 import AddUserDialog from '@/components/AddUserDialog'
 import { logger } from '@/lib/logging'
+import CrewPage from '@/pages/CrewPage'
 import { reconcileInventoryGroup, type GroupReconcileResult } from '@/lib/groupInventoryReconciliation'
-import {
-  fixUnreconciledForLookupPanel,
-  panelSupportsListReconcile,
-} from '@/lib/listReconcileFixes'
 import { parseDeviceLibraryFromBackup, saveDeviceLibrary } from '@/lib/deviceLibraryStorage'
 import { sendAdminSettingsNotification } from '@/lib/supabase/adminNotifications'
+import { useHorizontalScrollHints } from '@/components/ui/useHorizontalScrollHints'
 import {
   exportOrganizationBundle,
   importOrganizationBundleFromFile,
@@ -280,7 +279,72 @@ function AdminResetPasswordDialog({
   );
 }
 
+const SETTINGS_PRIMARY_TAB_IDS = [
+  'general',
+  'userDefined',
+  'libraries',
+  'masterCrew',
+  'organization',
+  'users',
+  'data',
+  'workspaces',
+  'logs',
+] as const;
+type SettingsPrimaryTabId = (typeof SETTINGS_PRIMARY_TAB_IDS)[number];
+const ADMIN_ONLY_SETTINGS_TABS: SettingsPrimaryTabId[] = [
+  'userDefined',
+  'libraries',
+  'masterCrew',
+  'organization',
+  'users',
+  'workspaces',
+  'logs',
+];
+const URL_SYNC_EVENT = 'trackit:url-sync';
+function isAdminOnlySettingsTab(tab: SettingsPrimaryTabId): boolean {
+  return ADMIN_ONLY_SETTINGS_TABS.includes(tab);
+}
+
+function readSettingsPrimaryTabFromSearch(): SettingsPrimaryTabId {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('st');
+    if (raw && (SETTINGS_PRIMARY_TAB_IDS as readonly string[]).includes(raw)) {
+      return raw as SettingsPrimaryTabId;
+    }
+  } catch {
+    /* ignore malformed URLs */
+  }
+  return 'general';
+}
+
+function readUserDefinedPanelFromSearch(): UserDefinedPanel {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('usp');
+    const allowedPanels: UserDefinedPanel[] = ['overview', 'categories', 'units', 'locations', 'projects', 'financial'];
+    if (raw && allowedPanels.includes(raw as UserDefinedPanel)) {
+      return raw as UserDefinedPanel;
+    }
+  } catch {
+    /* ignore malformed URLs */
+  }
+  return 'categories';
+}
+
+function readLibrariesPanelFromSearch(): LibrariesPanel {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('lp');
+    const allowedPanels: LibrariesPanel[] = ['suppliers', 'positionTemplates', 'templates', 'deviceLibrary', 'cabinets'];
+    if (raw && allowedPanels.includes(raw as LibrariesPanel)) {
+      return raw as LibrariesPanel;
+    }
+  } catch {
+    /* ignore malformed URLs */
+  }
+  return 'positionTemplates';
+}
+
 export default function SettingsPage() {
+  const location = useLocation();
   const { currentUser, authBackend } = useAuth();
   const { activeWorkspaceId, activeWorkspaceRole, workspaces } = useWorkspace();
   const { activeOrganizationId, activeOrganizationName } = useOrganization();
@@ -314,6 +378,7 @@ export default function SettingsPage() {
       url.searchParams.set('tab', activeTab);
     }
     window.history.replaceState({}, '', url.toString());
+    window.dispatchEvent(new CustomEvent(URL_SYNC_EVENT));
   }, [mainTab, activeTab]);
 
   const [settings, setSettings] = useState<SettingsState>({
@@ -337,9 +402,11 @@ export default function SettingsPage() {
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
   const [defaultSettings, setDefaultSettings] = useState<DefaultSettings>(() => SettingsService.loadDefaultSettings());
   const [financialSettings, setFinancialSettings] = useState<{ expenseTypes: FinancialCodeEntry[]; costCenters: FinancialCodeEntry[] }>(() => getFinancialSettings());
-  const [settingsTab, setSettingsTab] = useState('general');
-  const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>('categories');
-  const [librariesPanel, setLibrariesPanel] = useState<LibrariesPanel>('positionTemplates');
+  const [settingsTab, setSettingsTab] = useState<SettingsPrimaryTabId>(() =>
+    readSettingsPrimaryTabFromSearch(),
+  )
+  const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>(() => readUserDefinedPanelFromSearch());
+  const [librariesPanel, setLibrariesPanel] = useState<LibrariesPanel>(() => readLibrariesPanelFromSearch());
   const canManageSharedConfig = activeWorkspaceId
     ? activeWorkspaceRole === 'admin'
     : currentUser?.role === 'admin';
@@ -348,6 +415,15 @@ export default function SettingsPage() {
   const listRedoStackRef = useRef<ListUndoSnapshot[]>([]);
   const [listUndoAvailable, setListUndoAvailable] = useState(false);
   const [listRedoAvailable, setListRedoAvailable] = useState(false);
+  const {
+    scrollRef: primaryTabsListRef,
+    isOverflowing: isPrimaryTabsOverflowing,
+    canScrollLeft: primaryTabsCanScrollLeft,
+    canScrollRight: primaryTabsCanScrollRight,
+    shouldPulseRightHint: shouldPulsePrimaryTabsHint,
+  } = useHorizontalScrollHints<HTMLDivElement>({
+    pulseStorageKey: 'settings-primary-tabs-hint-pulsed',
+  });
 
   const [importDuplicates, setImportDuplicates] = useState<{
     type: SettingsKey;
@@ -364,6 +440,69 @@ export default function SettingsPage() {
     fileType: 'json' | 'excel';
     file: File;
   } | null>(null);
+
+  useEffect(() => {
+    const search = new URLSearchParams(location.search);
+    const stRaw = search.get('st');
+    const requestedSettingsTab = stRaw && (SETTINGS_PRIMARY_TAB_IDS as readonly string[]).includes(stRaw)
+      ? (stRaw as SettingsPrimaryTabId)
+      : 'general';
+    const nextSettingsTab =
+      !canManageSharedConfig && isAdminOnlySettingsTab(requestedSettingsTab)
+        ? 'general'
+        : requestedSettingsTab;
+    if (nextSettingsTab !== settingsTab) {
+      setSettingsTab(nextSettingsTab);
+    }
+
+    if (nextSettingsTab === 'userDefined') {
+      const uspRaw = search.get('usp');
+      const allowedUserPanels: UserDefinedPanel[] = ['overview', 'categories', 'units', 'locations', 'projects', 'financial'];
+      const nextUserPanel = uspRaw && allowedUserPanels.includes(uspRaw as UserDefinedPanel)
+        ? (uspRaw as UserDefinedPanel)
+        : 'categories';
+      if (nextUserPanel !== userDefinedPanel) {
+        setUserDefinedPanel(nextUserPanel);
+      }
+    }
+
+    if (nextSettingsTab === 'libraries') {
+      const lpRaw = search.get('lp');
+      const allowedLibraryPanels: LibrariesPanel[] = ['suppliers', 'positionTemplates', 'templates', 'deviceLibrary', 'cabinets'];
+      const nextLibraryPanel = lpRaw && allowedLibraryPanels.includes(lpRaw as LibrariesPanel)
+        ? (lpRaw as LibrariesPanel)
+        : 'positionTemplates';
+      if (nextLibraryPanel !== librariesPanel) {
+        setLibrariesPanel(nextLibraryPanel);
+      }
+    }
+  }, [location.search, canManageSharedConfig]);
+
+  useEffect(() => {
+    if (!canManageSharedConfig && isAdminOnlySettingsTab(settingsTab)) {
+      setSettingsTab('general');
+    }
+  }, [settingsTab, canManageSharedConfig]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('st', settingsTab);
+    if (settingsTab === 'userDefined') {
+      url.searchParams.set('usp', userDefinedPanel);
+      url.searchParams.delete('lp');
+    } else if (settingsTab === 'libraries') {
+      url.searchParams.set('lp', librariesPanel);
+      url.searchParams.delete('usp');
+    } else {
+      url.searchParams.delete('usp');
+      url.searchParams.delete('lp');
+      if (settingsTab !== 'data') {
+        url.searchParams.delete('dp');
+      }
+    }
+    window.history.replaceState({}, '', url.toString());
+    window.dispatchEvent(new CustomEvent(URL_SYNC_EVENT));
+  }, [settingsTab, userDefinedPanel, librariesPanel]);
 
   useEffect(() => {
     if (importDuplicateReport.length === 0) {
@@ -1876,19 +2015,8 @@ export default function SettingsPage() {
     setListRedoAvailable(listRedoStackRef.current.length > 0);
   };
 
-  const handleFixUnreconciledLookup = () => {
-    if (settingsTab === 'libraries' && librariesPanel === 'suppliers') {
-      fixUnreconciledForLookupPanel('suppliers', settings);
-      return;
-    }
-    if (!panelSupportsListReconcile(userDefinedPanel)) {
-      return;
-    }
-    fixUnreconciledForLookupPanel(userDefinedPanel, settings);
-  };
-
   return (
-    <div className="settings-page container max-w-6xl py-6">
+    <div className="settings-page mx-auto w-full max-w-6xl px-2 py-6 sm:px-4">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1914,59 +2042,91 @@ export default function SettingsPage() {
             <Redo2 className="mr-2 h-4 w-4" />
             Redo
           </Button>
-          {(settingsTab === 'userDefined' && panelSupportsListReconcile(userDefinedPanel)) && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleFixUnreconciledLookup}
-              title="Clear invalid inventory references for this list"
-            >
-              <Wrench className="mr-2 h-4 w-4" />
-              Fix unreconciled
-            </Button>
-          )}
         </div>
       </div>
 
-      <Tabs value={settingsTab} onValueChange={setSettingsTab} className="w-full">
-        <TabsList className="settings-primary-tabs mb-4 flex h-auto min-h-10 w-full max-w-full flex-nowrap justify-start gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-muted p-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:flex-wrap lg:overflow-x-visible [&::-webkit-scrollbar]:hidden">
-          <TabsTrigger value="general" title="General settings" className="inline-flex items-center gap-1.5">
-            <SlidersHorizontal className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-            <span data-settings-tab-long>General Settings</span>
-            <span data-settings-tab-short>General</span>
-          </TabsTrigger>
-          <TabsTrigger value="userDefined" title="Lookup lists" className="inline-flex items-center gap-1.5">
-            <Boxes className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-            <span data-settings-tab-long>Lookup Lists</span>
-            <span data-settings-tab-short>Lookup Lists</span>
-          </TabsTrigger>
-          <TabsTrigger value="libraries" title="Libraries" className="inline-flex items-center gap-1.5">
-            <Library className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-            <span data-settings-tab-long>Libraries</span>
-            <span data-settings-tab-short>Libraries</span>
-          </TabsTrigger>
-          <TabsTrigger value="users" title="Users" className="inline-flex items-center gap-1.5">
-            <Users className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-            <span data-settings-tab-long>Users</span>
-            <span data-settings-tab-short>Users</span>
-          </TabsTrigger>
-          <TabsTrigger value="data" title="Data management" className="inline-flex items-center gap-1.5">
-            <HardDrive className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-            <span data-settings-tab-long>Data Management</span>
-            <span data-settings-tab-short>Data</span>
-          </TabsTrigger>
-          <TabsTrigger value="workspaces" title="Workspaces" className="inline-flex items-center gap-1.5">
-            <Wrench className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-            <span data-settings-tab-long>Workspaces</span>
-            <span data-settings-tab-short>Workspaces</span>
-          </TabsTrigger>
-          <TabsTrigger value="logs" title="System logs" className="inline-flex items-center gap-1.5">
-            <ScrollText className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
-            <span data-settings-tab-long>System Logs</span>
-            <span data-settings-tab-short>Logs</span>
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={settingsTab} onValueChange={(value) => setSettingsTab(value as SettingsPrimaryTabId)} className="w-full">
+        <div
+          className="settings-primary-tabs-shell relative mb-4"
+          data-overflowing={isPrimaryTabsOverflowing ? 'true' : 'false'}
+          data-can-scroll-left={primaryTabsCanScrollLeft ? 'true' : 'false'}
+          data-can-scroll-right={primaryTabsCanScrollRight ? 'true' : 'false'}
+        >
+          <TabsList
+            ref={primaryTabsListRef}
+            data-overflowing={isPrimaryTabsOverflowing ? 'true' : 'false'}
+            className="settings-primary-tabs flex h-auto min-h-10 w-full max-w-full flex-nowrap justify-start gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-muted p-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:flex-wrap lg:overflow-x-visible [&::-webkit-scrollbar]:hidden"
+          >
+            <TabsTrigger value="general" title="General settings" className="inline-flex items-center gap-1.5">
+              <SlidersHorizontal className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+              <span data-settings-tab-long>General Settings</span>
+              <span data-settings-tab-short>General</span>
+            </TabsTrigger>
+            {canManageSharedConfig && (
+              <TabsTrigger value="userDefined" title="Lookup lists" className="inline-flex items-center gap-1.5">
+                <Boxes className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <span data-settings-tab-long>Lookup Lists</span>
+                <span data-settings-tab-short>Lookup Lists</span>
+              </TabsTrigger>
+            )}
+            {canManageSharedConfig && (
+              <TabsTrigger value="libraries" title="Libraries" className="inline-flex items-center gap-1.5">
+                <Library className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <span data-settings-tab-long>Libraries</span>
+                <span data-settings-tab-short>Libraries</span>
+              </TabsTrigger>
+            )}
+            {canManageSharedConfig && (
+              <TabsTrigger value="masterCrew" title="Master crew contacts" className="inline-flex items-center gap-1.5">
+                <Contact className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <span data-settings-tab-long>Master Crew</span>
+                <span data-settings-tab-short>Crew roster</span>
+              </TabsTrigger>
+            )}
+            {canManageSharedConfig && (
+              <TabsTrigger value="organization" title="Organization library" className="inline-flex items-center gap-1.5">
+                <Building2 className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <span data-settings-tab-long>Organization</span>
+                <span data-settings-tab-short>Org</span>
+              </TabsTrigger>
+            )}
+            {canManageSharedConfig && (
+              <TabsTrigger value="users" title="Users" className="inline-flex items-center gap-1.5">
+                <Users className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <span data-settings-tab-long>Users</span>
+                <span data-settings-tab-short>Users</span>
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="data" title="Data management" className="inline-flex items-center gap-1.5">
+              <HardDrive className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+              <span data-settings-tab-long>Data Management</span>
+              <span data-settings-tab-short>Data</span>
+            </TabsTrigger>
+            {canManageSharedConfig && (
+              <TabsTrigger value="workspaces" title="Workspaces" className="inline-flex items-center gap-1.5">
+                <Wrench className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <span data-settings-tab-long>Workspaces</span>
+                <span data-settings-tab-short>Workspaces</span>
+              </TabsTrigger>
+            )}
+            {canManageSharedConfig && (
+              <TabsTrigger value="logs" title="System logs" className="inline-flex items-center gap-1.5">
+                <ScrollText className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <span data-settings-tab-long>System Logs</span>
+                <span data-settings-tab-short>Logs</span>
+              </TabsTrigger>
+            )}
+          </TabsList>
+          <div className="settings-tabs-scroll-hint settings-tabs-scroll-hint-left" aria-hidden>
+            <ChevronLeft className="h-4 w-4" />
+          </div>
+          <div
+            className={`settings-tabs-scroll-hint settings-tabs-scroll-hint-right${shouldPulsePrimaryTabsHint ? ' settings-tabs-scroll-hint-pulse-once' : ''}`}
+            aria-hidden
+          >
+            <ChevronRight className="h-4 w-4" />
+          </div>
+        </div>
 
         <TabsContent value="general">
           <GeneralSettingsTab
@@ -1979,66 +2139,116 @@ export default function SettingsPage() {
           />
         </TabsContent>
 
-        <TabsContent value="userDefined">
-          <UserDefinedListsSection
-            panel={userDefinedPanel}
-            onPanelChange={setUserDefinedPanel}
-            settings={settings}
-            updateSettingsList={updateSettingsList}
-            financialSettings={financialSettings}
-            setFinancialSettings={setFinancialSettings}
-            currentUsername={currentUser?.username ?? 'admin'}
-            onRequestDeleteReconcile={requestListDeleteReconcile}
-            onNormalizeRackIds={handleNormalizeRackIds}
-            canDeleteItems={canManageSharedConfig}
-          />
-        </TabsContent>
+        {canManageSharedConfig && (
+          <TabsContent value="userDefined">
+            <UserDefinedListsSection
+              panel={userDefinedPanel}
+              onPanelChange={setUserDefinedPanel}
+              settings={settings}
+              updateSettingsList={updateSettingsList}
+              financialSettings={financialSettings}
+              setFinancialSettings={setFinancialSettings}
+              currentUsername={currentUser?.username ?? 'admin'}
+              onRequestDeleteReconcile={requestListDeleteReconcile}
+              onNormalizeRackIds={handleNormalizeRackIds}
+              canDeleteItems={canManageSharedConfig}
+            />
+          </TabsContent>
+        )}
 
-        <TabsContent value="libraries">
-          <LibrariesSection
-            panel={librariesPanel}
-            onPanelChange={setLibrariesPanel}
-            settings={settings}
-            updateSettingsList={updateSettingsList}
-            onRequestDeleteReconcile={requestListDeleteReconcile}
-            canDeleteItems={canManageSharedConfig}
-          />
-        </TabsContent>
+        {canManageSharedConfig && (
+          <TabsContent value="libraries">
+            <LibrariesSection
+              panel={librariesPanel}
+              onPanelChange={setLibrariesPanel}
+              settings={settings}
+              updateSettingsList={updateSettingsList}
+              onRequestDeleteReconcile={requestListDeleteReconcile}
+              canDeleteItems={canManageSharedConfig}
+            />
+          </TabsContent>
+        )}
 
-        <TabsContent value="users">
-          {authBackend === 'supabase' ? (
-            activeWorkspaceId ? (
-              <SupabaseWorkspaceUsersCard
-                workspaceId={activeWorkspaceId}
-                workspaceName={activeWorkspaceName}
-                currentUserId={currentUser?.id || ''}
-                canManageUsers={canManageSharedConfig}
-              />
+        {canManageSharedConfig && (
+          <TabsContent value="masterCrew" className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Master crew contacts are shared across productions. Each production&apos;s Crew tab assigns people to that shoot; attach names from this roster when building a crew list.
+            </p>
+            <CrewPage />
+          </TabsContent>
+        )}
+
+        {canManageSharedConfig && (
+          <TabsContent value="organization" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Organization library</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm text-muted-foreground">
+                <p>
+                  Shared organization bundles (libraries, lookups, portable metadata tied to your org in Supabase) are exported and imported from Data Management-not from this shortcut card alone.
+                </p>
+                {authBackend === 'supabase' && activeOrganizationId ? (
+                  <p className="text-foreground">
+                    Active organization:{' '}
+                    <span className="font-medium text-foreground">
+                      {activeOrganizationName ?? activeOrganizationId}
+                    </span>
+                  </p>
+                ) : authBackend === 'supabase' ? (
+                  <p>Select or join a team workspace to associate an organization for library portability.</p>
+                ) : (
+                  <p>Organization-level cloud sync applies when you sign in with Supabase and use team workspaces.</p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={() => setSettingsTab('data')}>
+                    Open Data Management
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setSettingsTab('workspaces')}>
+                    Workspaces and invites
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {canManageSharedConfig && (
+          <TabsContent value="users">
+            {authBackend === 'supabase' ? (
+              activeWorkspaceId ? (
+                <SupabaseWorkspaceUsersCard
+                  workspaceId={activeWorkspaceId}
+                  workspaceName={activeWorkspaceName}
+                  currentUserId={currentUser?.id || ''}
+                  canManageUsers={canManageSharedConfig}
+                />
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>User Management</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
+                      Switch to a team workspace to manage users. Personal mode does not expose team user administration.
+                    </div>
+                  </CardContent>
+                </Card>
+              )
             ) : (
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle>User Management</CardTitle>
+                  <Button onClick={() => setShowAddUserDialog(true)} className="flex items-center">
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add User
+                  </Button>
                 </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
-                    Switch to a team workspace to manage users. Personal mode does not expose team user administration.
-                  </div>
-                </CardContent>
+                <CardContent>{renderUsersList()}</CardContent>
               </Card>
-            )
-          ) : (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>User Management</CardTitle>
-                <Button onClick={() => setShowAddUserDialog(true)} className="flex items-center">
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Add User
-                </Button>
-              </CardHeader>
-              <CardContent>{renderUsersList()}</CardContent>
-            </Card>
-          )}
-        </TabsContent>
+            )}
+          </TabsContent>
+        )}
 
         <TabsContent value="data" className="space-y-6">
           <DataBackupTab
@@ -2059,20 +2269,24 @@ export default function SettingsPage() {
           />
         </TabsContent>
 
-        <TabsContent value="workspaces" className="space-y-6">
-          <WorkspaceTeamTab />
-        </TabsContent>
+        {canManageSharedConfig && (
+          <TabsContent value="workspaces" className="space-y-6">
+            <WorkspaceTeamTab />
+          </TabsContent>
+        )}
 
-        <TabsContent value="logs">
-          <Card>
-            <CardHeader>
-              <CardTitle>System Logs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SystemLogs />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {canManageSharedConfig && (
+          <TabsContent value="logs">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Logs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SystemLogs />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       <AddUserDialog
