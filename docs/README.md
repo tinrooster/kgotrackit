@@ -1,6 +1,6 @@
 # trackIT v2 — Documentation
 
-**Version:** 1.0.1 · **Last reviewed:** 2026-05-07
+**Version:** 1.0.1 · **Last reviewed:** 2026-05-08
 
 trackIT is a broadcast/AV inventory management system delivered as a **web app** (local Vite dev + static deploy targets such as Vercel/Netlify), with shared React/TypeScript source under `src/`.
 
@@ -12,6 +12,7 @@ trackIT is a broadcast/AV inventory management system delivered as a **web app**
 |---|---|
 | [project-structure.md](./project-structure.md) | Directory layout, routes, components, services, data model, Supabase schema, storage architecture |
 | [roadmap.md](./roadmap.md) | Shipped work, active priorities, upcoming items, and deferred features |
+| [supabase-auth-send-email-hook.md](./supabase-auth-send-email-hook.md) | Setup guide for Supabase Auth Send Email HTTP hook using Resend API |
 
 Archived legacy docs are stored in `docs_old/`.
 
@@ -64,6 +65,7 @@ Edge Functions are in `supabase/functions/` (Deno).
 
 ### Other
 
+- **Supabase Auth email flow:** Redirect URL validation issues were resolved by enforcing full-origin redirects (`https://...`) in Auth URL config and invite-link generation. The project now includes a `send-email` Auth hook function for custom email delivery via Resend API, but hosted Auth email quota/rate limits still apply on the current plan.
 - **Unused pages:** Several files under `src/pages/` are not wired to any route (`Dashboard.tsx`, `Inventory.tsx`, `ItemDetail.tsx`, `ItemDetailsPage.tsx`, `NotFound.tsx`, `RestockPage.tsx`). See `project-structure.md` for the full list.
 - **Workspace crew contacts (master DB):** `crewContactsService` persists shared contacts for **Add from master DB** inside production crew editing. `src/pages/CrewPage.tsx` is a standalone directory UI that is **not routed** today (historical `/crew` URL redirects to `/productions`).
 - **Deprecated code:** `src/deprecated/` contains two archived files; do not import from this path.

@@ -57,6 +57,38 @@ function getWorkspaceUserNotifyEmail(): string | null {
   return configuredAddress ? configuredAddress : null;
 }
 
+function normalizeHttpUrl(value: string | null | undefined): string | null {
+  const trimmedValue = String(value || '').trim();
+  if (!trimmedValue) {
+    return null;
+  }
+  try {
+    const parsedUrl = new URL(trimmedValue);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return null;
+    }
+    return parsedUrl.origin;
+  } catch {
+    return null;
+  }
+}
+
+function resolveInviteRedirectUrl(request: Request): string | undefined {
+  const configuredRedirectUrl = normalizeHttpUrl(Deno.env.get('INVITE_REDIRECT_URL'));
+  if (configuredRedirectUrl) {
+    return configuredRedirectUrl;
+  }
+  const configuredSiteUrl = normalizeHttpUrl(Deno.env.get('SITE_URL'));
+  if (configuredSiteUrl) {
+    return configuredSiteUrl;
+  }
+  const requestOrigin = normalizeHttpUrl(request.headers.get('origin'));
+  if (requestOrigin) {
+    return requestOrigin;
+  }
+  return undefined;
+}
+
 async function sendWithResend(message: EmailMessage): Promise<void> {
   const resendApiKey = Deno.env.get('RESEND_API_KEY');
   const fromEmail = Deno.env.get('NOTIFY_FROM_EMAIL');
@@ -254,7 +286,11 @@ Deno.serve(async (request) => {
       targetUserId = matchedUser?.id ?? null;
       const existingUserMatched = !!matchedUser;
       if (!targetUserId) {
-        const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email);
+        const redirectTo = resolveInviteRedirectUrl(request);
+        const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+          email,
+          redirectTo ? { redirectTo } : undefined
+        );
         if (inviteError) {
           return jsonResponse(500, { error: inviteError.message });
         }

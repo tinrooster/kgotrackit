@@ -1,6 +1,6 @@
 # trackIT v2 — Roadmap
 
-**Version:** 1.0.1 · **Last reviewed:** 2026-05-07
+**Version:** 1.0.1 · **Last reviewed:** 2026-05-08
 
 This document tracks what has shipped, what is actively in progress, and what is planned or deferred. Items are grouped by priority tier (P0-P3) and then by batch for near-term work.
 
@@ -13,6 +13,14 @@ This document tracks what has shipped, what is actively in progress, and what is
 - **Planner boundaries:** Crew schedule calendar **date pickers constrained** to production start/end.
 - **Crew UX:** Departments with **rename / delete toolbar icons**, reorder, collapse; typed **phone + email**; shared **`src/lib/dateTimeInputs.ts`** for date + quarter-hour time normalization across productions UI.
 - **Overlay safety:** Production **slide-out** (`Sheet`) and **Planning Workspace** dialog **ignore outside-click dismissal** so in-progress drafts are not wiped by stray clicks.
+
+---
+
+## Shipped enhancements (Auth + Workspace users · 2026-05)
+
+- **Invite redirect hardening:** `workspace-member-admin` now resolves invite redirects from `INVITE_REDIRECT_URL` -> `SITE_URL` -> request origin and passes `redirectTo` to `inviteUserByEmail`.
+- **Auth Send Email hook:** Added `supabase/functions/send-email` with webhook-signature verification and Resend API delivery, plus setup guide (`docs/supabase-auth-send-email-hook.md`) and script support in `scripts/setup-supabase-invite.sh`.
+- **Operational note:** hosted Auth email throughput is still constrained by project plan limits (`GOTRUE_RATE_LIMIT_EMAIL_SENT`), so generated-link admin testing remains the fallback when email quota is exhausted.
 
 ---
 
