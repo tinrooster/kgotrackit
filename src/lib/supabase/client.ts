@@ -44,6 +44,23 @@ export function isSupabaseConfigured(): boolean {
   return Boolean(url && key);
 }
 
+export function getSupabaseConfigDiagnostics(): {
+  isConfigured: boolean;
+  rawUrlPresent: boolean;
+  normalizedUrl: string | null;
+  anonKeyPresent: boolean;
+} {
+  const rawUrl = import.meta.env.VITE_SUPABASE_URL;
+  const normalizedUrl = normalizeSupabaseUrl(rawUrl);
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  return {
+    isConfigured: Boolean(normalizedUrl && anonKey),
+    rawUrlPresent: Boolean(rawUrl?.trim()),
+    normalizedUrl,
+    anonKeyPresent: Boolean(anonKey),
+  };
+}
+
 export function getSupabase(): SupabaseClient | null {
   const url = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();

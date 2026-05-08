@@ -7,13 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff, Loader2, LogIn, Key, Mail } from 'lucide-react';
-import { getSupabase } from '@/lib/supabase/client';
+import { getSupabase, getSupabaseConfigDiagnostics } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import type { UserWithPassword, LoginResult } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { logger } from '@/utils/logger';
+import { useLocation } from 'react-router-dom';
+
+const LAST_ROUTE_STORAGE_KEY = 'trackit:last-route';
 
 function normalizeLoginResult(raw: LoginResult | boolean): LoginResult {
   if (typeof raw === 'boolean') {
@@ -57,6 +60,8 @@ type ResetPasswordValues = z.infer<ReturnType<typeof buildResetPasswordSchema>>;
 
 export function LoginForm() {
   const { login, resetPassword, authBackend, requestPasswordResetEmail } = useAuth();
+  const supabaseConfigDiagnostics = useMemo(() => getSupabaseConfigDiagnostics(), []);
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -92,6 +97,19 @@ export function LoginForm() {
   const [magicBusy, setMagicBusy] = useState(false);
   const resetUsername = watchReset('username');
   const loginEmail = watchLogin('username');
+
+  const getPostLoginDestination = (): string => {
+    const state = location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null;
+    const from = state?.from;
+    if (from?.pathname) {
+      return `${from.pathname ?? ''}${from.search ?? ''}${from.hash ?? ''}`;
+    }
+    try {
+      return sessionStorage.getItem(LAST_ROUTE_STORAGE_KEY) || '/';
+    } catch {
+      return '/';
+    }
+  };
 
   const sendMagicLink = async () => {
     const email = loginEmail.trim();
@@ -180,9 +198,13 @@ export function LoginForm() {
           : [...existingUsers, adminUser];
 
         window.electronStore.setData('users', updatedUsers);
-        window.electronStore.setData('rememberedUser', adminUser);
+        if (data.remember) {
+          window.electronStore.setData('rememberedUser', adminUser);
+        } else {
+          window.electronStore.deleteData('rememberedUser');
+        }
         toast.success('Admin login recovered. Reloading...');
-        window.location.href = '/';
+        window.location.href = getPostLoginDestination();
         return;
       }
 
@@ -386,7 +408,7 @@ export function LoginForm() {
       <p className="mt-3 text-center text-xs text-muted-foreground leading-snug">
         {authBackend === 'supabase'
           ? 'Cloud sign-in (Supabase). Use the email and password from Authentication → Users for this project.'
-          : 'Local sign-in only: this bundle was built without Supabase env vars. Cloud accounts will not work until you redeploy with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'}
+          : `Local sign-in only: this bundle was built without valid Supabase env vars. Cloud accounts will not work until you redeploy with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. (debug: rawUrlPresent=${supabaseConfigDiagnostics.rawUrlPresent ? 'yes' : 'no'}, normalizedUrl=${supabaseConfigDiagnostics.normalizedUrl ?? 'invalid'}, anonKeyPresent=${supabaseConfigDiagnostics.anonKeyPresent ? 'yes' : 'no'})`}
       </p>
 
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
