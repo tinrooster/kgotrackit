@@ -60,6 +60,35 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
+function getOptionalEnv(name: string): string | null {
+  const value = Deno.env.get(name)?.trim();
+  return value || null;
+}
+
+function resolveHookSecret(): string {
+  const singular = getOptionalEnv('SEND_EMAIL_HOOK_SECRET');
+  const plural = getOptionalEnv('SEND_EMAIL_HOOK_SECRETS');
+  const raw = singular || plural;
+  if (!raw) {
+    throw new Error('Missing SEND_EMAIL_HOOK_SECRET or SEND_EMAIL_HOOK_SECRETS.');
+  }
+  const firstSecret = raw.split('|')[0]?.trim() || '';
+  return firstSecret.replace('v1,whsec_', '');
+}
+
+function resolveProjectRef(request: Request): string {
+  const explicitRef = getOptionalEnv('PROJECT_REF');
+  if (explicitRef) {
+    return explicitRef;
+  }
+  const host = String(request.headers.get('host') || '').toLowerCase();
+  const match = host.match(/^([a-z0-9-]+)\.supabase\.co(?::\d+)?$/);
+  if (match?.[1]) {
+    return match[1];
+  }
+  throw new Error('Missing PROJECT_REF and could not infer project ref from request host.');
+}
+
 function buildActionTitle(action: string): string {
   switch (action) {
     case 'signup':
@@ -177,9 +206,9 @@ Deno.serve(async (request) => {
 
   try {
     const resendApiKey = getRequiredEnv('RESEND_API_KEY');
-    const fromEmail = getRequiredEnv('AUTH_HOOK_FROM_EMAIL');
-    const hookSecret = getRequiredEnv('SEND_EMAIL_HOOK_SECRET').replace('v1,whsec_', '');
-    const projectRef = getRequiredEnv('PROJECT_REF');
+    const fromEmail = getOptionalEnv('AUTH_HOOK_FROM_EMAIL') || getRequiredEnv('NOTIFY_FROM_EMAIL');
+    const hookSecret = resolveHookSecret();
+    const projectRef = resolveProjectRef(request);
 
     const body = await request.text();
     const headers = Object.fromEntries(request.headers);
@@ -201,6 +230,7 @@ Deno.serve(async (request) => {
     return jsonResponse(200, {});
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error('[send-email hook] failure:', message);
     return jsonResponse(500, {
       error: {
         http_code: 500,
