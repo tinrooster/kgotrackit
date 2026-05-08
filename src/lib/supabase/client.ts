@@ -13,7 +13,8 @@ function warnInvalidSupabaseHostOnce(message: string) {
 export function normalizeSupabaseUrl(raw: string | undefined): string | null {
   const t = raw?.trim();
   if (!t) return null;
-  const candidate = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  const unquoted = t.replace(/^['"]+|['"]+$/g, '').trim();
+  const candidate = /^https?:\/\//i.test(unquoted) ? unquoted : `https://${unquoted}`;
   try {
     const u = new URL(candidate);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
