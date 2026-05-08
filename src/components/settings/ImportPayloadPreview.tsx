@@ -4,10 +4,12 @@ import { summarizeImportPayloadLists } from '@/lib/importListNormalization';
 interface ImportPayloadPreviewProps {
   data: NormalizedImportPayload;
   fileName?: string;
+  /** Max path lines shown per list in each expandable preview (default 60). */
+  maxLinesPerList?: number;
 }
 
-export function ImportPayloadPreview({ data, fileName }: ImportPayloadPreviewProps) {
-  const listSummaries = summarizeImportPayloadLists(data);
+export function ImportPayloadPreview({ data, fileName, maxLinesPerList = 60 }: ImportPayloadPreviewProps) {
+  const listSummaries = summarizeImportPayloadLists(data, maxLinesPerList);
   const inventoryCount = Array.isArray(data.inventory) ? data.inventory.length : 0;
 
   return (
@@ -41,9 +43,9 @@ export function ImportPayloadPreview({ data, fileName }: ImportPayloadPreviewPro
         {listSummaries.map((s) => (
           <details key={s.key} className="rounded-md border border-border/50 bg-muted/10">
             <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/30">
-              {s.label} — preview (first {Math.min(s.lines.length, 60)} paths)
+              {s.label} — preview (first {Math.min(s.lines.length, maxLinesPerList)} paths)
             </summary>
-            <pre className="max-h-48 overflow-auto border-t border-border/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+            <pre className="max-h-40 overflow-auto border-t border-border/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground sm:max-h-48">
               {s.lines.length > 0 ? s.lines.join('\n') : '— (no rows)'}
             </pre>
           </details>

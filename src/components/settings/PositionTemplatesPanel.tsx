@@ -60,11 +60,12 @@ export function PositionTemplatesPanel({ canDeleteItems = true }: PositionTempla
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Position templates</CardTitle>
+        <CardTitle>Crew position templates</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Shared position labels for crew assignments. These are organization-scoped and reused across productions.
+          Shared position labels for crew assignments. In Supabase team mode these are stored per active organization
+          and sync with the org library; open them from Organization when you are setting up the master org.
         </p>
         <div className="grid gap-2 sm:grid-cols-4">
           <Input

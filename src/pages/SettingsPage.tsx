@@ -350,7 +350,7 @@ function readLibrariesPanelFromSearch(): LibrariesPanel {
   } catch {
     /* ignore malformed URLs */
   }
-  return 'positionTemplates';
+  return 'suppliers';
 }
 
 export default function SettingsPage() {
@@ -504,7 +504,7 @@ export default function SettingsPage() {
       const allowedLibraryPanels: LibrariesPanel[] = ['suppliers', 'positionTemplates', 'templates', 'deviceLibrary', 'cabinets'];
       const nextLibraryPanel = lpRaw && allowedLibraryPanels.includes(lpRaw as LibrariesPanel)
         ? (lpRaw as LibrariesPanel)
-        : 'positionTemplates';
+        : 'suppliers';
       if (nextLibraryPanel !== librariesPanel) {
         setLibrariesPanel(nextLibraryPanel);
       }
@@ -2165,6 +2165,40 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Define the master organization</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  To stand up a <span className="font-medium text-foreground">new</span> organization for your team,
+                  create a workspace. That ties Supabase org data, portable exports, and org-scoped libraries (including
+                  crew position templates) to a single master org.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={() => setSettingsTab('workspaces')}>
+                    Set up workspace (new org)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setSettingsTab('libraries');
+                      setLibrariesPanel('positionTemplates');
+                    }}
+                  >
+                    Crew position templates (org library)
+                  </Button>
+                </div>
+                {authBackend !== 'supabase' ? (
+                  <p className="text-xs">
+                    Organization features apply after you sign in with Supabase and use a team workspace.
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-foreground">
                 <Contact className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
@@ -2375,148 +2409,202 @@ export default function SettingsPage() {
           }
         }}
       >
-        <DraggableDialogContent className="w-[min(calc(100vw-1rem),720px)] max-h-[min(92vh,880px)]">
-          <DialogHeader>
-            <DialogTitle>
-              {importDuplicateReport.length > 0 ? 'Review import — overlaps detected' : 'Review import'}
-            </DialogTitle>
-            <DialogDescription>
-              {importDuplicateReport.length > 0
-                ? `Found ${importDuplicateReport.reduce((sum, section) => sum + section.imported.length, 0)} overlapping list or inventory entries across ${importDuplicateReport.length} section(s). Preview the file below, then choose how to reconcile.`
-                : 'Preview what will be imported. Confirm to apply lists and inventory from this file.'}
-            </DialogDescription>
-          </DialogHeader>
+        <DraggableDialogContent className="flex h-[min(90vh,860px)] max-h-[min(90vh,860px)] w-[min(calc(100vw-1rem),820px)] flex-col gap-0 overflow-hidden p-0">
+          <div className="shrink-0 border-b border-border/60 px-6 pb-3 pt-6">
+            <DialogHeader className="space-y-2 p-0 text-left">
+              <DialogTitle>
+                {importDuplicateReport.length > 0 ? 'Review import — overlaps detected' : 'Review import'}
+              </DialogTitle>
+              <DialogDescription>
+                {importDuplicateReport.length > 0
+                  ? `Found ${importDuplicateReport.reduce((sum, section) => sum + section.imported.length, 0)} overlapping list or inventory entries across ${importDuplicateReport.length} section(s). Use the tabs to switch between the file preview and overlap resolution.`
+                  : 'Preview what will be imported, then use Import to apply lists and inventory from this file.'}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-2">
-            {importInProgress?.data ? (
-              <ImportPayloadPreview data={importInProgress.data as NormalizedImportPayload} fileName={importInProgress.file?.name} />
-            ) : null}
-
-            {importDuplicateReport.length > 0 ? (
-              <div className="space-y-3 rounded-md border border-border/60 bg-muted/10 p-3">
-                <p className="text-xs font-medium text-foreground">Reconciliation</p>
-                <div className="flex items-start space-x-2">
-                  <input
-                    type="radio"
-                    id="skip-option"
-                    name="import-action"
-                    checked={importDuplicateAction === 'skip'}
-                    onChange={() => setImportDuplicateAction('skip')}
-                    className="mt-1"
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6">
+            {importInProgress?.data && importDuplicateReport.length > 0 ? (
+              <Tabs
+                key={`${importInProgress.file?.name ?? 'import'}-${importDuplicateReport.map((s) => s.type).join('|')}`}
+                defaultValue="preview"
+                className="flex min-h-0 flex-1 flex-col gap-0 pt-2"
+              >
+                <TabsList className="mb-2 h-auto shrink-0 flex-wrap justify-start gap-1 bg-muted/50 p-1">
+                  <TabsTrigger value="preview" className="text-xs sm:text-sm">
+                    List preview
+                  </TabsTrigger>
+                  <TabsTrigger value="reconcile" className="text-xs sm:text-sm">
+                    Resolve overlaps (
+                    {importDuplicateReport.reduce((sum, section) => sum + section.imported.length, 0)})
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent
+                  value="preview"
+                  className="mt-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1 data-[state=inactive]:hidden"
+                >
+                  <ImportPayloadPreview
+                    data={importInProgress.data as NormalizedImportPayload}
+                    fileName={importInProgress.file?.name}
+                    maxLinesPerList={45}
                   />
-                  <div>
-                    <label htmlFor="skip-option" className="font-medium text-foreground">
-                      Skip duplicate rows
-                    </label>
-                    <p className="text-sm text-muted-foreground">
-                      Do not import list rows whose id or top-level name already exists. Other rows are still added.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <input
-                    type="radio"
-                    id="replace-option"
-                    name="import-action"
-                    checked={importDuplicateAction === 'replace'}
-                    onChange={() => setImportDuplicateAction('replace')}
-                    className="mt-1"
-                  />
-                  <div>
-                    <label htmlFor="replace-option" className="font-medium text-foreground">
-                      Replace existing items
-                    </label>
-                    <p className="text-sm text-muted-foreground">Replace matching list rows (and inventory, if selected) with the imported versions.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <input
-                    type="radio"
-                    id="merge-option"
-                    name="import-action"
-                    checked={importDuplicateAction === 'merge'}
-                    onChange={() => setImportDuplicateAction('merge')}
-                    className="mt-1"
-                  />
-                  <div>
-                    <label htmlFor="merge-option" className="font-medium text-foreground">
-                      Merge (recommended for locations)
-                    </label>
-                    <p className="text-sm text-muted-foreground">
-                      Same-named parents combine; sub-locations and nested rows merge by id. Keeps your existing parent ids.
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Global choice is the default. Override per section in the table below.
-                </p>
-
-                <div className="mt-2 space-y-3">
-                  <h4 className="text-sm font-medium text-foreground">Conflict detail</h4>
-                  {importDuplicateReport.map((section) => (
-                    <div key={section.type} className="rounded border border-border/60">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
-                        <div className="text-sm font-medium capitalize">
-                          {section.type} ({section.imported.length} conflict{section.imported.length === 1 ? '' : 's'})
-                        </div>
-                        <Select
-                          value={importSectionActions[section.type] || importDuplicateAction}
-                          onValueChange={(value: 'skip' | 'replace' | 'merge') =>
-                            setImportSectionActions((previous) => ({ ...previous, [section.type]: value }))
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-[160px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="skip">Skip duplicates</SelectItem>
-                            <SelectItem value="merge">Merge</SelectItem>
-                            <SelectItem value="replace">Replace existing</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="max-h-44 overflow-auto">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/20">
-                            <tr>
-                              <th className="px-3 py-2 text-left">Existing</th>
-                              <th className="px-3 py-2 text-left">Imported</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {section.imported.slice(0, 12).map((entry, index) => {
-                              const match = section.existing.find(
-                                (ex) => ex.id === entry.id || ex.name === entry.name,
-                              );
-                              return (
-                                <tr key={`${section.type}-${String(entry.id ?? index)}`} className="border-t">
-                                  <td className="px-3 py-2 text-muted-foreground">
-                                    {match?.name || match?.id || '(match by id/name)'}
-                                  </td>
-                                  <td className="px-3 py-2">{entry.name || entry.id || '(unnamed)'}</td>
-                                </tr>
-                              );
-                            })}
-                            {section.imported.length > 12 ? (
-                              <tr className="border-t">
-                                <td colSpan={2} className="px-3 py-2 text-xs text-muted-foreground italic">
-                                  +{section.imported.length - 12} more conflicts
-                                </td>
-                              </tr>
-                            ) : null}
-                          </tbody>
-                        </table>
+                </TabsContent>
+                <TabsContent
+                  value="reconcile"
+                  className="mt-0 flex min-h-0 flex-1 flex-col gap-3 overflow-hidden data-[state=inactive]:hidden"
+                >
+                  <div className="shrink-0 space-y-2 rounded-md border border-border/60 bg-muted/10 p-3">
+                    <p className="text-xs font-medium text-foreground">Default for all sections</p>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        id="skip-option"
+                        name="import-action"
+                        checked={importDuplicateAction === 'skip'}
+                        onChange={() => setImportDuplicateAction('skip')}
+                        className="mt-1"
+                      />
+                      <div>
+                        <label htmlFor="skip-option" className="font-medium text-foreground">
+                          Skip duplicate rows
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                          Skip list rows whose id or top-level name already exists. Other rows are still added.
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        id="replace-option"
+                        name="import-action"
+                        checked={importDuplicateAction === 'replace'}
+                        onChange={() => setImportDuplicateAction('replace')}
+                        className="mt-1"
+                      />
+                      <div>
+                        <label htmlFor="replace-option" className="font-medium text-foreground">
+                          Replace existing items
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                          Replace matching rows with the imported versions (per section below).
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        id="merge-option"
+                        name="import-action"
+                        checked={importDuplicateAction === 'merge'}
+                        onChange={() => setImportDuplicateAction('merge')}
+                        className="mt-1"
+                      />
+                      <div>
+                        <label htmlFor="merge-option" className="font-medium text-foreground">
+                          Merge (recommended for locations)
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                          Same-named parents combine; nested rows merge by id. Keeps existing parent ids.
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Override the default per section in each tab. Scroll the tab row if many lists conflict.
+                    </p>
+                  </div>
+
+                  <Tabs
+                    defaultValue={importDuplicateReport[0]?.type ?? 'categories'}
+                    className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                  >
+                    <TabsList className="mb-2 h-auto max-h-28 shrink-0 flex-wrap justify-start gap-1 overflow-y-auto border border-border/40 bg-background/80 p-1">
+                      {importDuplicateReport.map((section) => (
+                        <TabsTrigger
+                          key={section.type}
+                          value={section.type}
+                          className="max-w-[11rem] truncate px-2 py-1.5 text-[11px] capitalize sm:text-xs"
+                          title={String(section.type)}
+                        >
+                          {section.type} ({section.imported.length})
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                    {importDuplicateReport.map((section) => (
+                      <TabsContent
+                        key={section.type}
+                        value={section.type}
+                        className="mt-0 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-md border border-border/50 data-[state=inactive]:hidden"
+                      >
+                        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2">
+                          <div className="text-sm font-medium capitalize">
+                            {section.type} — action for this section
+                          </div>
+                          <Select
+                            value={importSectionActions[section.type] || importDuplicateAction}
+                            onValueChange={(value: 'skip' | 'replace' | 'merge') =>
+                              setImportSectionActions((previous) => ({ ...previous, [section.type]: value }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="skip">Skip duplicates</SelectItem>
+                              <SelectItem value="merge">Merge</SelectItem>
+                              <SelectItem value="replace">Replace existing</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto">
+                          <table className="w-full text-sm">
+                            <thead className="sticky top-0 z-[1] bg-muted/90 backdrop-blur-sm">
+                              <tr>
+                                <th className="px-3 py-2 text-left">Existing</th>
+                                <th className="px-3 py-2 text-left">Imported</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {section.imported.slice(0, 12).map((entry, index) => {
+                                const match = section.existing.find(
+                                  (ex) => ex.id === entry.id || ex.name === entry.name,
+                                );
+                                return (
+                                  <tr key={`${section.type}-${String(entry.id ?? index)}`} className="border-t border-border/40">
+                                    <td className="px-3 py-2 text-muted-foreground">
+                                      {match?.name || match?.id || '(match by id/name)'}
+                                    </td>
+                                    <td className="px-3 py-2">{entry.name || entry.id || '(unnamed)'}</td>
+                                  </tr>
+                                );
+                              })}
+                              {section.imported.length > 12 ? (
+                                <tr className="border-t border-border/40">
+                                  <td colSpan={2} className="px-3 py-2 text-xs text-muted-foreground italic">
+                                    +{section.imported.length - 12} more conflicts
+                                  </td>
+                                </tr>
+                              ) : null}
+                            </tbody>
+                          </table>
+                        </div>
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                </TabsContent>
+              </Tabs>
+            ) : importInProgress?.data ? (
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-2 pr-1">
+                <ImportPayloadPreview
+                  data={importInProgress.data as NormalizedImportPayload}
+                  fileName={importInProgress.file?.name}
+                  maxLinesPerList={50}
+                />
               </div>
             ) : null}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 gap-2 border-t border-border/60 bg-background px-6 py-4">
             <Button
               variant="outline"
               type="button"

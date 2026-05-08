@@ -163,7 +163,10 @@ export function mergeLookupListEntries(
 
 const LIST_KEYS: SettingsListKey[] = ['categories', 'units', 'locations', 'suppliers', 'projects', 'expenseCodes'];
 
-export function summarizeImportPayloadLists(data: NormalizedImportPayload): {
+export function summarizeImportPayloadLists(
+  data: NormalizedImportPayload,
+  maxOutlineLines = 60,
+): {
   key: SettingsListKey;
   label: string;
   topCount: number;
@@ -216,7 +219,7 @@ export function summarizeImportPayloadLists(data: NormalizedImportPayload): {
     const list = data[key];
     const topCount = list.length;
     const subCount = countSubs(list);
-    const lines = flatten(list, '', 60);
+    const lines = flatten(list, '', maxOutlineLines);
     return { key, label: labels[key], topCount, subCount, lines };
   }).filter((s) => s.topCount > 0 || s.subCount > 0);
 }

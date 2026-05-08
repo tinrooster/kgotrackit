@@ -32,10 +32,10 @@ export interface LibrariesSectionProps {
 
 const LIB_NAV: { id: LibrariesPanel; label: string }[] = [
   { id: 'suppliers', label: 'Vendors' },
-  { id: 'positionTemplates', label: 'Position templates' },
-  { id: 'templates', label: 'Templates' },
+  { id: 'templates', label: 'Item templates' },
   { id: 'deviceLibrary', label: 'Device library' },
   { id: 'cabinets', label: 'Cab/Storage' },
+  { id: 'positionTemplates', label: 'Crew position templates' },
 ];
 
 export function LibrariesSection({
@@ -58,8 +58,8 @@ export function LibrariesSection({
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Vendor names, portal URLs, saved templates, and the device catalog. Lookup Lists keeps categories,
-            units, locations, and projects.
+            Vendor names, portal URLs, item templates, device catalog, and secure storage. Crew position templates are
+            stored per organization (Supabase team mode) and are also linked from Settings → Organization.
           </p>
           <nav className="flex flex-wrap gap-2" aria-label="Library section">
             {LIB_NAV.map(({ id, label }) => (

@@ -51,8 +51,8 @@ const USER_DEFINED_PANEL_LABELS: Record<string, string> = {
 
 const LIBRARIES_PANEL_LABELS: Record<string, string> = {
   suppliers: 'Vendors',
-  positionTemplates: 'Position templates',
-  templates: 'Templates',
+  positionTemplates: 'Crew position templates',
+  templates: 'Item templates',
   deviceLibrary: 'Device library',
   cabinets: 'Cab/Storage',
 };
