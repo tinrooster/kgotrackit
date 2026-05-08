@@ -18,7 +18,7 @@ function normalizeTemplate(raw: unknown, index: number): PositionTemplate | null
   const source = raw as Partial<PositionTemplate> & Record<string, unknown>;
   const label = typeof source.label === 'string' ? source.label.trim() : '';
   if (!label) return null;
-  return {
+  const normalized: PositionTemplate = {
     id: typeof source.id === 'string' && source.id ? source.id : crypto.randomUUID(),
     label,
     defaultRoleTag: typeof source.defaultRoleTag === 'string' ? source.defaultRoleTag.trim() || undefined : undefined,
@@ -26,6 +26,11 @@ function normalizeTemplate(raw: unknown, index: number): PositionTemplate | null
     sortOrder:
       typeof source.sortOrder === 'number' && Number.isFinite(source.sortOrder) ? source.sortOrder : index,
   };
+  const demoSeed = source.__demoSeed as PositionTemplate['__demoSeed'];
+  if (demoSeed && typeof demoSeed.version === 'string' && typeof demoSeed.fingerprint === 'string') {
+    normalized.__demoSeed = { version: demoSeed.version, fingerprint: demoSeed.fingerprint };
+  }
+  return normalized;
 }
 
 function dispatchPositionTemplatesUpdated(templates: PositionTemplate[]): void {

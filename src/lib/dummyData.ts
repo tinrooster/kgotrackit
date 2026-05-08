@@ -1,145 +1,64 @@
 /**
  * Starter templates used only when a user explicitly opts in.
+ *
+ * The actual writes are delegated to `src/lib/demoSeed/populateDemoData` so
+ * every seeded entity carries a `__demoSeed` stamp and is later strippable via
+ * `stripDemoData`. The legacy exports below (`DUMMY_INVENTORY_DATA`,
+ * `INITIAL_SETTINGS`) remain for backwards-compat with workspace dialogs that
+ * build a snapshot payload directly; they now mirror the curated demo seed.
  */
 
-import { v4 as uuidv4 } from 'uuid';
-import { InventoryItem, OrderStatus } from '@/types/inventory';
-import { subDays, addDays } from 'date-fns';
-import { STORAGE_KEYS } from "./storageService";
-import { getItems, getSettings, saveItems, saveSettings } from './storageService';
+import { type InventoryItem } from '@/types/inventory';
+import { STORAGE_KEYS } from './storageService';
+import { getItems, getSettings } from './storageService';
 import { getActiveWorkspaceId } from './supabase/workspaceData';
-import { DEMO_BROADCAST_ON_AIR_TEMPLATE, SettingsService } from '@/lib/settingsService';
-
-const categories = ["Cable", "Connector", "Hardware", "Tool", "Software", "Expendable", "Fiber Optic", "Power", "Networking", "Audio", "Video", "Lighting"];
-const units = ["ft", "each", "box", "spool", "kit", "license", "pair", "meter"];
-const locationNames = ["Rm 105 A", "Engineering Store", "PCR 1 Project Area", "TE Room", "Lighting Rm", "Studio ", "Tech Bench", "Remote Kit"];
-const locations = locationNames.map(name => ({
-  id: uuidv4(),
-  name,
-  subcategories: []
-}));
-const suppliers = ["Joseph Electronics", "Markertek", "B&H Photo", "Clark Wire & Cable", "Amazon Business", "Sweetwater", "Local Hardware"];
-const projects = ["2025:SUTRO", "2024:NAB", "MAINTENANCE", "STUDIO_UPGRADE", "Ultrix", "INFRASTRUCTURE"];
-
-const generateRandomDate = (start: Date, end: Date): Date => {
-  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-};
-
-const generateRandomInt = (min: number, max: number): number => {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
-
-const generateRandomFloat = (min: number, max: number, decimals: number = 2): number => {
-  const factor = Math.pow(10, decimals);
-  return Math.round((Math.random() * (max - min) + min) * factor) / factor;
-};
-
-const generateBarcode = (): string => {
-  return Math.random().toString(36).substring(2, 15).toUpperCase();
-}
-
-function generateRandomOrderStatus(): OrderStatus {
-  const statuses = [
-    OrderStatus.PENDING,
-    OrderStatus.IN_PROGRESS,
-    OrderStatus.COMPLETED,
-    OrderStatus.CANCELLED
-  ];
-  return statuses[Math.floor(Math.random() * statuses.length)];
-}
-
-const dummyItems: InventoryItem[] = [];
-
-for (let i = 0; i < 200; i++) {
-  const category = categories[generateRandomInt(0, categories.length - 1)];
-  const unit = units[generateRandomInt(0, units.length - 1)];
-  const location = locations[generateRandomInt(0, locations.length - 1)];
-  const quantity = generateRandomInt(0, category === "Cable" ? 5000 : 100);
-  const costPerUnit = category === "Cable" ? generateRandomFloat(0.10, 1.50) : generateRandomFloat(5, 500);
-  const price = costPerUnit * 1.3; // 30% markup
-  const reorderLevel = generateRandomInt(0, quantity > 10 ? Math.floor(quantity * 0.3) : 5);
-  const minQuantity = reorderLevel;
-  const orderStatus = generateRandomOrderStatus();
-  const deliveryPercentage = orderStatus === OrderStatus.COMPLETED ? 100 : (orderStatus === OrderStatus.IN_PROGRESS ? generateRandomInt(30, 90) : 0);
-  const lastUpdated = generateRandomDate(new Date(2023, 0, 1), new Date());
-  const lastOrdered = orderStatus === OrderStatus.COMPLETED ? new Date() : undefined;
-  const expectedDelivery = orderStatus === OrderStatus.IN_PROGRESS ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : undefined;
-
-  dummyItems.push({
-    id: uuidv4(),
-    name: `${category} Item ${i + 1}`,
-    description: `Generated dummy description for ${category} item #${i + 1}`,
-    quantity: quantity,
-    minQuantity: minQuantity,
-    unit: unit,
-    costPerUnit: Math.random() > 0.1 ? costPerUnit : undefined, // Some items without cost
-    price: Math.random() > 0.1 ? price : undefined, // Some items without price
-    category: category,
-    location: location.id,
-    reorderLevel: Math.random() > 0.2 ? reorderLevel : undefined, // Some items without reorder level
-    barcode: Math.random() > 0.3 ? generateBarcode() : undefined, // Some items without barcode
-    notes: Math.random() > 0.7 ? `Additional notes for item ${i + 1}` : undefined,
-    supplier: suppliers[generateRandomInt(0, suppliers.length - 1)],
-    supplierWebsite: Math.random() > 0.6 ? `www.${suppliers[generateRandomInt(0, suppliers.length - 1)].toLowerCase().replace(/ /g, '')}.com` : undefined,
-    project: Math.random() > 0.15 ? projects[generateRandomInt(0, projects.length - 1)] : undefined, // Some unassigned
-    lastUpdated: lastUpdated,
-    orderStatus: orderStatus,
-    deliveryPercentage: deliveryPercentage,
-    expectedDeliveryDate: expectedDelivery,
-  });
-}
-
-// Update the specific example item
-const warehouseLocation = {
-  id: uuidv4(),
-  name: "Warehouse A",
-  subcategories: []
-};
-locations.push(warehouseLocation);
-
-dummyItems.push({
-  id: uuidv4(),
-  name: "Belden 1855a Yellow",
-  description: "1000ft Spool, SDI Cable",
-  quantity: 10, // 10 delivered
-  minQuantity: 5,
-  unit: "spool",
-  costPerUnit: 340,
-  price: 442, // ~30% markup
-  category: "Cable",
-  location: warehouseLocation.id,
-  reorderLevel: 5,
-  barcode: generateBarcode(),
-  notes: "DUMMY DATA   >  14 ordered total, 4 backordered ETA 2 weeks",
-  supplier: "Joseph Electronics",
-  supplierWebsite: "www.josephelectronics.com",
-  project: "2025:SUTRO",
-  lastUpdated: new Date(),
-  orderStatus: OrderStatus.IN_PROGRESS,
-  deliveryPercentage: Math.round((10/14)*100), // ~71%
-  expectedDeliveryDate: addDays(new Date(), 14)
-});
-
-// Initial settings data
-export const INITIAL_SETTINGS = {
-  [STORAGE_KEYS.CATEGORIES]: categories,
-  [STORAGE_KEYS.UNITS]: units,
-  [STORAGE_KEYS.LOCATIONS]: locations,
-  [STORAGE_KEYS.SUPPLIERS]: suppliers,
-  [STORAGE_KEYS.PROJECTS]: projects
-};
-
-export const DUMMY_INVENTORY_DATA = dummyItems;
-
-export type SetupDefaultsChoice = 'blank' | 'starter';
-
-const SETUP_DEFAULTS_CHOICE_KEY = 'trackit:setup-defaults-choice:v1';
+import {
+  DEMO_SEED_FIELD,
+  DEMO_SEED_SOURCE,
+  DEMO_SEED_VERSION,
+  fingerprintEntity,
+  populateDemoData,
+} from '@/lib/demoSeed';
 
 const cloneTemplate = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
 const setupContextKey = (): string => {
   const activeWorkspaceId = getActiveWorkspaceId();
   return activeWorkspaceId ? `workspace:${activeWorkspaceId}` : 'personal';
 };
+
+/**
+ * Curated demo inventory rows, pre-stamped with `__demoSeed`. This list is
+ * what `CreateWorkspaceDialog` / `WorkspaceUtilitiesDialog` push into the
+ * workspace snapshot when the user opts into "Include sample inventory".
+ *
+ * Each row carries the same `version` + `fingerprint` it would have received
+ * from `populateDemoData`, so a later `stripDemoData` against that workspace
+ * will identify and remove these rows even though they bypassed the regular
+ * populate path. The dialog should also call `recordManifestForWorkspace` to
+ * cover lookup-list strip on the new workspace.
+ */
+export const DUMMY_INVENTORY_DATA: InventoryItem[] = DEMO_SEED_SOURCE.inventory.map((source) => {
+  const cloned = cloneTemplate(source);
+  const fingerprint = fingerprintEntity(cloned, 'inventory');
+  return {
+    ...cloned,
+    [DEMO_SEED_FIELD]: { version: DEMO_SEED_VERSION, fingerprint },
+  } as InventoryItem;
+});
+
+/** Initial lookup-list defaults keyed by storage key (legacy shape). */
+export const INITIAL_SETTINGS = {
+  [STORAGE_KEYS.CATEGORIES]: cloneTemplate(DEMO_SEED_SOURCE.lookups.categories),
+  [STORAGE_KEYS.UNITS]: cloneTemplate(DEMO_SEED_SOURCE.lookups.units),
+  [STORAGE_KEYS.LOCATIONS]: cloneTemplate(DEMO_SEED_SOURCE.lookups.locations),
+  [STORAGE_KEYS.SUPPLIERS]: cloneTemplate(DEMO_SEED_SOURCE.lookups.suppliers),
+  [STORAGE_KEYS.PROJECTS]: cloneTemplate(DEMO_SEED_SOURCE.lookups.projects),
+};
+
+export type SetupDefaultsChoice = 'blank' | 'starter';
+
+const SETUP_DEFAULTS_CHOICE_KEY = 'trackit:setup-defaults-choice:v1';
 
 const readChoiceMap = (): Record<string, SetupDefaultsChoice> => {
   try {
@@ -200,35 +119,25 @@ export const recordSetupChoiceForWorkspace = (workspaceId: string, choice: Setup
   writeChoiceMap(map);
 };
 
-export const applySetupDefaultsChoice = (choice: SetupDefaultsChoice, includeSampleInventory: boolean): void => {
+/**
+ * Apply the user's first-run setup choice to the active context. Routed
+ * through `populateDemoData` so seeded inventory carries `__demoSeed` stamps.
+ *
+ * `includeSampleInventory` preserves the existing personal/InitialDefaultsDialog
+ * UX. Productions / crew / position templates are NOT applied here — those
+ * are opt-in via Settings → Workspace Utilities → Demo data.
+ */
+export const applySetupDefaultsChoice = (
+  choice: SetupDefaultsChoice,
+  includeSampleInventory: boolean,
+): void => {
   if (choice === 'starter') {
-    saveSettings({
-      ...getSettings(),
-      categories: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.CATEGORIES]),
-      units: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.UNITS]),
-      locations: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.LOCATIONS]),
-      suppliers: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.SUPPLIERS]),
-      projects: cloneTemplate(INITIAL_SETTINGS[STORAGE_KEYS.PROJECTS]),
+    populateDemoData({
+      lookupLists: true,
+      inventory: includeSampleInventory,
+      productions: false,
+      onAirTemplate: true,
     });
-
-    const uiDefaults = SettingsService.loadDefaultSettings();
-    SettingsService.saveDefaultSettings({
-      ...uiDefaults,
-      maintenanceOnAirSchedule: { ...DEMO_BROADCAST_ON_AIR_TEMPLATE },
-    });
-
-    if (includeSampleInventory) {
-      const sampleItems = cloneTemplate(DUMMY_INVENTORY_DATA).map((item) => ({
-        ...item,
-        lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated : new Date(item.lastUpdated),
-        expectedDeliveryDate: item.expectedDeliveryDate
-          ? item.expectedDeliveryDate instanceof Date
-            ? item.expectedDeliveryDate
-            : new Date(item.expectedDeliveryDate)
-          : undefined,
-      }));
-      saveItems(sampleItems);
-    }
   }
 
   const map = readChoiceMap();

@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS, recordSetupChoiceForWorkspace } from '@/lib/dummyData';
 import { STORAGE_KEYS, type Settings } from '@/lib/storageService';
 import { createWorkspaceWithSnapshot, type WorkspaceSnapshotPayload } from '@/lib/supabase/workspaceData';
+import { DEMO_SEED_SOURCE, DEMO_SEED_VERSION, recordManifestForWorkspace } from '@/lib/demoSeed';
 
 type WorkspaceDefaultsChoice = 'blank' | 'starter';
 
@@ -112,6 +113,21 @@ export function CreateWorkspaceDialog({
 
       const workspaceId = await createWorkspaceWithSnapshot(trimmedName, snapshot);
       recordSetupChoiceForWorkspace(workspaceId, choice);
+
+      if (choice === 'starter') {
+        recordManifestForWorkspace(workspaceId, {
+          version: DEMO_SEED_VERSION,
+          seededAt: new Date().toISOString(),
+          lookups: {
+            categories: DEMO_SEED_SOURCE.lookups.categories.map((row) => row.name),
+            units: DEMO_SEED_SOURCE.lookups.units.map((row) => row.name),
+            locations: DEMO_SEED_SOURCE.lookups.locations.map((row) => row.name),
+            suppliers: DEMO_SEED_SOURCE.lookups.suppliers.map((row) => row.name),
+            projects: DEMO_SEED_SOURCE.lookups.projects.map((row) => row.name),
+          },
+          onAirSchedule: null,
+        });
+      }
       durableLogger.info('audit', 'WORKSPACE_CREATED', {
         workspaceName: trimmedName,
         workspaceId,

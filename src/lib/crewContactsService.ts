@@ -56,7 +56,7 @@ function normalizeCrewContact(raw: unknown): CrewContact | null {
   const fullName = typeof source.fullName === 'string' ? source.fullName.trim() : '';
   if (!fullName) return null;
   const now = new Date().toISOString();
-  return {
+  const normalized: CrewContact = {
     id: typeof source.id === 'string' && source.id ? source.id : crypto.randomUUID(),
     fullName,
     contactType: source.contactType === 'vendor' ? 'vendor' : 'crew',
@@ -77,6 +77,11 @@ function normalizeCrewContact(raw: unknown): CrewContact | null {
     createdAt: typeof source.createdAt === 'string' ? source.createdAt : now,
     updatedAt: typeof source.updatedAt === 'string' ? source.updatedAt : now,
   };
+  const demoSeed = source.__demoSeed as CrewContact['__demoSeed'];
+  if (demoSeed && typeof demoSeed.version === 'string' && typeof demoSeed.fingerprint === 'string') {
+    normalized.__demoSeed = { version: demoSeed.version, fingerprint: demoSeed.fingerprint };
+  }
+  return normalized;
 }
 
 export function getCrewContacts(): CrewContact[] {

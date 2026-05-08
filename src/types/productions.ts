@@ -1,3 +1,5 @@
+import type { DemoSeedMeta } from '@/types/inventory';
+
 export type ProductionStatus = 'planning' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface ChecklistItem {
@@ -57,6 +59,8 @@ export interface PositionTemplate {
   defaultRoleTag?: string;
   defaultLocation?: string;
   sortOrder: number;
+  /** Set by `src/lib/demoSeed/`. Presence flags this template as demo data. */
+  __demoSeed?: DemoSeedMeta;
 }
 
 export interface CrewAssignmentShift {
@@ -82,6 +86,8 @@ export interface CrewScheduleEntry {
 
 export interface Production {
   id: string;
+  /** Set by `src/lib/demoSeed/`. Presence flags this production as demo data. */
+  __demoSeed?: DemoSeedMeta;
   name: string;
   client?: string;
   location?: string;

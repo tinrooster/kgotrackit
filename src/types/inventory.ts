@@ -9,8 +9,23 @@ export enum OrderStatus {
 /** Fiber optic characterization for cable inventory (optional). */
 export type FiberOpticMode = 'sm' | 'mm' | 'na' | 'mtp_mpo';
 
+/**
+ * Marker stamped on entities seeded by the demo populate flow. Persists across
+ * snapshots so we can later identify and strip demo content (whole-flag or only
+ * those still matching their original fingerprint). Never set this manually
+ * outside of `src/lib/demoSeed/`.
+ */
+export interface DemoSeedMeta {
+  /** Seed schema version (`v1`, `v2`, …) — bump when seed shapes change. */
+  version: string;
+  /** Stable hash of original seeded content. Used to detect user edits. */
+  fingerprint: string;
+}
+
 export interface InventoryItem {
   id: string;
+  /** Set by `src/lib/demoSeed/`. Presence flags this row as demo data. */
+  __demoSeed?: DemoSeedMeta;
   /** Durable human-readable inventory row identifier (monotonic; never reused). */
   recordId?: string;
   name: string;
