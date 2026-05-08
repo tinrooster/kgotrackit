@@ -3,10 +3,12 @@ import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { CrewScheduleEntry, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimeInput } from '@/components/ui/time-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsible';
 import { minutesToTime, normalizeQuarterHourTime, parseTimeToMinutes } from '@/lib/dateTimeInputs';
 import {
   AlertDialog,
@@ -302,8 +304,7 @@ export function CrewScheduleCalendar({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border p-3">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Add schedule entry</p>
+      <OptionalFormCollapsible title="Add schedule entry" className="rounded-md border">
         <div className="grid gap-2 sm:grid-cols-2">
           <Select value={draft.crewMemberId} onValueChange={(value) => setDraft((previous) => ({ ...previous, crewMemberId: value }))}>
             <SelectTrigger className="h-8">
@@ -330,29 +331,25 @@ export function CrewScheduleCalendar({
               }))
             }
           />
-          <Input
+          <TimeInput
             className="h-8"
-            type="time"
-            step={900}
             value={draft.startTime}
             onChange={(event) => setDraft((previous) => ({ ...previous, startTime: event.target.value }))}
-            onBlur={() =>
+            onBlurCommit={(value) =>
               setDraft((previous) => ({
                 ...previous,
-                startTime: previous.startTime ? normalizeQuarterHourTime(previous.startTime) : '',
+                startTime: value ?? '',
               }))
             }
           />
-          <Input
+          <TimeInput
             className="h-8"
-            type="time"
-            step={900}
             value={draft.endTime}
             onChange={(event) => setDraft((previous) => ({ ...previous, endTime: event.target.value }))}
-            onBlur={() =>
+            onBlurCommit={(value) =>
               setDraft((previous) => ({
                 ...previous,
-                endTime: previous.endTime ? normalizeQuarterHourTime(previous.endTime) : '',
+                endTime: value ?? '',
               }))
             }
           />
@@ -360,10 +357,8 @@ export function CrewScheduleCalendar({
           <Input className="h-8" placeholder="Location" value={draft.location} onChange={(event) => setDraft((previous) => ({ ...previous, location: event.target.value }))} />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Input
+          <TimeInput
             className="h-7 w-[130px]"
-            type="time"
-            step={900}
             value={derivedWindowStart}
             onChange={(event) =>
               onProjectedWindowChange?.({
@@ -371,16 +366,26 @@ export function CrewScheduleCalendar({
                 endTime: projectedWindowEndTime,
               })
             }
+            onBlurCommit={(value) =>
+              onProjectedWindowChange?.({
+                startTime: value,
+                endTime: projectedWindowEndTime,
+              })
+            }
           />
-          <Input
+          <TimeInput
             className="h-7 w-[130px]"
-            type="time"
-            step={900}
             value={derivedWindowEnd}
             onChange={(event) =>
               onProjectedWindowChange?.({
                 startTime: projectedWindowStartTime,
                 endTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : undefined,
+              })
+            }
+            onBlurCommit={(value) =>
+              onProjectedWindowChange?.({
+                startTime: projectedWindowStartTime,
+                endTime: value,
               })
             }
           />
@@ -425,7 +430,7 @@ export function CrewScheduleCalendar({
           <Plus className="h-3.5 w-3.5" />
           Add Entry
         </Button>
-      </div>
+      </OptionalFormCollapsible>
 
       <Tabs defaultValue="day-board" className="space-y-3">
         <TabsList>
@@ -680,35 +685,27 @@ export function CrewScheduleCalendar({
                   setEditingDraft((previous) => (previous ? { ...previous, role: event.target.value } : previous))
                 }
               />
-              <Input
+              <TimeInput
                 className="h-8"
-                type="time"
-                step={900}
                 value={editingDraft.startTime}
                 onChange={(event) =>
                   setEditingDraft((previous) => (previous ? { ...previous, startTime: event.target.value } : previous))
                 }
-                onBlur={() =>
+                onBlurCommit={(value) =>
                   setEditingDraft((previous) =>
-                    previous
-                      ? { ...previous, startTime: previous.startTime ? normalizeQuarterHourTime(previous.startTime) : '' }
-                      : previous
+                    previous ? { ...previous, startTime: value ?? '' } : previous
                   )
                 }
               />
-              <Input
+              <TimeInput
                 className="h-8"
-                type="time"
-                step={900}
                 value={editingDraft.endTime}
                 onChange={(event) =>
                   setEditingDraft((previous) => (previous ? { ...previous, endTime: event.target.value } : previous))
                 }
-                onBlur={() =>
+                onBlurCommit={(value) =>
                   setEditingDraft((previous) =>
-                    previous
-                      ? { ...previous, endTime: previous.endTime ? normalizeQuarterHourTime(previous.endTime) : '' }
-                      : previous
+                    previous ? { ...previous, endTime: value ?? '' } : previous
                   )
                 }
               />

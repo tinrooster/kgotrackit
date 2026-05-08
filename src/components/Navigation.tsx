@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, List, FileText, Settings, ShoppingCart, Clapperboard } from 'lucide-react'
+import { LayoutDashboard, List, FileText, Settings, ShoppingCart, Clapperboard, FlaskConical } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { UserMenu } from '@/components/UserMenu'
 import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService'
@@ -8,17 +8,19 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
+import { DEV_MENU_UPDATED_EVENT, getDevMenuPreference, isDevMenuEnabled, setDevMenuEnabled as persistDevMenuEnabled } from '@/lib/devMenu'
 
 export function Navigation() {
   const location = useLocation()
-  const { authBackend } = useAuth()
-  const { activeWorkspaceId, workspaces } = useWorkspace()
+  const { authBackend, currentUser } = useAuth()
+  const { activeWorkspaceId, activeWorkspaceRole, workspaces } = useWorkspace()
   const { activeOrganizationName } = useOrganization()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navContainerRef = useRef<HTMLDivElement | null>(null)
   const [mobileTabletUi, setMobileTabletUi] = useState(
     () => SettingsService.loadDefaultSettings().mobileTabletUi
   )
+  const [devMenuEnabled, setDevMenuEnabledState] = useState(() => isDevMenuEnabled())
 
   useEffect(() => {
     const syncMobileTablet = () => {
@@ -27,6 +29,19 @@ export function Navigation() {
     window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileTablet)
     return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncMobileTablet)
   }, [])
+
+  useEffect(() => {
+    const syncDevMenu = () => setDevMenuEnabledState(isDevMenuEnabled())
+    window.addEventListener(DEV_MENU_UPDATED_EVENT, syncDevMenu)
+    return () => window.removeEventListener(DEV_MENU_UPDATED_EVENT, syncDevMenu)
+  }, [])
+
+  useEffect(() => {
+    const isAdmin = (activeWorkspaceId ? activeWorkspaceRole : currentUser?.role) === 'admin'
+    if (!isAdmin) return;
+    if (getDevMenuPreference() !== null) return;
+    persistDevMenuEnabled(true);
+  }, [activeWorkspaceId, activeWorkspaceRole, currentUser?.role]);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
@@ -70,6 +85,14 @@ export function Navigation() {
     { path: "/reports", label: "Reports", icon: FileText },
     { path: "/settings", label: "Settings", icon: Settings }
   ]
+  const isNavItemActive = (path: string): boolean => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
+  const isAdmin = (activeWorkspaceId ? activeWorkspaceRole : currentUser?.role) === 'admin'
+  const devNavItems = (isAdmin && devMenuEnabled)
+    ? [{ path: '/dev', label: 'Dev', icon: FlaskConical }]
+    : []
 
   return (
     <nav className="bg-background border-b sticky top-0 z-50">
@@ -110,7 +133,7 @@ export function Navigation() {
                 className={cn(
                   'flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md text-sm font-medium transition-colors md:min-h-0 md:min-w-0',
                   mobileTabletUi ? 'px-2 py-1.5 md:max-lg:px-2 md:max-lg:justify-center lg:px-3 lg:py-2' : 'px-3 py-2',
-                  location.pathname === item.path
+                  isNavItemActive(item.path)
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
@@ -125,6 +148,34 @@ export function Navigation() {
                 <span className={cn(mobileTabletUi && "md:max-lg:sr-only")}>{item.label}</span>
               </Link>
             ))}
+            {devNavItems.length > 0 ? (
+              <>
+                <div className="mx-1 h-6 w-px bg-border/70 lg:mx-2" />
+                {devNavItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    title={`Dev: ${item.label}`}
+                    className={cn(
+                      'flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md text-sm font-medium transition-colors md:min-h-0 md:min-w-0',
+                      mobileTabletUi ? 'px-2 py-1.5 md:max-lg:px-2 md:max-lg:justify-center lg:px-3 lg:py-2' : 'px-3 py-2',
+                      isNavItemActive(item.path)
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        mobileTabletUi ? "mr-2 md:max-lg:mr-0 lg:mr-2" : "mr-2"
+                      )}
+                      aria-hidden
+                    />
+                    <span className={cn(mobileTabletUi && "md:max-lg:sr-only")}>{item.label}</span>
+                  </Link>
+                ))}
+              </>
+            ) : null}
             <div className="ml-2 md:ml-4 flex items-center">
               <UserMenu />
             </div>
@@ -151,7 +202,28 @@ export function Navigation() {
                 to={item.path}
                 className={cn(
                   'flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
-                  location.pathname === item.path
+                  isNavItemActive(item.path)
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                )}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <item.icon className="h-4 w-4 shrink-0" aria-hidden />
+                <span>{item.label}</span>
+              </Link>
+            ))}
+            {devNavItems.length > 0 ? (
+              <div className="px-3 pt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Developer</p>
+              </div>
+            ) : null}
+            {devNavItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  'flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
+                  isNavItemActive(item.path)
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}

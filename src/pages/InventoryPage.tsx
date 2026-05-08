@@ -7,7 +7,7 @@ import { InventoryItem, CategoryNode, ItemWithSubcategories } from '@/types/inve
 import BatchOperations from '@/components/BatchOperations';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-import { getSettings, getItems, saveItems, SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
+import { getSettings, getItems, saveItems, SETTINGS_UPDATED_EVENT, STORAGE_KEYS } from '@/lib/storageService';
 import {
   applyInventoryState,
   canRedoInventory,
@@ -39,6 +39,10 @@ import {
   Undo2,
   Redo2,
   Zap,
+  Ruler,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
 } from 'lucide-react';
 import { AddItemDialog } from '@/components/AddItemDialog';
 import { MobileQuickAddDialog } from '@/components/MobileQuickAddDialog';
@@ -52,6 +56,13 @@ import { ItemTemplate } from '@/types/templates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useHorizontalScrollHints } from '@/components/ui/useHorizontalScrollHints';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
   Tooltip,
@@ -226,6 +237,9 @@ export default function InventoryPage() {
   const [mobileTabletUi, setMobileTabletUi] = useState(
     () => SettingsService.loadDefaultSettings().mobileTabletUi
   );
+  const [isCondensedView, setIsCondensedView] = useState(
+    () => SettingsService.loadDefaultSettings().condensedView
+  );
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -274,16 +288,32 @@ export default function InventoryPage() {
     const handleSettingsUpdated = () => {
       loadSettings();
     };
+    const settingsKeys = new Set<string>([
+      STORAGE_KEYS.CATEGORIES,
+      STORAGE_KEYS.UNITS,
+      STORAGE_KEYS.LOCATIONS,
+      STORAGE_KEYS.SUPPLIERS,
+      STORAGE_KEYS.PROJECTS,
+      STORAGE_KEYS.EXPENSE_CODES,
+      STORAGE_KEYS.GENERAL_SETTINGS,
+    ]);
+    const handleSettingsStorage = (event: StorageEvent) => {
+      if (event.key === null || settingsKeys.has(event.key)) {
+        loadSettings();
+      }
+    };
 
     loadSettings();
     window.addEventListener(SETTINGS_UPDATED_EVENT, handleSettingsUpdated);
     window.addEventListener('focus', handleSettingsUpdated);
     document.addEventListener('visibilitychange', handleSettingsUpdated);
+    window.addEventListener('storage', handleSettingsStorage);
 
     return () => {
       window.removeEventListener(SETTINGS_UPDATED_EVENT, handleSettingsUpdated);
       window.removeEventListener('focus', handleSettingsUpdated);
       document.removeEventListener('visibilitychange', handleSettingsUpdated);
+      window.removeEventListener('storage', handleSettingsStorage);
     };
   }, []);
 
@@ -333,15 +363,31 @@ export default function InventoryPage() {
   }, []);
 
   useEffect(() => {
+    const syncCondensedView = () => {
+      setIsCondensedView(SettingsService.loadDefaultSettings().condensedView);
+    };
+    syncCondensedView();
+    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncCondensedView);
+    return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, syncCondensedView);
+  }, []);
+
+  useEffect(() => {
     const syncProductionAllocations = () => {
       setProductionAllocationMap(getInventoryProductionAllocationMap());
+    };
+    const handleProductionStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === STORAGE_KEYS.PRODUCTIONS) {
+        syncProductionAllocations();
+      }
     };
     syncProductionAllocations();
     window.addEventListener(INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT, syncProductionAllocations);
     window.addEventListener('focus', syncProductionAllocations);
+    window.addEventListener('storage', handleProductionStorage);
     return () => {
       window.removeEventListener(INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT, syncProductionAllocations);
       window.removeEventListener('focus', syncProductionAllocations);
+      window.removeEventListener('storage', handleProductionStorage);
     };
   }, []);
 
@@ -712,6 +758,60 @@ export default function InventoryPage() {
     return { totalQuantity, totalInventoryValue };
   }, [filteredItems]);
 
+  const checkoutActivityByItemId = useMemo(() => {
+    type CheckoutActivitySummary = {
+      type: 'check-in' | 'check-out';
+      timestamp: Date;
+      performedBy: string;
+      cabinetName: string;
+      quantity: number;
+    };
+    const map: Record<string, CheckoutActivitySummary> = {};
+    try {
+      const raw = localStorage.getItem('checkout-recent-activities');
+      if (!raw) {
+        return map;
+      }
+      const parsed = JSON.parse(raw) as Array<{
+        message?: string;
+        timestamp?: string;
+        details?: {
+          itemId?: string;
+          quantity?: number;
+          cabinetName?: string;
+          performedBy?: string;
+        };
+      }>;
+      parsed.forEach((entry) => {
+        const itemId = entry.details?.itemId;
+        if (!itemId) {
+          return;
+        }
+        if (entry.message !== 'ITEM_CHECKIN' && entry.message !== 'ITEM_CHECKOUT') {
+          return;
+        }
+        const ts = new Date(entry.timestamp || 0);
+        if (Number.isNaN(ts.getTime())) {
+          return;
+        }
+        const existing = map[itemId];
+        if (existing && existing.timestamp.getTime() >= ts.getTime()) {
+          return;
+        }
+        map[itemId] = {
+          type: entry.message === 'ITEM_CHECKOUT' ? 'check-out' : 'check-in',
+          timestamp: ts,
+          performedBy: String(entry.details?.performedBy || 'unknown'),
+          cabinetName: String(entry.details?.cabinetName || 'Unknown cabinet'),
+          quantity: Number(entry.details?.quantity || 0),
+        };
+      });
+    } catch {
+      return map;
+    }
+    return map;
+  }, [items, updateTrigger]);
+
   // Handle column sort
   const handleSort = (field: keyof InventoryItem) => {
     if (sortField === field) {
@@ -1067,6 +1167,16 @@ export default function InventoryPage() {
   const [isDetailedView, setIsDetailedView] = useState(false);
   const [isTinyScreen, setIsTinyScreen] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [isAutoFitEnabled, setIsAutoFitEnabled] = useState(false);
+  const {
+    scrollRef: tableScrollRef,
+    isOverflowing: isTableOverflowing,
+    canScrollLeft: canTableScrollLeft,
+    canScrollRight: canTableScrollRight,
+    shouldPulseRightHint: shouldPulseTableRightHint,
+  } = useHorizontalScrollHints<HTMLDivElement>({
+    pulseStorageKey: 'inventory-table-scroll-hint-pulsed',
+  });
 
   useEffect(() => {
     try {
@@ -1118,6 +1228,7 @@ export default function InventoryPage() {
 
   const handleColumnResizeStart = (event: React.MouseEvent, column: string) => {
     event.preventDefault();
+    setIsAutoFitEnabled(false);
     const startWidth = columnWidths[column] || 180;
     resizeStateRef.current = {
       column,
@@ -1208,7 +1319,9 @@ export default function InventoryPage() {
     const syncTinyScreen = () => {
       const tiny = mediaQuery.matches;
       setIsTinyScreen(tiny);
-      if (!tiny) {
+      if (tiny) {
+        setFiltersCollapsed(true);
+      } else {
         setFiltersCollapsed(false);
       }
     };
@@ -1216,6 +1329,110 @@ export default function InventoryPage() {
     mediaQuery.addEventListener('change', syncTinyScreen);
     return () => mediaQuery.removeEventListener('change', syncTinyScreen);
   }, []);
+
+  const resetAllColumnWidths = () => {
+    setIsAutoFitEnabled(false);
+    setColumnWidths({});
+    toast.success('Column widths reset');
+  };
+
+  const autofitAllColumns = () => {
+    setIsAutoFitEnabled(true);
+    const defaultWidths: Record<string, number> = {
+      photoUrl: 72,
+      recordId: 96,
+      assetId: 120,
+      name: 220,
+      category: 180,
+      location: 180,
+      rackLocation: 140,
+      project: 160,
+      quantity: 140,
+      unit: 90,
+      expenseTypeCode: 120,
+      costCenterCode: 120,
+      costPerUnit: 120,
+      totalValue: 120,
+      lastUpdated: 190,
+      lastModifiedBy: 200,
+    };
+
+    const maxSampleRows = 60;
+    const sample = filteredItems.slice(0, maxSampleRows);
+    const next: Record<string, number> = {};
+    const baseCharWidth = isCondensedView ? 7 : 8;
+
+    for (const column of activeColumns) {
+      const headerLabel =
+        column === 'recordId'
+          ? 'Record ID'
+          : column === 'assetId'
+            ? 'Asset tag'
+            : column.charAt(0).toUpperCase() + column.slice(1).replace(/([A-Z])/g, ' $1');
+
+      const headerEstimate = headerLabel.length * baseCharWidth + 48;
+      let maxEstimate = headerEstimate;
+
+      for (const item of sample) {
+        const raw = (item as any)?.[column];
+        const valueText =
+          column === 'photoUrl'
+            ? 'Photo'
+            : column === 'costPerUnit'
+              ? formatCurrency(Number(raw ?? 0))
+              : column === 'totalValue'
+                ? formatCurrency(Number(item.quantity ?? 0) * Number(item.costPerUnit ?? 0))
+                : column === 'lastUpdated'
+                  ? 'MMM d, yyyy · h:mm a'
+                  : raw === null || raw === undefined
+                    ? '—'
+                    : String(raw);
+        const estimate = valueText.length * baseCharWidth + 40;
+        if (estimate > maxEstimate) {
+          maxEstimate = estimate;
+        }
+      }
+
+      const floor = defaultWidths[column] ?? 140;
+      const capped = Math.min(520, Math.max(floor, maxEstimate));
+      next[column] = Math.round(capped);
+    }
+
+    setColumnWidths(next);
+    toast.success('Auto-fit column widths applied', { description: `Sampled ${Math.min(maxSampleRows, filteredItems.length)} row(s).` });
+  };
+
+  const getCellClampClass = (column: string) => {
+    // Hard rule: rows should never exceed 2 lines.
+    if (isTinyScreen) {
+      if (column === 'photoUrl') {
+        return 'trackit-clamp-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap';
+      }
+      return 'trackit-clamp-2 whitespace-normal break-words';
+    }
+
+    // Simple view: keep common scan columns tight; allow name/date to use two lines.
+    if (!isDetailedView) {
+      if (column === 'name') return 'trackit-clamp-2 whitespace-normal break-words';
+      if (column === 'lastUpdated') return 'trackit-clamp-2 whitespace-normal break-words';
+      if (column === 'category' || column === 'location' || column === 'project') {
+        return 'trackit-clamp-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap';
+      }
+      if (column === 'quantity' || column === 'unit') {
+        return 'trackit-clamp-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap';
+      }
+      return 'trackit-clamp-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap';
+    }
+
+    // Detailed view:
+    // - Condensed: name gets 2 lines, everything else stays 1 line.
+    // - Not condensed: allow 2 lines for readability.
+    if (isCondensedView) {
+      if (column === 'name') return 'trackit-clamp-2 whitespace-normal break-words';
+      return 'trackit-clamp-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap';
+    }
+    return 'trackit-clamp-2 whitespace-normal break-words';
+  };
 
   return (
     <div className="inventory-page w-full min-w-0 max-w-full space-y-4">
@@ -1242,6 +1459,21 @@ export default function InventoryPage() {
                   ) : (
                     <span className="text-xs text-muted-foreground">Filters hidden</span>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto h-10 w-10"
+                    onClick={() => {
+                      handleFilterChange('category', 'all');
+                      handleFilterChange('location', 'all');
+                      handleFilterChange('project', 'all');
+                    }}
+                    disabled={!selectedCategory && !selectedLocation && !selectedProject}
+                    title="Clear all filters"
+                    aria-label="Clear all filters"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               ) : null}
               <div
@@ -1308,30 +1540,32 @@ export default function InventoryPage() {
               </Select>
               </div>
             </div>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(mobileTabletUi && "h-11 w-11 touch-manipulation")}
-                    onClick={() => {
-                      handleFilterChange('category', 'all');
-                      handleFilterChange('location', 'all');
-                      handleFilterChange('project', 'all');
-                    }}
-                    disabled={!selectedCategory && !selectedLocation && !selectedProject}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {selectedCategory || selectedLocation || selectedProject 
-                    ? "Clear all filters" 
-                    : "No active filters"}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {!isTinyScreen ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(mobileTabletUi && "h-11 w-11 touch-manipulation")}
+                      onClick={() => {
+                        handleFilterChange('category', 'all');
+                        handleFilterChange('location', 'all');
+                        handleFilterChange('project', 'all');
+                      }}
+                      disabled={!selectedCategory && !selectedLocation && !selectedProject}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {selectedCategory || selectedLocation || selectedProject
+                      ? "Clear all filters"
+                      : "No active filters"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : null}
           </div>
           <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div className="flex items-center gap-2 sm:mr-2">
@@ -1344,45 +1578,131 @@ export default function InventoryPage() {
               {isDetailedView ? 'Detailed View' : 'Simple View'}
             </Label>
           </div>
-          {inventoryUndoEnabled && (
+          {!isTinyScreen ? (
+            <div className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2">
+              <Switch
+                id="autofit-columns-toggle"
+                checked={isAutoFitEnabled}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    autofitAllColumns();
+                  } else {
+                    resetAllColumnWidths();
+                  }
+                }}
+              />
+              <Label htmlFor="autofit-columns-toggle" className="text-sm whitespace-nowrap">
+                {isAutoFitEnabled ? 'Auto-fit on' : 'Auto-fit off'}
+              </Label>
+            </div>
+          ) : null}
+          {isTinyScreen ? (
+            <div className="flex w-full items-center gap-2">
+              <Button type="button" size="icon" className="h-11 w-11" onClick={() => setIsAddDialogOpen(true)} title="Add item">
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className={cn("h-11 w-11", mobileTabletUi ? "touch-manipulation" : "")}
+                onClick={() => setIsQuickAddOpen(true)}
+                title="Quick add"
+              >
+                <Zap className="h-4 w-4" />
+              </Button>
+              {inventoryUndoEnabled ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-11 px-0"
+                  disabled={!invUndoAvail}
+                  onClick={handleInventoryUndo}
+                  title="Undo"
+                >
+                  <Undo2 className="h-4 w-4" />
+                  <span className="sr-only">Undo</span>
+                </Button>
+              ) : null}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="icon" className="h-11 w-11" title="More actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">More actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    disabled={!inventoryUndoEnabled || !invRedoAvail}
+                    onClick={handleInventoryRedo}
+                  >
+                    <Redo2 className="mr-2 h-4 w-4" />
+                    Redo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (isAutoFitEnabled) {
+                        resetAllColumnWidths();
+                      } else {
+                        autofitAllColumns();
+                      }
+                    }}
+                  >
+                    <Ruler className="mr-2 h-4 w-4" />
+                    {isAutoFitEnabled ? 'Disable auto-fit' : 'Enable auto-fit'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsExportDialogOpen(true)}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export current view
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : (
             <>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full sm:w-auto"
-                disabled={!invUndoAvail}
-                onClick={handleInventoryUndo}
-              >
-                <Undo2 className="mr-2 h-4 w-4" />
-                Undo
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full sm:w-auto"
-                disabled={!invRedoAvail}
-                onClick={handleInventoryRedo}
-              >
-                <Redo2 className="mr-2 h-4 w-4" />
-                Redo
-              </Button>
+              {inventoryUndoEnabled && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    disabled={!invUndoAvail}
+                    onClick={handleInventoryUndo}
+                    title="Undo"
+                  >
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Undo
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    disabled={!invRedoAvail}
+                    onClick={handleInventoryRedo}
+                    title="Redo"
+                  >
+                    <Redo2 className="mr-2 h-4 w-4" />
+                    Redo
+                  </Button>
+                </div>
+              )}
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <Button className="w-full sm:w-auto" onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Item
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className={cn("w-full sm:w-auto", mobileTabletUi ? "h-11 touch-manipulation" : "h-10")}
+                  onClick={() => setIsQuickAddOpen(true)}
+                >
+                  <Zap className="mr-2 h-4 w-4" />
+                  Quick add
+                </Button>
+              </div>
             </>
           )}
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <Button className="w-full sm:w-auto" onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className={cn("w-full sm:w-auto", mobileTabletUi ? "h-11 touch-manipulation" : "h-10")}
-              onClick={() => setIsQuickAddOpen(true)}
-            >
-              <Zap className="mr-2 h-4 w-4" />
-              Quick add
-            </Button>
-          </div>
         </div>
         </div>
 
@@ -1390,10 +1710,12 @@ export default function InventoryPage() {
         <div className="text-sm text-muted-foreground">
           {filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'} found
         </div>
-        <Button variant="outline" onClick={() => setIsExportDialogOpen(true)}>
-          <Download className="mr-2 h-4 w-4" />
-          Export Current View
-        </Button>
+        {!isTinyScreen ? (
+          <Button variant="outline" onClick={() => setIsExportDialogOpen(true)}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Current View
+          </Button>
+        ) : null}
       </div>
       </div>
 
@@ -1424,8 +1746,14 @@ export default function InventoryPage() {
         </div>
       )}
 
-      <div className="min-w-0 w-full max-w-full bg-card text-card-foreground rounded-lg border shadow-sm">
+      <div
+        className="inventory-table-scroll-shell min-w-0 w-full max-w-full bg-card text-card-foreground rounded-lg border shadow-sm relative"
+        data-overflowing={isTableOverflowing ? 'true' : 'false'}
+        data-can-scroll-left={canTableScrollLeft ? 'true' : 'false'}
+        data-can-scroll-right={canTableScrollRight ? 'true' : 'false'}
+      >
         <Table
+          containerRef={tableScrollRef}
           containerClassName="max-h-[calc(100vh-16rem)] w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x"
           className={cn(
             'w-full table-fixed border-collapse align-top text-sm',
@@ -1434,12 +1762,14 @@ export default function InventoryPage() {
         >
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[30px]">
-                <Checkbox
-                  checked={isAllSelected}
-                  onCheckedChange={toggleSelectAll}
-                  className={cn(mobileTabletUi && "h-5 w-5")}
-                />
+              <TableHead className="w-[44px] px-2">
+                <div className="flex items-center justify-center">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={toggleSelectAll}
+                    className={cn("shrink-0", mobileTabletUi && "h-5 w-5")}
+                  />
+                </div>
               </TableHead>
               {activeColumns.map((column) => (
                 <TableHead
@@ -1510,23 +1840,40 @@ export default function InventoryPage() {
                 onDoubleClick={() => handleEditItem(item)}
               >
                 <TableCell>
-                  <Checkbox
-                    checked={selectedItems.includes(item.id)}
-                    onCheckedChange={() => toggleItemSelection(item.id)}
-                    className={cn(mobileTabletUi && "h-5 w-5")}
-                  />
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={selectedItems.includes(item.id)}
+                      onCheckedChange={() => toggleItemSelection(item.id)}
+                      className={cn("shrink-0", mobileTabletUi && "h-5 w-5")}
+                    />
+                  </div>
                 </TableCell>
                 {activeColumns.map((column) => (
                   <TableCell
                     key={column}
                     style={{ width: columnWidths[column] ? `${columnWidths[column]}px` : undefined }}
-                    className="align-top whitespace-normal break-words [overflow-wrap:anywhere]"
+                    className={cn(
+                      'align-top',
+                      isTinyScreen
+                        ? 'whitespace-normal break-words'
+                        : // When condensed spacing + detailed columns are enabled, preserve row structure.
+                          // Avoid per-character wrapping that makes long values unreadable.
+                          isCondensedView && isDetailedView && column !== 'name'
+                        ? 'whitespace-nowrap'
+                        : 'whitespace-normal break-words'
+                    )}
                   >
-                    <FormatCellValue
-                      item={item}
-                      column={column}
-                      allocation={productionAllocationMap[item.id]}
-                    />
+                    <div
+                      className={cn('min-w-0', getCellClampClass(column))}
+                    >
+                      <FormatCellValue
+                        item={item}
+                        column={column}
+                        allocation={productionAllocationMap[item.id]}
+                        compact={isTinyScreen}
+                        checkoutActivity={checkoutActivityByItemId[item.id]}
+                      />
+                    </div>
                   </TableCell>
                 ))}
                 <TableCell>
@@ -1614,6 +1961,18 @@ export default function InventoryPage() {
             </TableRow>
           </TableFooter>
         </Table>
+        <div className="inventory-table-scroll-hint inventory-table-scroll-hint-left" aria-hidden>
+          <ChevronLeft className="h-4 w-4" />
+        </div>
+        <div
+          className={cn(
+            'inventory-table-scroll-hint inventory-table-scroll-hint-right',
+            shouldPulseTableRightHint && 'inventory-table-scroll-hint-pulse-once',
+          )}
+          aria-hidden
+        >
+          <ChevronRight className="h-4 w-4" />
+        </div>
       </div>
 
       {/* Dialogs */}

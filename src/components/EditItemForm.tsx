@@ -560,6 +560,7 @@ export function EditItemForm({
               projects={projects}
               inventoryRecordLine={item.recordId ?? undefined}
               assetTagLine={item.assetId}
+              inventoryItemId={item.id}
             />
           </TabsContent>
 

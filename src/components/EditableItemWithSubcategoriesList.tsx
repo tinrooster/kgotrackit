@@ -336,13 +336,13 @@ function SortableItem({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="space-y-2">
-      <div className="flex justify-between items-center gap-2 rounded-md border border-border/80 bg-muted/30 p-2 font-medium text-foreground shadow-sm">
+    <div ref={setNodeRef} style={style} className="space-y-1.5 sm:space-y-2">
+      <div className="flex flex-col items-stretch gap-1.5 rounded-md border border-border/80 bg-muted/30 p-1.5 font-medium text-foreground shadow-sm sm:flex-row sm:items-center sm:gap-2 sm:p-2">
         <div className="flex min-w-0 flex-1 items-center">
           <button
             {...attributes}
             {...listeners}
-            className="mr-2 shrink-0 cursor-grab p-1 active:cursor-grabbing"
+            className="mr-1 shrink-0 cursor-grab p-1 active:cursor-grabbing sm:mr-2"
             title={`Reorder ${item.name}`}
             aria-label={`Reorder ${item.name}`}
           >
@@ -351,7 +351,7 @@ function SortableItem({
           {enableSubcategories && (item.children?.length ?? 0) > 0 ? (
             <button
               type="button"
-              className="mr-1 shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="mr-1 shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground sm:p-1.5"
               onClick={() => setSubsExpanded((v) => !v)}
               aria-expanded={subsExpanded}
               aria-label={subsExpanded ? 'Collapse subcategories' : 'Expand subcategories'}
@@ -363,7 +363,7 @@ function SortableItem({
               )}
             </button>
           ) : (
-            <span className="mr-1 w-7 shrink-0" aria-hidden />
+            <span className="mr-1 w-5 shrink-0 sm:w-7" aria-hidden />
           )}
           {isEditing ? (
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -395,14 +395,17 @@ function SortableItem({
                   aria-hidden="true"
                 />
               )}
-              <span className="truncate">{item.name}</span>
+              <span className="line-clamp-2 break-words text-sm leading-tight sm:truncate sm:text-base sm:leading-normal">
+                {item.name}
+              </span>
             </div>
           )}
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 justify-end gap-1 sm:gap-2">
           <Button
             variant="ghost"
             size="sm"
+            className="h-8 w-8 px-0 sm:h-9 sm:w-9"
             onClick={() => setIsEditing(true)}
             title={`Edit ${item.name}`}
             aria-label={`Edit ${item.name}`}
@@ -422,8 +425,8 @@ function SortableItem({
           <Button
             variant="ghost"
             size="sm"
+            className="delete-action-btn h-8 w-8 px-0 sm:h-9 sm:w-9"
             onClick={() => canDeleteItems && onRequestDeleteParent(item.id)}
-            className="delete-action-btn"
             disabled={!canDeleteItems}
             title={canDeleteItems ? 'Delete item' : 'Only admins can delete list entries'}
           >
@@ -465,7 +468,7 @@ function SortableItem({
                     }}
                     autoFocus
                   />
-                  <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2">
                     <Button type="button" variant="ghost" size="sm" onClick={() => { setSubAddOpen(false); setNewSubcategory(''); }}>
                       Cancel
                     </Button>
@@ -625,7 +628,7 @@ function SortableItem({
       )}
 
       {enableSubcategories && subsExpanded && (item.children?.length ?? 0) > 0 && (
-        <div className="ml-1 space-y-1 border-l-2 border-primary/30 pl-3 sm:ml-2 sm:pl-4">
+        <div className="ml-1 space-y-1 border-l-2 border-primary/30 pl-2.5 sm:ml-2 sm:pl-4">
           {item.children?.map((child, childIndex) => {
             const childKey = child.id ?? child.name;
             const childPresetRacks = getRackOptionsForSubLocationKey(child.name);
@@ -633,7 +636,7 @@ function SortableItem({
             return (
               <div key={childKey} className="space-y-1">
             <div
-              className="flex min-w-0 items-center justify-between gap-2 rounded-r-md border border-border/60 border-l-transparent bg-muted/15 py-1.5 pl-2 pr-2 text-sm text-muted-foreground"
+              className="flex min-w-0 flex-col items-stretch gap-1 rounded-r-md border border-border/60 border-l-transparent bg-muted/15 py-1 pl-1.5 pr-1.5 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:py-1.5 sm:pl-2 sm:pr-2"
             >
               {editingSubcategory === child.name ? (
                 <Input
@@ -660,14 +663,17 @@ function SortableItem({
                 />
               ) : (
                 <>
-                  <span className="min-w-0 flex-1 truncate italic">{child.name}</span>
-                  <div className="flex shrink-0 gap-2">
+                  <span className="min-w-0 flex-1 break-words italic leading-tight sm:truncate sm:leading-normal">
+                    {child.name}
+                  </span>
+                  <div className="flex shrink-0 justify-end gap-1 sm:gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-8 w-8 px-0 sm:h-9 sm:w-9"
                       onClick={() => onMoveSubcategory(item.id, child.name, "up")}
                       disabled={childIndex === 0}
-                      className="text-muted-foreground hover:text-foreground"
+                      aria-label={`Move ${child.name} up`}
                       title="Move up"
                     >
                       <ChevronUp className="h-4 w-4" />
@@ -675,9 +681,10 @@ function SortableItem({
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-8 w-8 px-0 sm:h-9 sm:w-9"
                       onClick={() => onMoveSubcategory(item.id, child.name, "down")}
                       disabled={childIndex >= childCount - 1}
-                      className="text-muted-foreground hover:text-foreground"
+                      aria-label={`Move ${child.name} down`}
                       title="Move down"
                     >
                       <ChevronDown className="h-4 w-4" />
@@ -685,11 +692,11 @@ function SortableItem({
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-8 w-8 px-0 sm:h-9 sm:w-9"
                       onClick={() => {
                         setEditValue(child.name);
                         setEditingSubcategory(child.name);
                       }}
-                      className="text-muted-foreground hover:text-foreground"
                       title={`Edit subcategory ${child.name}`}
                       aria-label={`Edit subcategory ${child.name}`}
                     >
@@ -708,8 +715,8 @@ function SortableItem({
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="delete-action-btn h-8 w-8 px-0 sm:h-9 sm:w-9"
                       onClick={() => canDeleteItems && onRequestDeleteSubcategory(item.id, child.name)}
-                      className="delete-action-btn"
                       disabled={!canDeleteItems}
                       title={canDeleteItems ? 'Delete subcategory' : 'Only admins can delete list entries'}
                     >
@@ -947,7 +954,7 @@ export function EditableItemWithSubcategoriesList({
         : '';
 
   return (
-    <div className="space-y-4">
+    <div className="lookup-list-editor space-y-3 sm:space-y-4">
       {!hideListTitle && (
         <div className="flex justify-between items-center">
           <div>
@@ -957,11 +964,11 @@ export function EditableItemWithSubcategoriesList({
         </div>
       )}
 
-      <div className="flex min-w-0 gap-2">
+      <div className="lookup-list-add-row flex min-w-0 gap-1.5 sm:gap-2">
         <Input
           ref={addInputRef}
           type="text"
-          className="min-w-0 flex-1 placeholder:text-muted-foreground/40"
+          className="h-9 min-w-0 flex-1 text-sm placeholder:text-muted-foreground/40 sm:h-10"
           placeholder={addPlaceholder}
           onKeyDown={handleKeyDown}
           aria-label={addPlaceholder}
@@ -969,17 +976,17 @@ export function EditableItemWithSubcategoriesList({
         <Button
           type="button"
           onClick={handleAddItem}
-          className="shrink-0 border-border"
+          className="lookup-list-add-btn h-9 shrink-0 border-border px-2.5 sm:h-10 sm:px-3"
           variant="outline"
         >
-          <Plus className="mr-2 h-4 w-4" />
-          Add
+          <Plus className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Add</span>
         </Button>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map(item => item.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2">
+          <div className="lookup-list-items space-y-1.5 sm:space-y-2">
             {items.map((item) => (
               <SortableItem
                 key={item.id}

@@ -19,7 +19,7 @@ import {
 } from '@/lib/supabase/workspaceMemberAdmin';
 import { setActiveWorkspaceId } from '@/lib/supabase/workspaceData';
 import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
-import { Key, Users } from 'lucide-react';
+import { CheckCircle2, Key, Users } from 'lucide-react';
 import { logger as durableLogger } from '@/lib/logging';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreateWorkspaceDialog } from '@/components/settings/CreateWorkspaceDialog';
@@ -129,7 +129,6 @@ export function WorkspaceTeamTab() {
 
   const isWorkspaceOwner = !!activeWorkspaceId && !!currentUser?.id && activeWorkspaceRow?.ownerUserId === currentUser.id;
   const canManageMembers = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
-  const canDeleteWorkspace = !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isWorkspaceOwner);
   const manageableWorkspaces = React.useMemo(
     () => workspaces.filter((w) => w.role === 'admin' || w.ownerUserId === currentUser?.id),
     [currentUser?.id, workspaces],
@@ -179,10 +178,16 @@ export function WorkspaceTeamTab() {
           <p className="mt-1 text-muted-foreground">
             {activeWorkspaceId ? (
               <>
-                <span className="font-medium text-foreground">{activeWorkspaceRow?.name ?? 'Workspace'}</span>
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  {activeWorkspaceRow?.name ?? 'Workspace'}
+                </span>
                 {activeWorkspaceRole ? ` · your role: ${activeWorkspaceRole}` : ''}
                 <span className="mt-1 block font-mono text-[11px] text-muted-foreground/90" title="Workspace id">
                   {activeWorkspaceId}
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Inventory records {activeWorkspaceRow?.recordCount ?? 0} · Productions {activeWorkspaceRow?.productionCount ?? 0}
                 </span>
               </>
             ) : (
@@ -254,10 +259,17 @@ export function WorkspaceTeamTab() {
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-foreground">{w.name}</div>
                         <div className="mt-0.5 text-xs text-muted-foreground">
-                          Created {createdLabel} · Owner {createdBy} · Records {recordCount}
+                          Created {createdLabel} · Owner {createdBy} · Records {recordCount} · Productions {w.productionCount ?? 0}
                         </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">{w.role}</div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {isActive ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-300">
+                            Active
+                          </span>
+                        ) : null}
+                        <span>{w.role}</span>
+                      </div>
                     </div>
                   </button>
                 );
@@ -279,29 +291,30 @@ export function WorkspaceTeamTab() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">Create a separate workspace with empty or starter defaults.</p>
-          <Button type="button" onClick={() => setCreateDialogOpen(true)} disabled={busy}>
-            New workspace…
-          </Button>
-        </div>
+        <div className="pt-2" />
 
-        <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+        <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-medium text-foreground">Workspace administration</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setManageDialogOpen(true)}
-              disabled={manageableWorkspaces.length === 0}
-            >
-              Manage workspaces
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button type="button" onClick={() => setCreateDialogOpen(true)} disabled={busy}>
+                New workspace…
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setManageDialogOpen(true)}
+                disabled={manageableWorkspaces.length === 0}
+              >
+                Manage workspaces
+              </Button>
+            </div>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Administer network workspaces: members, roles, and deletion.
           </p>
+          <p className="text-xs text-muted-foreground">Create a separate workspace with empty or starter defaults.</p>
         </div>
       </CardContent>
 

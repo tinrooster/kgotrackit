@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,15 +6,25 @@ import { Badge } from '@/components/ui/badge';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { InventoryItem } from '@/types/inventory';
 import { Plus, Filter, Clapperboard } from 'lucide-react';
-import { SETTINGS_UPDATED_EVENT } from '@/lib/storageService';
+import { SETTINGS_UPDATED_EVENT, STORAGE_KEYS } from '@/lib/storageService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getSettings } from '@/lib/storageService';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
 import { resolveProjectDisplay } from '@/lib/projectOptions';
 import { getProductions, PRODUCTIONS_UPDATED_EVENT } from '@/lib/productionService';
+import { flattenVehiclePacklistItems } from '@/lib/vehiclePacklistUtils';
 import { Production, ProductionStatus, PRODUCTION_STATUS_LABELS } from '@/types/productions';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 const ACTIVE_PRODUCTION_STATUS_FILTERS: ProductionStatus[] = ['planning', 'confirmed', 'in_progress'];
+const PRODUCTION_STATUS_BADGE_CLASSES: Record<ProductionStatus, string> = {
+  planning: 'border-yellow-500/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300',
+  confirmed: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  in_progress: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  completed: 'border-muted-foreground/30 bg-muted text-muted-foreground',
+  cancelled: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
+};
 
 function getChecklistProgress(production: Production): { done: number; total: number; percent: number } {
   let done = 0;
@@ -33,7 +43,7 @@ function getPacklistProgress(production: Production): { done: number; total: num
   let done = 0;
   let total = 0;
   for (const packlist of production.vehiclePacklists) {
-    for (const item of packlist.items) {
+    for (const item of flattenVehiclePacklistItems(packlist)) {
       total += 1;
       if (item.completed) done += 1;
     }
@@ -65,6 +75,10 @@ export default function DashboardPage() {
       if (e.key === 'inventoryItems') {
         const newItems = e.newValue ? JSON.parse(e.newValue) : [];
         setItems(newItems);
+        return;
+      }
+      if (e.key === STORAGE_KEYS.PRODUCTIONS) {
+        setProductions(getProductions());
       }
     };
 
@@ -584,7 +598,12 @@ export default function DashboardPage() {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <p className="font-medium">{production.name}</p>
-                            <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                            <span
+                              className={cn(
+                                'rounded-full border px-2 py-0.5 text-xs',
+                                PRODUCTION_STATUS_BADGE_CLASSES[production.status],
+                              )}
+                            >
                               {PRODUCTION_STATUS_LABELS[production.status]}
                             </span>
                           </div>
@@ -602,6 +621,29 @@ export default function DashboardPage() {
                             <Badge variant="outline" className="text-[11px]">
                               Crew {crew.percent}% ({crew.scheduled}/{crew.crewCount})
                             </Badge>
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span>Checklist</span>
+                                <span>{checklist.percent}%</span>
+                              </div>
+                              <Progress value={checklist.percent} className="h-1.5" />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span>Packlists</span>
+                                <span>{packlists.percent}%</span>
+                              </div>
+                              <Progress value={packlists.percent} className="h-1.5" />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span>Crew</span>
+                                <span>{crew.percent}%</span>
+                              </div>
+                              <Progress value={crew.percent} className="h-1.5" />
+                            </div>
                           </div>
                         </button>
                         );

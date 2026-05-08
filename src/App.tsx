@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Navigation } from './components/Navigation';
 import InventoryPage from './pages/InventoryPage';
@@ -15,16 +15,30 @@ import { getActiveWorkspaceId } from './lib/supabase/workspaceData';
 import { CLOUD_HYDRATED_EVENT } from './lib/cloudSyncEvents';
 import CheckoutPage from './pages/CheckoutPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AppBreadcrumbs } from './components/AppBreadcrumbs';
 import { SettingsService } from './lib/settingsService';
 import { refreshRackLocationsFromServer } from './lib/rackLocationsConfig';
 import HelpPage from './pages/HelpPage';
 import AboutPage from './pages/AboutPage';
 import ProductionsPage from './pages/ProductionsPage';
+import TimePickerLabPage from './pages/TimePickerLabPage';
+import UiDiagnosticsPage from './pages/UiDiagnosticsPage';
+import DevMenuPage from './pages/DevMenuPage';
+
+const LAST_ROUTE_STORAGE_KEY = 'trackit:last-route';
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
+        Restoring session...
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <Navigate to="/login" state={{ from: location }} replace />;
@@ -34,9 +48,39 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const inventoryFullBleed = location.pathname === '/inventory';
   const { loading: authLoading } = useAuth();
   const [showInitialDefaultsDialog, setShowInitialDefaultsDialog] = useState(false);
+  const [restoreChecked, setRestoreChecked] = useState(false);
+
+  useEffect(() => {
+    // Persist the most recent in-app route so refresh/login can restore the exact subpage.
+    if (location.pathname === '/login') return;
+    try {
+      const fullPath = `${location.pathname}${location.search}${location.hash}`;
+      sessionStorage.setItem(LAST_ROUTE_STORAGE_KEY, fullPath);
+    } catch {
+      /* ignore */
+    }
+  }, [location.hash, location.pathname, location.search]);
+
+  useEffect(() => {
+    if (restoreChecked || authLoading) return;
+    setRestoreChecked(true);
+    if (location.pathname !== '/' || location.search || location.hash) {
+      return;
+    }
+    try {
+      const storedPath = sessionStorage.getItem(LAST_ROUTE_STORAGE_KEY);
+      if (!storedPath || storedPath === '/' || storedPath === '/login') {
+        return;
+      }
+      navigate(storedPath, { replace: true });
+    } catch {
+      /* ignore */
+    }
+  }, [authLoading, location.hash, location.pathname, location.search, navigate, restoreChecked]);
 
   useEffect(() => {
     void refreshRackLocationsFromServer();
@@ -119,6 +163,7 @@ export default function App() {
             onDismiss={handleDismissSetupDialog}
           />
           <Navigation />
+          <AppBreadcrumbs />
           <main
             className={cn(
               'min-w-0 py-6',
@@ -176,7 +221,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/crew" element={<Navigate to="/productions" replace />} />
+              <Route path="/crew" element={<Navigate to="/settings?st=masterCrew" replace />} />
               <Route
                 path="/help"
                 element={
@@ -193,6 +238,32 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/dev"
+                element={
+                  <ProtectedRoute>
+                    <DevMenuPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dev/time-picker-lab"
+                element={
+                  <ProtectedRoute>
+                    <TimePickerLabPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dev/ui-diagnostics"
+                element={
+                  <ProtectedRoute>
+                    <UiDiagnosticsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/time-picker-lab" element={<Navigate to="/dev/time-picker-lab" replace />} />
+              <Route path="/ui-diagnostics" element={<Navigate to="/dev/ui-diagnostics" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

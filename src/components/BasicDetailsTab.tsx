@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Combobox } from "@/components/ui/combobox";
 import { flattenProjectOptions } from "@/lib/projectOptions";
+import { formatDistanceToNow } from "date-fns";
 import {
   getRackOptionsForFlatLocationLabel,
   RACK_LOCATIONS_UPDATED_EVENT,
@@ -29,6 +30,8 @@ interface BasicDetailsTabProps {
   inventoryRecordLine?: string | null;
   /** Physical asset tag pattern preview or saved tag (`assetId`). */
   assetTagLine?: string | null;
+  /** Existing inventory item id when editing; used to show latest check-in/out status. */
+  inventoryItemId?: string;
 }
 
 export function BasicDetailsTab({ 
@@ -40,6 +43,7 @@ export function BasicDetailsTab({
   itemNameOptional = false,
   inventoryRecordLine = null,
   assetTagLine = null,
+  inventoryItemId,
 }: BasicDetailsTabProps) {
   // Function to get flattened category options with subcategories inline
   const getFlattenedCategoryOptions = React.useMemo(() => {
@@ -90,6 +94,69 @@ export function BasicDetailsTab({
     const locationId = form.watch('location')?.split('/')[0]; // Get the parent location ID
     return cabinets?.filter(cabinet => cabinet.locationId === locationId) || [];
   }, [form.watch('location'), cabinets]);
+  const secureCabinets = React.useMemo(
+    () => availableCabinets.filter((cabinet) => cabinet.isSecure),
+    [availableCabinets],
+  );
+  const selectedCabinetId = form.watch("cabinet");
+  const selectedCabinet = React.useMemo(
+    () => availableCabinets.find((cabinet) => cabinet.id === selectedCabinetId),
+    [availableCabinets, selectedCabinetId],
+  );
+
+  const [lastCheckSummary, setLastCheckSummary] = React.useState<{
+    type: "check-in" | "check-out";
+    quantity: number;
+    cabinetName: string;
+    performedBy: string;
+    timestamp: Date;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (!inventoryItemId) {
+      setLastCheckSummary(null);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem("checkout-recent-activities");
+      if (!raw) {
+        setLastCheckSummary(null);
+        return;
+      }
+      const parsed = JSON.parse(raw) as Array<{
+        message?: string;
+        timestamp?: string;
+        details?: {
+          itemId?: string;
+          quantity?: number;
+          cabinetName?: string;
+          performedBy?: string;
+        };
+      }>;
+      const matching = parsed
+        .filter((entry) => entry.details?.itemId === inventoryItemId)
+        .filter((entry) => entry.message === "ITEM_CHECKIN" || entry.message === "ITEM_CHECKOUT")
+        .sort((a, b) => {
+          const ta = new Date(a.timestamp || 0).getTime();
+          const tb = new Date(b.timestamp || 0).getTime();
+          return tb - ta;
+        });
+      const latest = matching[0];
+      if (!latest) {
+        setLastCheckSummary(null);
+        return;
+      }
+      setLastCheckSummary({
+        type: latest.message === "ITEM_CHECKIN" ? "check-in" : "check-out",
+        quantity: Number(latest.details?.quantity ?? 0),
+        cabinetName: String(latest.details?.cabinetName ?? "Unknown cabinet"),
+        performedBy: String(latest.details?.performedBy ?? "unknown"),
+        timestamp: new Date(latest.timestamp || Date.now()),
+      });
+    } catch {
+      setLastCheckSummary(null);
+    }
+  }, [inventoryItemId]);
 
   const watchedLocationId = form.watch("location");
   const flatLocationLabel = React.useMemo(() => {
@@ -350,36 +417,94 @@ export function BasicDetailsTab({
             )}
           />
 
-          {availableCabinets.length > 0 && (
-            <FormField
-              control={form.control}
-              name="cabinet"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cabinet</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || undefined}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select cabinet" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {availableCabinets.map((cabinet) => (
-                        <SelectItem key={cabinet.id} value={cabinet.id}>
-                          {cabinet.name} {cabinet.isSecure && '🔒'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
+          <FormField
+            control={form.control}
+            name="cabinet"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cabinet</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
+                  value={field.value || undefined}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select cabinet" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {availableCabinets.map((cabinet) => (
+                      <SelectItem key={cabinet.id} value={cabinet.id}>
+                        {cabinet.name} {cabinet.isSecure && '🔒'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2.5">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Secure cabinet controls
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={secureCabinets.length === 0}
+                      onClick={() => {
+                        const currentSecure = secureCabinets.find((cabinet) => cabinet.id === field.value);
+                        if (currentSecure) {
+                          return;
+                        }
+                        field.onChange(secureCabinets[0]?.id ?? "");
+                      }}
+                    >
+                      Add to secure cabinet
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!selectedCabinet || !selectedCabinet.isSecure}
+                      onClick={() => field.onChange("")}
+                    >
+                      Remove secure cabinet
+                    </Button>
+                  </div>
+                  {secureCabinets.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No secure cabinets are configured for this location.
+                    </p>
+                  ) : selectedCabinet?.isSecure ? (
+                    <p className="text-xs text-muted-foreground">
+                      Assigned secure cabinet: <span className="font-medium text-foreground">{selectedCabinet.name}</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      This item is not currently assigned to a secure cabinet.
+                    </p>
+                  )}
+                  {lastCheckSummary ? (
+                    <p className="text-xs text-muted-foreground">
+                      Last recorded check:{" "}
+                      <span className="font-medium text-foreground">
+                        {lastCheckSummary.type === "check-out" ? "Checked out" : "Checked in"}
+                      </span>{" "}
+                      {lastCheckSummary.quantity > 0 ? `${lastCheckSummary.quantity}x` : ""} at{" "}
+                      <span className="font-medium text-foreground">{lastCheckSummary.cabinetName}</span>{" "}
+                      by {lastCheckSummary.performedBy} ·{" "}
+                      {formatDistanceToNow(lastCheckSummary.timestamp, { addSuffix: true })}
+                    </p>
+                  ) : inventoryItemId ? (
+                    <p className="text-xs text-muted-foreground">
+                      Last recorded check: none yet.
+                    </p>
+                  ) : null}
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {showRackField && (
             <FormField

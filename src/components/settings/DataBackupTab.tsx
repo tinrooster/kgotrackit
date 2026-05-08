@@ -41,6 +41,20 @@ import type {
   OrganizationImportSections,
 } from '@/lib/supabase/organizationPortability';
 
+const URL_SYNC_EVENT = 'trackit:url-sync';
+
+function readDataPanelFromSearch(): 'import-export' | 'backup-restore' {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('dp');
+    if (raw === 'import-export' || raw === 'backup-restore') {
+      return raw;
+    }
+  } catch {
+    // ignore malformed URLs
+  }
+  return 'import-export';
+}
+
 interface DataBackupTabProps {
   onExportData: () => void;
   onExportExcel: () => void;
@@ -110,7 +124,7 @@ export function DataBackupTab({
   organizationDataLabel,
 }: DataBackupTabProps) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('import-export');
+  const [activeTab, setActiveTab] = useState<'import-export' | 'backup-restore'>(() => readDataPanelFromSearch());
   const [isImporting, setIsImporting] = useState(false);
   const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -587,6 +601,13 @@ export function DataBackupTab({
       });
     }
   };
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('dp', activeTab);
+    window.history.replaceState({}, '', url.toString());
+    window.dispatchEvent(new CustomEvent(URL_SYNC_EVENT));
+  }, [activeTab]);
 
   return (
     <div className="space-y-6">

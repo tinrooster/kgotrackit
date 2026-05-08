@@ -273,7 +273,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         await store.set('users', updatedUsers);
         setCurrentUser(adminUser);
-        await store.set('rememberedUser', adminUser);
+        if (rememberMe) {
+          await store.set('rememberedUser', adminUser);
+        } else {
+          await store.delete('rememberedUser');
+        }
         logger.info('Admin dev login override applied');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
         toast.success('Login successful');
@@ -298,7 +302,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
           await store.set('users', [...users, defaultAdmin]);
           setCurrentUser(defaultAdmin);
-          await store.set('rememberedUser', defaultAdmin);
+          if (rememberMe) {
+            await store.set('rememberedUser', defaultAdmin);
+          } else {
+            await store.delete('rememberedUser');
+          }
           logger.info('Recovered missing admin account during login');
           durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
           toast.success('Login successful');
@@ -324,7 +332,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
         await store.set('users', updatedUsers);
         setCurrentUser(normalizedAdmin);
-        await store.set('rememberedUser', normalizedAdmin);
+        if (rememberMe) {
+          await store.set('rememberedUser', normalizedAdmin);
+        } else {
+          await store.delete('rememberedUser');
+        }
         logger.info('Recovered admin login with deterministic dev credentials');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: 'admin', rememberMe }, 'AuthContext');
         toast.success('Login successful');
@@ -335,7 +347,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (passwordMatch) {
         setCurrentUser(userRecord);
-        await store.set('rememberedUser', userRecord);
+        if (rememberMe) {
+          await store.set('rememberedUser', userRecord);
+        } else {
+          await store.delete('rememberedUser');
+        }
         logger.info('User session remembered');
         logger.info('Login successful');
         durableLogger.info('security', 'AUTH_LOGIN_SUCCESS', { username: userRecord.username, rememberMe }, 'AuthContext');

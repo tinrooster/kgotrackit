@@ -4,10 +4,10 @@ import { collapsibleSectionSurfaceClass } from '@/lib/ui/collapsibleSectionSurfa
 import { cn } from '@/lib/utils';
 
 interface OptionalFormCollapsibleProps {
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-  /** When true, section starts expanded (native &lt;details open&gt;). */
+  /** When false or omitted (default), the section loads collapsed — open with the disclosure control. */
   defaultOpen?: boolean;
 }
 

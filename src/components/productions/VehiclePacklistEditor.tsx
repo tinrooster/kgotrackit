@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Plus, Trash2, Truck, Unlink } from 'lucide-react';
-import { VehiclePacklist, ChecklistItem, ChecklistGroup } from '@/types/productions';
+import { Plus, Trash2, Truck, Unlink, AlertTriangle } from 'lucide-react';
+import { VehiclePacklist, VehiclePacklistSection, ChecklistItem, ChecklistGroup } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { InventoryItemPicker } from './InventoryItemPicker';
 import { BulkInventorySelectionDialog, BulkSelectionResult } from './BulkInventorySelectionDialog';
@@ -19,6 +20,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsible';
+import {
+  ensureVehiclePacklistShape,
+  removeVehiclePacklistItemById,
+  upsertVehiclePacklistItemById,
+  flattenVehiclePacklistItems,
+} from '@/lib/vehiclePacklistUtils';
 
 interface VehiclePacklistEditorProps {
   packlists: VehiclePacklist[];
@@ -33,37 +41,77 @@ function newItem(label: string): ChecklistItem {
   return { id: crypto.randomUUID(), label, completed: false };
 }
 
+function dedupeSignature(item: Pick<ChecklistItem, 'label' | 'inventoryItemId'>): string {
+  return `${item.label.trim().toLowerCase()}::${item.inventoryItemId || ''}`;
+}
+
+function sortItemsCopy(items: ChecklistItem[], sortMode: 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'): ChecklistItem[] {
+  if (sortMode === 'manual') return items;
+  const sorted = [...items];
+  sorted.sort((left, right) => {
+    if (sortMode === 'name_asc') return left.label.localeCompare(right.label);
+    if (sortMode === 'name_desc') return right.label.localeCompare(left.label);
+    if (sortMode === 'qty_asc') return (left.quantity ?? 1) - (right.quantity ?? 1);
+    return (right.quantity ?? 1) - (left.quantity ?? 1);
+  });
+  return sorted;
+}
+
+function filterPacked(items: ChecklistItem[], packedFilter: 'all' | 'open' | 'done'): ChecklistItem[] {
+  return items.filter((item) => {
+    if (packedFilter === 'done') return item.completed;
+    if (packedFilter === 'open') return !item.completed;
+    return true;
+  });
+}
+
 export function VehiclePacklistEditor({
   packlists,
   onChange,
   checklistGroups = [],
   inventoryItems = [],
   readOnly = false,
-  requireDeleteConfirm = false
+  requireDeleteConfirm = false,
 }: VehiclePacklistEditorProps) {
   const [newVehicleName, setNewVehicleName] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
   const [selectedChecklistGroupByPacklist, setSelectedChecklistGroupByPacklist] = useState<Record<string, string>>({});
-  const [pendingDelete, setPendingDelete] = useState<{ packlistId?: string; itemId?: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<
+    | { kind: 'packlist'; packlistId: string }
+    | { kind: 'item'; packlistId: string; itemId: string }
+    | { kind: 'section'; packlistId: string; sectionId: string }
+    | null
+  >(null);
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [packedFilter, setPackedFilter] = useState<'all' | 'open' | 'done'>('all');
   const [sortMode, setSortMode] = useState<'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'>('manual');
+
   const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
     if (!requireDeleteConfirm) {
       deleteAction();
       return;
     }
     if (deleteKey.startsWith('packlist:')) {
-      setPendingDelete({ packlistId: deleteKey.replace('packlist:', '') });
+      setPendingDelete({ kind: 'packlist', packlistId: deleteKey.replace('packlist:', '') });
+      return;
+    }
+    if (deleteKey.startsWith('section:')) {
+      const [, packlistId, sectionId] = deleteKey.split(':');
+      if (packlistId && sectionId) setPendingDelete({ kind: 'section', packlistId, sectionId });
       return;
     }
     if (deleteKey.startsWith('item:')) {
-      setPendingDelete({ itemId: deleteKey.replace('item:', '') });
+      const [, packlistId, itemId] = deleteKey.split(':');
+      if (packlistId && itemId) setPendingDelete({ kind: 'item', packlistId, itemId });
     }
   };
 
   const updatePacklist = (id: string, updates: Partial<VehiclePacklist>) => {
-    onChange(packlists.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+    onChange(
+      packlists.map((packlistEntry) =>
+        packlistEntry.id === id ? ensureVehiclePacklistShape({ ...packlistEntry, ...updates }) : packlistEntry,
+      ),
+    );
   };
 
   const removePacklist = (id: string) => {
@@ -73,27 +121,50 @@ export function VehiclePacklistEditor({
   const addPacklist = () => {
     const name = newVehicleName.trim();
     if (!name) return;
-    onChange([...packlists, { id: crypto.randomUUID(), vehicleName: name, items: [] }]);
+    onChange([...packlists, { id: crypto.randomUUID(), vehicleName: name, items: [], sections: [] }]);
     setNewVehicleName('');
   };
 
-  const updateItem = (packlistId: string, itemId: string, updates: Partial<ChecklistItem>) => {
-    const packlist = packlists.find((p) => p.id === packlistId)!;
-    updatePacklist(packlistId, {
-      items: packlist.items.map((i) => (i.id === itemId ? { ...i, ...updates } : i)),
-    });
+  const collectSignatures = (packlist: VehiclePacklist): Set<string> => {
+    const shaped = ensureVehiclePacklistShape(packlist);
+    const set = new Set<string>();
+    for (const section of shaped.sections) {
+      for (const item of section.items) set.add(dedupeSignature(item));
+    }
+    for (const item of shaped.items) set.add(dedupeSignature(item));
+    return set;
+  };
+
+  const updateItemById = (packlistId: string, itemId: string, updates: Partial<ChecklistItem>) => {
+    const entry = packlists.find((p) => p.id === packlistId);
+    if (!entry) return;
+    const next = upsertVehiclePacklistItemById(entry, itemId, (item) => ({ ...item, ...updates }));
+    updatePacklist(packlistId, next);
   };
 
   const removeItem = (packlistId: string, itemId: string) => {
-    const packlist = packlists.find((p) => p.id === packlistId)!;
-    updatePacklist(packlistId, { items: packlist.items.filter((i) => i.id !== itemId) });
+    const entry = packlists.find((p) => p.id === packlistId);
+    if (!entry) return;
+    const removed = removeVehiclePacklistItemById(entry, itemId);
+    if (!removed) return;
+    updatePacklist(packlistId, removed);
+  };
+
+  const removeSection = (packlistId: string, sectionId: string) => {
+    const entry = packlists.find((p) => p.id === packlistId);
+    if (!entry) return;
+    const shaped = ensureVehiclePacklistShape(entry);
+    updatePacklist(packlistId, {
+      sections: shaped.sections.filter((section) => section.id !== sectionId),
+    });
   };
 
   const addItem = (packlistId: string) => {
     const label = (newItemLabels[packlistId] ?? '').trim();
     if (!label) return;
-    const packlist = packlists.find((p) => p.id === packlistId)!;
-    updatePacklist(packlistId, { items: [...packlist.items, newItem(label)] });
+    const packlistEntry = packlists.find((p) => p.id === packlistId)!;
+    const shaped = ensureVehiclePacklistShape(packlistEntry);
+    updatePacklist(packlistId, { items: [...shaped.items, newItem(label)] });
     setNewItemLabels((prev) => ({ ...prev, [packlistId]: '' }));
   };
 
@@ -101,31 +172,50 @@ export function VehiclePacklistEditor({
     const checklistGroupId = selectedChecklistGroupByPacklist[packlistId];
     if (!checklistGroupId) return;
     const checklistGroup = checklistGroups.find((group) => group.id === checklistGroupId);
-    const packlist = packlists.find((entry) => entry.id === packlistId);
-    if (!checklistGroup || !packlist) return;
+    const packlistEntry = packlists.find((entry) => entry.id === packlistId);
+    if (!checklistGroup || !packlistEntry) return;
 
-    const existingKeys = new Set(
-      packlist.items.map((item) => `${item.label.toLowerCase()}::${item.inventoryItemId || ''}`)
-    );
+    const shaped = ensureVehiclePacklistShape(packlistEntry);
+    const existingKeys = collectSignatures(packlistEntry);
     const additions: ChecklistItem[] = checklistGroup.items
-      .filter((item) => !existingKeys.has(`${item.label.toLowerCase()}::${item.inventoryItemId || ''}`))
+      .filter((item) => !existingKeys.has(dedupeSignature(item)))
       .map((item) => ({
         id: crypto.randomUUID(),
         label: item.label,
-        completed: item.completed,
+        completed: false,
         quantity: item.quantity ?? 1,
         inventoryItemId: item.inventoryItemId,
         notes: item.notes,
       }));
     if (additions.length === 0) return;
-    updatePacklist(packlistId, { items: [...packlist.items, ...additions] });
+
+    const existingSectionIndex = shaped.sections.findIndex((section) => section.checklistGroupId === checklistGroup.id);
+    let nextSections: VehiclePacklistSection[];
+    if (existingSectionIndex >= 0) {
+      nextSections = shaped.sections.map((section, index) =>
+        index === existingSectionIndex ? { ...section, items: [...section.items, ...additions] } : section,
+      );
+    } else {
+      nextSections = [
+        ...shaped.sections,
+        {
+          id: crypto.randomUUID(),
+          title: checklistGroup.title,
+          checklistGroupId: checklistGroup.id,
+          items: additions,
+        },
+      ];
+    }
+
+    updatePacklist(packlistId, { sections: nextSections });
   };
 
   const addLinkedItem = (packlistId: string, inv: InventoryItem) => {
-    const packlist = packlists.find((p) => p.id === packlistId)!;
+    const packlistEntry = packlists.find((p) => p.id === packlistId)!;
+    const shaped = ensureVehiclePacklistShape(packlistEntry);
     updatePacklist(packlistId, {
       items: [
-        ...packlist.items,
+        ...shaped.items,
         {
           id: crypto.randomUUID(),
           label: inv.name,
@@ -139,7 +229,8 @@ export function VehiclePacklistEditor({
 
   const addBulkLinkedItems = (packlistId: string, selections: BulkSelectionResult[]) => {
     if (selections.length === 0) return;
-    const packlist = packlists.find((p) => p.id === packlistId)!;
+    const packlistEntry = packlists.find((p) => p.id === packlistId)!;
+    const shaped = ensureVehiclePacklistShape(packlistEntry);
     const additions: ChecklistItem[] = selections.map(({ item, status }) => ({
       id: crypto.randomUUID(),
       label: item.name,
@@ -155,36 +246,96 @@ export function VehiclePacklistEditor({
               ? 'Needs scheduling'
               : 'Needed',
     }));
-    updatePacklist(packlistId, { items: [...packlist.items, ...additions] });
+    updatePacklist(packlistId, { items: [...shaped.items, ...additions] });
   };
 
   const linkInventoryItem = (packlistId: string, itemId: string, inv: InventoryItem) => {
-    updateItem(packlistId, itemId, { inventoryItemId: inv.id, label: inv.name });
+    updateItemById(packlistId, itemId, { inventoryItemId: inv.id, label: inv.name });
+  };
+
+  const filterByQuery = (items: ChecklistItem[]): ChecklistItem[] => {
+    const normalizedQuery = listSearchQuery.trim().toLowerCase();
+    if (!normalizedQuery) return items;
+    return items.filter(
+      (item) =>
+        item.label.toLowerCase().includes(normalizedQuery) || (item.notes || '').toLowerCase().includes(normalizedQuery)
+    );
   };
 
   const getVisibleItems = (items: ChecklistItem[]): ChecklistItem[] => {
-    const normalizedQuery = listSearchQuery.trim().toLowerCase();
-    const filteredItems = items.filter((item) => {
-      const matchesQuery =
-        !normalizedQuery ||
-        item.label.toLowerCase().includes(normalizedQuery) ||
-        (item.notes || '').toLowerCase().includes(normalizedQuery);
-      const matchesPacked =
-        packedFilter === 'all' ||
-        (packedFilter === 'done' && item.completed) ||
-        (packedFilter === 'open' && !item.completed);
-      return matchesQuery && matchesPacked;
-    });
-    if (sortMode === 'manual') return filteredItems;
-    const sortedItems = [...filteredItems];
-    sortedItems.sort((left, right) => {
-      if (sortMode === 'name_asc') return left.label.localeCompare(right.label);
-      if (sortMode === 'name_desc') return right.label.localeCompare(left.label);
-      if (sortMode === 'qty_asc') return (left.quantity ?? 1) - (right.quantity ?? 1);
-      return (right.quantity ?? 1) - (left.quantity ?? 1);
-    });
-    return sortedItems;
+    const filtered = filterPacked(filterByQuery(items), packedFilter);
+    return sortItemsCopy(filtered, sortMode);
   };
+
+  const checklistGroupCompletion = (checklistGroupId?: string): 'ok' | 'open' | 'unknown' => {
+    if (!checklistGroupId) return 'unknown';
+    const group = checklistGroups.find((g) => g.id === checklistGroupId);
+    if (!group || group.items.length === 0) return 'unknown';
+    return group.items.every((item) => item.completed) ? 'ok' : 'open';
+  };
+
+  const renderPacklistLine = (packlistId: string, item: ChecklistItem) => (
+    <div key={item.id} className="flex items-center gap-2 px-3 py-2">
+      <Checkbox
+        checked={item.completed}
+        onCheckedChange={(checked) => updateItemById(packlistId, item.id, { completed: Boolean(checked) })}
+        title={item.completed ? 'Mark as not packed' : 'Mark as packed'}
+      />
+      <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
+        {item.label}
+        {item.completed && (
+          <span className="ml-2 rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-300">
+            Packed
+          </span>
+        )}
+      </span>
+      {!readOnly ? (
+        <Input
+          type="number"
+          min={1}
+          className="h-7 w-16 text-xs"
+          value={item.quantity ?? 1}
+          onChange={(event) =>
+            updateItemById(packlistId, item.id, {
+              quantity: Math.max(1, Number(event.target.value) || 1),
+            })
+          }
+        />
+      ) : (
+        <span className="text-xs text-muted-foreground">×{item.quantity ?? 1}</span>
+      )}
+      {item.inventoryItemId && <span className="text-xs text-blue-700 dark:text-blue-300">linked</span>}
+      {!readOnly && inventoryItems.length > 0 && !item.inventoryItemId ? (
+        <InventoryItemPicker
+          inventoryItems={inventoryItems}
+          onSelect={(inv) => linkInventoryItem(packlistId, item.id, inv)}
+          title="Link inventory item to packlist"
+        />
+      ) : null}
+      {!readOnly && item.inventoryItemId ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          title="Unlink inventory item"
+          onClick={() => updateItemById(packlistId, item.id, { inventoryItemId: undefined })}
+        >
+          <Unlink className="h-3.5 w-3.5" />
+        </Button>
+      ) : null}
+      {!readOnly && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('h-8 w-8 shrink-0 border', 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20')}
+          onClick={() => runDeleteAction(`item:${packlistId}:${item.id}`, () => removeItem(packlistId, item.id))}
+          title="Delete item"
+        >
+          <Trash2 className="h-3.5 w-3.5 text-red-300" />
+        </Button>
+      )}
+    </div>
+  );
 
   if (packlists.length === 0 && readOnly) {
     return <p className="text-sm text-muted-foreground">No vehicle packlists.</p>;
@@ -226,182 +377,167 @@ export function VehiclePacklistEditor({
         </Select>
       </div>
       <p className="text-xs text-muted-foreground">
-        Item checkbox marks packed status only (not multi-select for list actions).
+        Checklist packs stay grouped below. Checkbox marks packed on the truck. A badge appears when the matching
+        production checklist still has unchecked lines.
       </p>
-      {packlists.map((packlist) => (
-        <div key={packlist.id} className="rounded-md border">
-          <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2">
-            <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
-            {readOnly ? (
-              <span className="flex-1 text-sm font-medium">{packlist.vehicleName}</span>
-            ) : (
-              <Input
-                className="h-7 flex-1 border-none bg-transparent p-0 text-sm font-medium shadow-none focus-visible:ring-0"
-                value={packlist.vehicleName}
-                onChange={(e) => updatePacklist(packlist.id, { vehicleName: e.target.value })}
-              />
-            )}
-            <span className="ml-auto text-xs text-muted-foreground">
-              {packlist.items.filter((i) => i.completed).length}/{packlist.items.length} packed
-            </span>
-            {!readOnly && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0"
-                onClick={() => runDeleteAction(`packlist:${packlist.id}`, () => removePacklist(packlist.id))}
-                title="Delete packlist"
-              >
-                <Trash2 className="h-3.5 w-3.5 text-red-400" />
-              </Button>
-            )}
-          </div>
-          <div className="divide-y">
-            {getVisibleItems(packlist.items).map((item) => (
-              <div key={item.id} className="flex items-center gap-2 px-3 py-2">
-                <Checkbox
-                  checked={item.completed}
-                  onCheckedChange={(checked) =>
-                    updateItem(packlist.id, item.id, { completed: Boolean(checked) })
-                  }
-                  title={item.completed ? 'Mark as not packed' : 'Mark as packed'}
+      {packlists.map((packlistRaw) => {
+        const packlist = ensureVehiclePacklistShape(packlistRaw);
+        const allFlat = flattenVehiclePacklistItems(packlist);
+        const doneCount = allFlat.filter((i) => i.completed).length;
+        return (
+          <div key={packlist.id} className="rounded-md border">
+            <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2">
+              <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
+              {readOnly ? (
+                <span className="flex-1 text-sm font-medium">{packlist.vehicleName}</span>
+              ) : (
+                <Input
+                  className="h-7 flex-1 border-none bg-transparent p-0 text-sm font-medium shadow-none focus-visible:ring-0"
+                  value={packlist.vehicleName}
+                  onChange={(e) => updatePacklist(packlist.id, { vehicleName: e.target.value })}
                 />
-                <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
-                  {item.label}
-                  {item.completed && (
-                    <span className="ml-2 rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-300">
-                      Packed
-                    </span>
-                  )}
-                </span>
-                {!readOnly ? (
-                  <Input
-                    type="number"
-                    min={1}
-                    className="h-7 w-16 text-xs"
-                    value={item.quantity ?? 1}
-                    onChange={(event) =>
-                      updateItem(packlist.id, item.id, {
-                        quantity: Math.max(1, Number(event.target.value) || 1),
-                      })
-                    }
-                  />
-                ) : (
-                  <span className="text-xs text-muted-foreground">×{item.quantity ?? 1}</span>
-                )}
-                {item.inventoryItemId && (
-                  <span className="text-xs text-blue-700 dark:text-blue-300">linked</span>
-                )}
-                {!readOnly && inventoryItems.length > 0 && !item.inventoryItemId ? (
-                  <InventoryItemPicker
-                    inventoryItems={inventoryItems}
-                    onSelect={(inv) => linkInventoryItem(packlist.id, item.id, inv)}
-                    title="Link inventory item to packlist"
-                  />
-                ) : null}
-                {!readOnly && item.inventoryItemId ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    title="Unlink inventory item"
-                    onClick={() => updateItem(packlist.id, item.id, { inventoryItemId: undefined })}
-                  >
-                    <Unlink className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
-                {!readOnly && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                      'h-8 w-8 shrink-0 border',
-                      'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
-                    )}
-                    onClick={() => runDeleteAction(`item:${item.id}`, () => removeItem(packlist.id, item.id))}
-                    title="Delete item"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-red-300" />
-                  </Button>
-                )}
-              </div>
-            ))}
-            {packlist.items.length === 0 && (
-              <p className="px-3 py-2 text-xs text-muted-foreground">No items yet.</p>
-            )}
-          </div>
-          {!readOnly && (
-            <div className="flex gap-2 border-t px-3 py-2">
-              <Input
-                placeholder="Add item..."
-                className="h-7 text-sm"
-                value={newItemLabels[packlist.id] ?? ''}
-                onChange={(e) =>
-                  setNewItemLabels((prev) => ({ ...prev, [packlist.id]: e.target.value }))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addItem(packlist.id);
-                  }
-                }}
-              />
-              {checklistGroups.length > 0 && (
-                <>
-                  <Select
-                    value={selectedChecklistGroupByPacklist[packlist.id] || 'none'}
-                    onValueChange={(value) =>
-                      setSelectedChecklistGroupByPacklist((previous) => ({
-                        ...previous,
-                        [packlist.id]: value === 'none' ? '' : value,
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="h-7 min-w-[170px] text-xs">
-                      <SelectValue placeholder="Checklist pack" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Checklist pack</SelectItem>
-                      {checklistGroups.map((group) => (
-                        <SelectItem key={group.id} value={group.id}>
-                          {group.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 shrink-0 text-xs"
-                    disabled={!selectedChecklistGroupByPacklist[packlist.id]}
-                    onClick={() => addChecklistPackToPacklist(packlist.id)}
-                  >
-                    Add Pack
-                  </Button>
-                </>
               )}
-              <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={() => addItem(packlist.id)}>
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-              {inventoryItems.length > 0 && (
-                <>
-                  <InventoryItemPicker
-                    inventoryItems={inventoryItems}
-                    onSelect={(inv) => addLinkedItem(packlist.id, inv)}
-                    title="Add inventory item to packlist"
-                    triggerClassName="h-7 w-7 shrink-0"
-                  />
-                  <BulkInventorySelectionDialog
-                    inventoryItems={inventoryItems}
-                    onApply={(items) => addBulkLinkedItems(packlist.id, items)}
-                    buttonLabel="Bulk Pick"
-                  />
-                </>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {doneCount}/{allFlat.length} packed
+              </span>
+              {!readOnly && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0"
+                  onClick={() => runDeleteAction(`packlist:${packlist.id}`, () => removePacklist(packlist.id))}
+                  title="Delete packlist"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                </Button>
               )}
             </div>
-          )}
-        </div>
-      ))}
+
+            <div className="space-y-2 p-2">
+              {(packlist.sections ?? []).map((section) => {
+                if (section.items.length === 0) return null;
+                const visible = getVisibleItems(section.items);
+                if (visible.length === 0) {
+                  return null;
+                }
+                const completion = checklistGroupCompletion(section.checklistGroupId);
+                const titleNode = (
+                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                    <span className="truncate font-medium">{section.title}</span>
+                    {completion === 'open' ? (
+                      <Badge variant="outline" className="shrink-0 gap-1 border-amber-500/50 text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="h-3 w-3" aria-hidden />
+                        Checklist open
+                      </Badge>
+                    ) : null}
+                    {!readOnly && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto h-7 shrink-0 text-xs text-destructive hover:text-destructive"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          runDeleteAction(`section:${packlist.id}:${section.id}`, () => removeSection(packlist.id, section.id));
+                        }}
+                      >
+                        Remove pack
+                      </Button>
+                    )}
+                  </span>
+                );
+                return (
+                  <OptionalFormCollapsible key={section.id} title={titleNode} className="text-sm">
+                    <div className="divide-y rounded-md border border-border/50">{visible.map((item) => renderPacklistLine(packlist.id, item))}</div>
+                  </OptionalFormCollapsible>
+                );
+              })}
+            </div>
+
+            {(packlist.sections ?? []).length > 0 && getVisibleItems(packlist.items).length > 0 ? (
+              <div className="px-3 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Loose items on this truck
+              </div>
+            ) : null}
+            <div className="divide-y">
+              {getVisibleItems(packlist.items).map((item) => renderPacklistLine(packlist.id, item))}
+              {packlist.items.length === 0 && (packlist.sections ?? []).length === 0 && (
+                <p className="px-3 py-2 text-xs text-muted-foreground">No items yet.</p>
+              )}
+            </div>
+
+            {!readOnly && (
+              <div className="flex flex-wrap gap-2 border-t px-3 py-2">
+                <Input
+                  placeholder="Add item..."
+                  className="h-7 min-w-[120px] flex-1 text-sm"
+                  value={newItemLabels[packlist.id] ?? ''}
+                  onChange={(e) => setNewItemLabels((prev) => ({ ...prev, [packlist.id]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addItem(packlist.id);
+                    }
+                  }}
+                />
+                {checklistGroups.length > 0 && (
+                  <>
+                    <Select
+                      value={selectedChecklistGroupByPacklist[packlist.id] || 'none'}
+                      onValueChange={(value) =>
+                        setSelectedChecklistGroupByPacklist((previous) => ({
+                          ...previous,
+                          [packlist.id]: value === 'none' ? '' : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-7 min-w-[170px] text-xs">
+                        <SelectValue placeholder="Checklist pack" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Checklist pack</SelectItem>
+                        {checklistGroups.map((group) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            {group.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 shrink-0 text-xs"
+                      disabled={!selectedChecklistGroupByPacklist[packlist.id]}
+                      onClick={() => addChecklistPackToPacklist(packlist.id)}
+                    >
+                      Add Pack
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={() => addItem(packlist.id)}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+                {inventoryItems.length > 0 && (
+                  <>
+                    <InventoryItemPicker
+                      inventoryItems={inventoryItems}
+                      onSelect={(inv) => addLinkedItem(packlist.id, inv)}
+                      title="Add inventory item to packlist"
+                      triggerClassName="h-7 w-7 shrink-0"
+                    />
+                    <BulkInventorySelectionDialog
+                      inventoryItems={inventoryItems}
+                      onApply={(items) => addBulkLinkedItems(packlist.id, items)}
+                      buttonLabel="Bulk Pick"
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
       {!readOnly && (
         <div className="flex gap-2">
           <Input
@@ -427,9 +563,11 @@ export function VehiclePacklistEditor({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm delete</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingDelete?.packlistId
+              {pendingDelete?.kind === 'packlist'
                 ? 'Delete this vehicle packlist and all items in it?'
-                : 'Delete this packlist item?'}
+                : pendingDelete?.kind === 'section'
+                  ? 'Remove this checklist pack from the vehicle (lines in the production checklist are not deleted)?'
+                  : 'Delete this packlist item?'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -438,15 +576,12 @@ export function VehiclePacklistEditor({
               type="button"
               onClick={() => {
                 if (!pendingDelete) return;
-                if (pendingDelete.packlistId) {
+                if (pendingDelete.kind === 'packlist') {
                   removePacklist(pendingDelete.packlistId);
-                } else if (pendingDelete.itemId) {
-                  for (const packlist of packlists) {
-                    if (packlist.items.some((item) => item.id === pendingDelete.itemId)) {
-                      removeItem(packlist.id, pendingDelete.itemId);
-                      break;
-                    }
-                  }
+                } else if (pendingDelete.kind === 'section') {
+                  removeSection(pendingDelete.packlistId, pendingDelete.sectionId);
+                } else if (pendingDelete.kind === 'item') {
+                  removeItem(pendingDelete.packlistId, pendingDelete.itemId);
                 }
                 setPendingDelete(null);
               }}

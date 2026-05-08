@@ -13,7 +13,7 @@ import * as React from "react"
           className={cn(
             "relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground",
             variant === "destructive" &&
-              "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+              "border-destructive/55 bg-destructive/10 text-destructive [&>svg]:text-destructive dark:border-destructive/65 dark:bg-destructive/16",
             className
           )}
           {...props}

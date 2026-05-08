@@ -233,14 +233,14 @@ export const DraggableDialogContent = React.forwardRef<
   return (
     <DialogPrimitive.Portal>
       {showOverlay && (
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/85 backdrop-blur-[1.5px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
       )}
       <DialogPrimitive.Content
         ref={setRefs}
         style={computedStyle}
         className={cn(
           // Base layout — consumers control their own overflow
-          "z-50 flex flex-col rounded-lg border bg-background shadow-xl",
+          "z-50 flex flex-col rounded-lg border border-primary/35 border-t-primary/80 bg-background shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-2 ring-primary/25 outline outline-1 outline-border/90",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",

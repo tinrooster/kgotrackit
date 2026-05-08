@@ -9,7 +9,8 @@ import {
   deleteProduction,
   PRODUCTIONS_UPDATED_EVENT,
 } from '@/lib/productionService';
-import { getItems } from '@/lib/storageService';
+import { ensureVehiclePacklistShape } from '@/lib/vehiclePacklistUtils';
+import { getItems, STORAGE_KEYS } from '@/lib/storageService';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ProductionCard } from '@/components/productions/ProductionCard';
 import { ProductionDetail } from '@/components/productions/ProductionDetail';
 import { ProductionForm } from '@/components/productions/ProductionForm';
@@ -62,6 +73,7 @@ export default function ProductionsPage() {
   const [cloneSchedule, setCloneSchedule] = useState(true);
   const [cloneChecklist, setCloneChecklist] = useState(false);
   const [cloneVehiclePacklists, setCloneVehiclePacklists] = useState(false);
+  const [deleteTargetProduction, setDeleteTargetProduction] = useState<Production | null>(null);
   const productionIdFromQuery = searchParams.get('productionId');
 
   useEffect(() => {
@@ -76,6 +88,22 @@ export default function ProductionsPage() {
     };
     window.addEventListener(PRODUCTIONS_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(PRODUCTIONS_UPDATED_EVENT, handleUpdate);
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEYS.PRODUCTIONS) return;
+      const latest = getProductions();
+      setProductions(latest);
+      setSelectedProduction((current) =>
+        current ? latest.find((production) => production.id === current.id) ?? null : null,
+      );
+      setUndoAvailable(canUndoProduction());
+      setRedoAvailable(canRedoProduction());
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   useEffect(() => {
@@ -205,31 +233,52 @@ export default function ProductionsPage() {
             crewMemberId: crewIdMap.get(entry.crewMemberId) ?? entry.crewMemberId,
           }))
         : [];
+    const checklistIdMap = new Map<string, string>();
     const clonedChecklistGroups = cloneChecklist
-      ? source.checklistGroups.map((group) => ({
-          ...group,
-          id: crypto.randomUUID(),
-          items: group.items.map((item) => ({
-            ...item,
-            id: crypto.randomUUID(),
-            completed: false,
-            reservedQuantity: 0,
-            checkedOutQuantity: 0,
-          })),
-        }))
+      ? source.checklistGroups.map((group) => {
+          const nextGroupId = crypto.randomUUID();
+          checklistIdMap.set(group.id, nextGroupId);
+          return {
+            ...group,
+            id: nextGroupId,
+            items: group.items.map((item) => ({
+              ...item,
+              id: crypto.randomUUID(),
+              completed: false,
+              reservedQuantity: 0,
+              checkedOutQuantity: 0,
+            })),
+          };
+        })
       : [];
     const clonedVehiclePacklists = cloneVehiclePacklists
-      ? source.vehiclePacklists.map((packlist) => ({
-          ...packlist,
-          id: crypto.randomUUID(),
-          items: packlist.items.map((item) => ({
-            ...item,
+      ? source.vehiclePacklists.map((packlist) => {
+          const shaped = ensureVehiclePacklistShape(packlist);
+          return {
+            ...shaped,
             id: crypto.randomUUID(),
-            completed: false,
-            reservedQuantity: 0,
-            checkedOutQuantity: 0,
-          })),
-        }))
+            items: shaped.items.map((item) => ({
+              ...item,
+              id: crypto.randomUUID(),
+              completed: false,
+              reservedQuantity: 0,
+              checkedOutQuantity: 0,
+            })),
+            sections: (shaped.sections ?? []).map((section) => ({
+              ...section,
+              id: crypto.randomUUID(),
+              checklistGroupId:
+                cloneChecklist && section.checklistGroupId ? checklistIdMap.get(section.checklistGroupId) : undefined,
+              items: section.items.map((item) => ({
+                ...item,
+                id: crypto.randomUUID(),
+                completed: false,
+                reservedQuantity: 0,
+                checkedOutQuantity: 0,
+              })),
+            })),
+          };
+        })
       : [];
 
     recordProductionSnapshotBeforeChange(productions);
@@ -280,6 +329,19 @@ export default function ProductionsPage() {
     }
     setCreateOptionsOpen(false);
     setCloneDialogOpen(true);
+  };
+
+  const handleCardEdit = (production: Production) => {
+    setSelectedProduction(production);
+  };
+
+  const handleCardClone = (production: Production) => {
+    setCloneSourceProductionId(production.id);
+    setCloneDialogOpen(true);
+  };
+
+  const handleCardDelete = (production: Production) => {
+    setDeleteTargetProduction(production);
   };
 
   return (
@@ -364,6 +426,9 @@ export default function ProductionsPage() {
               key={production.id}
               production={production}
               onClick={setSelectedProduction}
+              onEdit={handleCardEdit}
+              onClone={handleCardClone}
+              onDelete={handleCardDelete}
             />
           ))}
         </div>
@@ -478,6 +543,36 @@ export default function ProductionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog
+        open={deleteTargetProduction !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetProduction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete production?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{' '}
+              <span className="font-medium text-foreground">{deleteTargetProduction?.name}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTargetProduction(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!deleteTargetProduction) return;
+                handleDelete(deleteTargetProduction.id);
+                toast.success('Production deleted');
+                setDeleteTargetProduction(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

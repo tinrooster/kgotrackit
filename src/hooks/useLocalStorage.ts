@@ -41,12 +41,15 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
   // Listen for changes to this localStorage key from other tabs/windows
   useEffect(() => {
     function handleStorageChange(e: StorageEvent) {
-      if (e.key === key && e.newValue) {
-        try {
-          setStoredValue(JSON.parse(e.newValue));
-        } catch (error) {
-          console.error(`Error parsing localStorage change for key "${key}":`, error);
-        }
+      if (e.key !== key) return;
+      if (e.newValue === null) {
+        setStoredValue(initialValue);
+        return;
+      }
+      try {
+        setStoredValue(JSON.parse(e.newValue));
+      } catch (error) {
+        console.error(`Error parsing localStorage change for key "${key}":`, error);
       }
     }
 
@@ -57,7 +60,7 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
         window.removeEventListener('storage', handleStorageChange);
       };
     }
-  }, [key]);
+  }, [initialValue, key]);
 
   return [storedValue, setValue];
 }

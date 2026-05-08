@@ -1,3 +1,6 @@
+/** Matches native `<input type="time">` fifteen-minute stepping used across Productions UI. */
+export const TIME_INPUT_STEP_SECONDS = 900;
+
 export function normalizeDateInputValue(value?: string): string {
   if (!value) return '';
   const trimmed = value.trim();
@@ -23,4 +26,21 @@ export function minutesToTime(minutes: number): string {
 export function normalizeQuarterHourTime(value?: string): string {
   if (!value) return '';
   return minutesToTime(parseTimeToMinutes(value));
+}
+
+/**
+ * Normalize `YYYY-MM-DDTHH:mm` / `YYYY-MM-DDTHH:mm:ss` to the nearest quarter hour.
+ * Returns empty string for invalid inputs.
+ */
+export function normalizeQuarterHourDateTimeLocal(value?: string): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/);
+  if (!match) return '';
+  const datePart = match[1];
+  const hours = Number(match[2]);
+  const minutes = Number(match[3]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return '';
+  const normalizedTime = minutesToTime(hours * 60 + minutes);
+  return `${datePart}T${normalizedTime}`;
 }

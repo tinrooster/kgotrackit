@@ -2,6 +2,10 @@ import { ChecklistItem, Production } from '@/types/productions';
 import { getItems, saveItems, STORAGE_KEYS } from '@/lib/storageService';
 import { requestCloudSync } from '@/lib/cloudSyncEvents';
 import { logger } from '@/lib/logging';
+import {
+  iteratePacklistItemLocations,
+  normalizeVehiclePacklist,
+} from '@/lib/vehiclePacklistUtils';
 
 export const PRODUCTIONS_UPDATED_EVENT = 'trackit:productions-updated';
 export const INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT = 'trackit:inventory-production-allocation-updated';
@@ -38,15 +42,7 @@ function normalizeProductionChecklistGroupIds(production: Production): Productio
         checkedOutQuantity: Number(item.checkedOutQuantity ?? 0) || 0,
       })),
     })),
-    vehiclePacklists: production.vehiclePacklists.map((packlist) => ({
-      ...packlist,
-      items: packlist.items.map((item) => ({
-        ...item,
-        quantity: normalizeChecklistQuantity(item),
-        reservedQuantity: Number(item.reservedQuantity ?? 0) || 0,
-        checkedOutQuantity: Number(item.checkedOutQuantity ?? 0) || 0,
-      })),
-    })),
+    vehiclePacklists: production.vehiclePacklists.map(normalizeVehiclePacklist),
   };
 }
 
@@ -142,9 +138,9 @@ export function getInventoryProductionAllocationMap(productions: Production[] = 
       }
     }
     for (const packlist of production.vehiclePacklists) {
-      for (const item of packlist.items) {
+      iteratePacklistItemLocations(packlist, (item) => {
         appendItem(item);
-      }
+      });
     }
   }
   return map;
@@ -271,10 +267,17 @@ export function applyProductionInventoryAction(
       ...group,
       items: group.items.map((item) => processLinkedItem(item)),
     })),
-    vehiclePacklists: production.vehiclePacklists.map((packlist) => ({
-      ...packlist,
-      items: packlist.items.map((item) => processLinkedItem(item)),
-    })),
+    vehiclePacklists: production.vehiclePacklists.map((packlist) => {
+      const normalized = normalizeVehiclePacklist(packlist);
+      return {
+        ...normalized,
+        items: normalized.items.map((item) => processLinkedItem(item)),
+        sections: (normalized.sections ?? []).map((section) => ({
+          ...section,
+          items: section.items.map((item) => processLinkedItem(item)),
+        })),
+      };
+    }),
   });
 
   if (action !== 'reserve') {
@@ -310,18 +313,33 @@ export function exportProductionPacklistsToPdf(production: Production): void {
 
   const vehicleMarkup = production.vehiclePacklists
     .map((packlist) => {
-      const rows = packlist.items
-        .map(
-          (item) => `
+      const normalized = normalizeVehiclePacklist(packlist);
+      const row = (item: ChecklistItem) => `
             <tr>
               <td class="check-col"></td>
               <td>${escaped(item.label)}</td>
               <td>${Number(item.quantity ?? 1) || 1}</td>
               <td>${item.completed ? 'Yes' : 'No'}</td>
             </tr>
-          `
-        )
-        .join('');
+          `;
+      const bodyParts: string[] = [];
+      for (const section of normalized.sections ?? []) {
+        bodyParts.push(`
+            <tr><td colspan="4" class="subhead">${escaped(section.title)}</td></tr>`);
+        for (const item of section.items) {
+          bodyParts.push(row(item));
+        }
+      }
+      if (normalized.items.length > 0) {
+        if ((normalized.sections?.length ?? 0) > 0) {
+          bodyParts.push(`
+            <tr><td colspan="4" class="subhead">${escaped('Other items')}</td></tr>`);
+        }
+        for (const item of normalized.items) {
+          bodyParts.push(row(item));
+        }
+      }
+      const tbody = bodyParts.length > 0 ? bodyParts.join('\n') : '<tr><td colspan="4">No items</td></tr>';
       return `
         <section class="packlist">
           <h3>${escaped(packlist.vehicleName)}</h3>
@@ -329,7 +347,9 @@ export function exportProductionPacklistsToPdf(production: Production): void {
             <thead>
               <tr><th class="check-col">Packed</th><th>Item</th><th>Qty</th><th>Done</th></tr>
             </thead>
-            <tbody>${rows || '<tr><td colspan="4">No items</td></tr>'}</tbody>
+            <tbody>
+            ${tbody}
+            </tbody>
           </table>
         </section>
       `;
@@ -347,7 +367,7 @@ export function exportProductionPacklistsToPdf(production: Production): void {
           .packlist { margin-bottom: 18px; page-break-inside: avoid; }
           table { width: 100%; border-collapse: collapse; }
           th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; text-align: left; }
-          th { background: #f3f4f6; }
+          td.subhead { background: #e5e7eb; font-weight: 600; font-size: 11px; }
           .check-col { width: 72px; }
           @media print { body { padding: 0; } }
         </style>

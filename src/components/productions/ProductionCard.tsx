@@ -1,8 +1,15 @@
-import { CalendarDays, MapPin, User, CheckSquare } from 'lucide-react';
+import { CalendarDays, MapPin, User, CheckSquare, MoreHorizontal, Copy, Pencil, Trash2 } from 'lucide-react';
 import { Production, PRODUCTION_STATUS_LABELS, ProductionStatus } from '@/types/productions';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const STATUS_VARIANT: Record<ProductionStatus, string> = {
   planning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -15,6 +22,9 @@ const STATUS_VARIANT: Record<ProductionStatus, string> = {
 interface ProductionCardProps {
   production: Production;
   onClick: (production: Production) => void;
+  onEdit?: (production: Production) => void;
+  onClone?: (production: Production) => void;
+  onDelete?: (production: Production) => void;
 }
 
 function countChecklistProgress(production: Production): { done: number; total: number } {
@@ -39,7 +49,7 @@ function formatDateRange(startDate?: string, endDate?: string): string | null {
   return null;
 }
 
-export function ProductionCard({ production, onClick }: ProductionCardProps) {
+export function ProductionCard({ production, onClick, onEdit, onClone, onDelete }: ProductionCardProps) {
   const { done, total } = countChecklistProgress(production);
   const dateRange = formatDateRange(production.startDate, production.endDate);
   const crewCount = production.crew.length;
@@ -53,14 +63,49 @@ export function ProductionCard({ production, onClick }: ProductionCardProps) {
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="line-clamp-2 text-base leading-snug">{production.name}</CardTitle>
-          <span
-            className={cn(
-              'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-              STATUS_VARIANT[production.status]
-            )}
-          >
-            {PRODUCTION_STATUS_LABELS[production.status]}
-          </span>
+          <div className="flex items-center gap-1">
+            <span
+              className={cn(
+                'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
+                STATUS_VARIANT[production.status]
+              )}
+            >
+              {PRODUCTION_STATUS_LABELS[production.status]}
+            </span>
+            {(onEdit || onClone || onDelete) ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(event) => event.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Production actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                  {onEdit ? (
+                    <DropdownMenuItem onSelect={() => onEdit(production)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                  ) : null}
+                  {onClone ? (
+                    <DropdownMenuItem onSelect={() => onClone(production)}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Clone from previous production
+                    </DropdownMenuItem>
+                  ) : null}
+                  {onDelete ? (
+                    <DropdownMenuItem
+                      onSelect={() => onDelete(production)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete production
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
         </div>
         {production.client && (
           <p className="text-sm text-muted-foreground">{production.client}</p>

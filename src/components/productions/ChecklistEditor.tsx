@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Trash2, GripVertical, Link2, Unlink, ChevronDown, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Trash2, GripVertical, Link2, Unlink, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import { ChecklistGroup, ChecklistItem } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
@@ -47,8 +47,15 @@ export function ChecklistEditor({
   const [newGroupTitle, setNewGroupTitle] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<{ groupId?: string; itemId?: string } | null>(null);
-  const [collapsedGroupIds, setCollapsedGroupIds] = useState<string[]>([]);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const validIds = new Set(groups.map((group) => group.id));
+    setExpandedGroupIds((previous) => previous.filter((id) => validIds.has(id)));
+  }, [groups]);
   const [draggingItem, setDraggingItem] = useState<{ groupId: string; itemId: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ groupId: string; itemId: string } | null>(null);
+  const [editingLabel, setEditingLabel] = useState('');
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [completionFilter, setCompletionFilter] = useState<'all' | 'open' | 'done'>('all');
   const [sortMode, setSortMode] = useState<'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'>('manual');
@@ -103,8 +110,8 @@ export function ChecklistEditor({
     setNewItemLabels((prev) => ({ ...prev, [groupId]: '' }));
   };
 
-  const toggleGroupCollapsed = (groupId: string) => {
-    setCollapsedGroupIds((previous) =>
+  const toggleGroupExpanded = (groupId: string) => {
+    setExpandedGroupIds((previous) =>
       previous.includes(groupId)
         ? previous.filter((id) => id !== groupId)
         : [...previous, groupId]
@@ -243,13 +250,13 @@ export function ChecklistEditor({
               variant="ghost"
               size="icon"
               className="h-6 w-6 shrink-0"
-              onClick={() => toggleGroupCollapsed(group.id)}
-              title={collapsedGroupIds.includes(group.id) ? 'Expand section' : 'Collapse section'}
+              onClick={() => toggleGroupExpanded(group.id)}
+              title={expandedGroupIds.includes(group.id) ? 'Collapse section' : 'Expand section'}
             >
-              {collapsedGroupIds.includes(group.id) ? (
-                <ChevronRight className="h-3.5 w-3.5" />
-              ) : (
+              {expandedGroupIds.includes(group.id) ? (
                 <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
               )}
             </Button>
             {!readOnly && <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
@@ -274,9 +281,11 @@ export function ChecklistEditor({
               </Button>
             )}
           </div>
-          {!collapsedGroupIds.includes(group.id) && <div className="divide-y">
+          {expandedGroupIds.includes(group.id) && <div className="divide-y">
             {getVisibleItems(group.items).map((item) => {
               const invName = resolveInventoryName(item.inventoryItemId);
+              const isEditingItemLabel =
+                editingItem?.groupId === group.id && editingItem?.itemId === item.id;
               return (
                 <div
                   key={item.id}
@@ -302,20 +311,50 @@ export function ChecklistEditor({
                     }
                     title={item.completed ? 'Mark as not completed' : 'Mark as completed'}
                   />
-                  <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
-                    {item.label}
-                    {invName && item.inventoryItemId && item.label !== invName && (
-                      <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
-                    )}
-                    {item.inventoryItemId && (
-                      <Link2 className="ml-1 inline h-3 w-3 text-blue-500" />
-                    )}
-                    {item.completed && (
-                      <span className="ml-2 rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-300">
-                        Completed
-                      </span>
-                    )}
-                  </span>
+                  {isEditingItemLabel ? (
+                    <Input
+                      className="h-7 flex-1 text-sm"
+                      value={editingLabel}
+                      onChange={(event) => setEditingLabel(event.target.value)}
+                      onBlur={() => {
+                        const next = editingLabel.trim();
+                        if (next.length > 0 && next !== item.label) {
+                          updateItem(group.id, item.id, { label: next });
+                        }
+                        setEditingItem(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          const next = editingLabel.trim();
+                          if (next.length > 0 && next !== item.label) {
+                            updateItem(group.id, item.id, { label: next });
+                          }
+                          setEditingItem(null);
+                        }
+                        if (event.key === 'Escape') {
+                          event.preventDefault();
+                          setEditingItem(null);
+                        }
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
+                      {item.label}
+                      {invName && item.inventoryItemId && item.label !== invName && (
+                        <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
+                      )}
+                      {item.inventoryItemId && (
+                        <Link2 className="ml-1 inline h-3 w-3 text-blue-500" />
+                      )}
+                      {item.completed && (
+                        <span className="ml-2 rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-300">
+                          Completed
+                        </span>
+                      )}
+                    </span>
+                  )}
                   {!readOnly ? (
                     <Input
                       type="number"
@@ -360,6 +399,18 @@ export function ChecklistEditor({
                           <Unlink className="h-3.5 w-3.5" />
                         </Button>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        title="Edit item label"
+                        onClick={() => {
+                          setEditingItem({ groupId: group.id, itemId: item.id });
+                          setEditingLabel(item.label);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

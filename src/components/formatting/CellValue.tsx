@@ -6,7 +6,7 @@ import { getSettings } from '@/lib/storageService';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
 import { accentColorForLocation, accentColorForProject } from '@/lib/lookupAccentColors';
 import { Badge } from "@/components/ui/badge";
-import { BarChart2, StickyNote } from "lucide-react";
+import { BarChart2, Lock, StickyNote } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -18,9 +18,23 @@ interface FormatCellValueProps {
   item: InventoryItem;
   column: string;
   allocation?: { reserved?: number; checkedOut?: number };
+  compact?: boolean;
+  checkoutActivity?: {
+    type: 'check-in' | 'check-out';
+    timestamp: Date;
+    performedBy: string;
+    cabinetName: string;
+    quantity: number;
+  };
 }
 
-export function FormatCellValue({ item, column, allocation }: FormatCellValueProps): React.ReactNode {
+export function FormatCellValue({
+  item,
+  column,
+  allocation,
+  compact = false,
+  checkoutActivity,
+}: FormatCellValueProps): React.ReactNode {
   const settings = getSettings();
 
   const getResolvedLabel = (value: string | undefined, source: 'categories' | 'locations' | 'projects') => {
@@ -63,6 +77,11 @@ export function FormatCellValue({ item, column, allocation }: FormatCellValuePro
 
   if (column === 'lastUpdated') {
     const dateValue = item[column] instanceof Date ? item[column] : new Date(item[column]);
+    const compactDateText = format(dateValue, 'MMM d, yyyy');
+    const compactMetaText = item.lastModifiedBy ? ` (${item.lastModifiedBy})` : '';
+    if (compact) {
+      return `${compactDateText}${compactMetaText}`;
+    }
     return (
       <div className="flex flex-col">
         <span>{format(dateValue, 'MMM d, yyyy · h:mm a')}</span>
@@ -82,6 +101,14 @@ export function FormatCellValue({ item, column, allocation }: FormatCellValuePro
         : new Date(item.lastUpdated)
       : null;
     const validDate = dateValue && !Number.isNaN(dateValue.getTime()) ? dateValue : null;
+    if (compact) {
+      if (!item.lastModifiedBy) {
+        return '-';
+      }
+      return validDate
+        ? `${item.lastModifiedBy} · ${format(validDate, 'MMM d, yyyy')}`
+        : item.lastModifiedBy;
+    }
     return (
       <div className="flex flex-col">
         <span>{item.lastModifiedBy || '-'}</span>
@@ -116,38 +143,72 @@ export function FormatCellValue({ item, column, allocation }: FormatCellValuePro
     );
   }
   if (column === 'name') {
+    const showCheckInOutFlag = Boolean(item.cabinet || checkoutActivity);
+    const checkFlagClassName = checkoutActivity
+      ? checkoutActivity.type === 'check-out'
+        ? 'border-red-500/40 bg-red-500/10 text-red-300'
+        : 'border-green-500/40 bg-green-500/10 text-green-300'
+      : 'border-blue-500/40 bg-blue-500/10 text-blue-300';
+    const checkFlagLabel = checkoutActivity
+      ? checkoutActivity.type === 'check-out'
+        ? 'Checked out'
+        : 'Checked in'
+      : 'Check In/Out';
     return (
-      <div className="flex min-w-0 items-start gap-2">
-        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{item[column]?.toString() || '-'}</span>
-        {item.reorderLevel !== undefined && item.quantity <= item.reorderLevel && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="destructive" className="flex items-center gap-1 px-2 py-0">
-                  <BarChart2 className="h-3 w-3" />
-                  <span className="text-xs">Low</span>
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Quantity below reorder level ({item.reorderLevel})</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-        {item.notes && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="secondary" className="flex items-center gap-1 px-2 py-0">
-                  <StickyNote className="h-3 w-3" />
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-[300px]">
-                <p className="whitespace-pre-wrap break-words text-sm">{item.notes}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="trackit-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+          {item[column]?.toString() || '-'}
+        </span>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {item.reorderLevel !== undefined && item.quantity <= item.reorderLevel && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="destructive" className="flex items-center gap-1 px-2 py-0">
+                    <BarChart2 className="h-3 w-3" />
+                    <span className="text-xs">Low</span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Quantity below reorder level ({item.reorderLevel})</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {item.notes && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="secondary" className="flex items-center gap-1 px-2 py-0">
+                    <StickyNote className="h-3 w-3" />
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-[300px]">
+                  <p className="whitespace-pre-wrap break-words text-sm">{item.notes}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {showCheckInOutFlag && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className={`flex items-center gap-1 px-2 py-0 ${checkFlagClassName}`}>
+                    <Lock className="h-3 w-3" />
+                    <span className="text-xs whitespace-nowrap">{checkFlagLabel}</span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {checkoutActivity
+                      ? `Last ${checkoutActivity.type === 'check-out' ? 'check-out' : 'check-in'} at ${checkoutActivity.cabinetName} by ${checkoutActivity.performedBy} · ${format(checkoutActivity.timestamp, 'MMM d, h:mm a')}`
+                      : 'This item is assigned to a cabinet and participates in check-in/out tracking.'}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </div>
     );
   }
@@ -161,7 +222,7 @@ export function FormatCellValue({ item, column, allocation }: FormatCellValuePro
           style={{ backgroundColor: categoryColor || 'hsl(var(--muted-foreground))' }}
           aria-hidden="true"
         />
-        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{resolvedCategory}</span>
+        <span className="min-w-0 break-words">{resolvedCategory}</span>
       </div>
     );
   }
@@ -175,7 +236,7 @@ export function FormatCellValue({ item, column, allocation }: FormatCellValuePro
           style={{ backgroundColor: locColor }}
           aria-hidden="true"
         />
-        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{locLabel}</span>
+        <span className="min-w-0 break-words">{locLabel}</span>
       </div>
     );
   }
@@ -189,7 +250,7 @@ export function FormatCellValue({ item, column, allocation }: FormatCellValuePro
           style={{ backgroundColor: projectColor }}
           aria-hidden="true"
         />
-        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{projectLabel}</span>
+        <span className="min-w-0 break-words">{projectLabel}</span>
       </div>
     );
   }

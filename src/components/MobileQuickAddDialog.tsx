@@ -232,6 +232,7 @@ export function MobileQuickAddDialog({
   type JumpHighlight = "name" | "details" | "location" | "category" | "unit" | "project";
   const [jumpHighlight, setJumpHighlight] = React.useState<JumpHighlight | null>(null);
   const jumpTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasHydratedForOpenRef = React.useRef(false);
 
   const flashJump = React.useCallback((id: JumpHighlight) => {
     if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
@@ -409,10 +410,16 @@ export function MobileQuickAddDialog({
   }, [categories, locations, projects, defaultUnitName, units, applyLocationId]);
 
   React.useEffect(() => {
-    if (open) {
-      hydrate();
-      requestAnimationFrame(() => nameRef.current?.focus());
+    if (!open) {
+      hasHydratedForOpenRef.current = false;
+      return;
     }
+    if (hasHydratedForOpenRef.current) {
+      return;
+    }
+    hasHydratedForOpenRef.current = true;
+    hydrate();
+    requestAnimationFrame(() => nameRef.current?.focus());
   }, [open, hydrate]);
 
   React.useEffect(() => {

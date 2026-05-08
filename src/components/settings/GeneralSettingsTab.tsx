@@ -9,6 +9,26 @@ import { Camera } from 'lucide-react';
 import type { DefaultSettings } from '@/lib/settingsService';
 import { CAMERA_DEVICE_ID_KEY, CAMERA_SETTINGS_UPDATED_EVENT } from "@/components/CameraSettingsDialog";
 
+const ORG_BROADCAST_ON_AIR_TEMPLATE: DefaultSettings['maintenanceOnAirSchedule'] = {
+  sunday: ['09:00', '17:00', '18:00', '23:00'],
+  monday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
+  tuesday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
+  wednesday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
+  thursday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
+  friday: ['05:00', '06:00', '11:00', '15:00', '16:00', '17:00', '18:00', '23:00'],
+  saturday: [],
+};
+
+const EMPTY_ON_AIR_TEMPLATE: DefaultSettings['maintenanceOnAirSchedule'] = {
+  sunday: [],
+  monday: [],
+  tuesday: [],
+  wednesday: [],
+  thursday: [],
+  friday: [],
+  saturday: [],
+};
+
 interface GeneralSettingsTabProps {
   onOpenCameraSettings: () => void;
   settings: DefaultSettings;
@@ -26,6 +46,29 @@ export function GeneralSettingsTab({
   canEditAssetTagPrefix,
   canEditAdminNotificationEmail,
 }: GeneralSettingsTabProps) {
+  const scheduleDayLabels: Array<{ key: keyof DefaultSettings['maintenanceOnAirSchedule']; label: string }> = [
+    { key: 'sunday', label: 'Sunday' },
+    { key: 'monday', label: 'Monday' },
+    { key: 'tuesday', label: 'Tuesday' },
+    { key: 'wednesday', label: 'Wednesday' },
+    { key: 'thursday', label: 'Thursday' },
+    { key: 'friday', label: 'Friday' },
+    { key: 'saturday', label: 'Saturday' },
+  ];
+
+  const normalizeTimeList = React.useCallback((raw: string): string[] => {
+    const validQuarterHour = /^([01]\d|2[0-3]):(00|15|30|45)$/;
+    return Array.from(
+      new Set(
+        raw
+          .split(',')
+          .map((value) => value.trim())
+          .filter((value) => validQuarterHour.test(value))
+          .sort((left, right) => left.localeCompare(right)),
+      ),
+    );
+  }, []);
+
   const confirmDeletesEnabled = settings.deleteConfirmationByUser?.[currentUsername] ?? true;
   const undoEnabled = settings.undoByUser?.[currentUsername] ?? true;
   const [cameraSummary, setCameraSummary] = React.useState('Checking available cameras...');
@@ -155,6 +198,110 @@ export function GeneralSettingsTab({
                 })
               }
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Maintenance Window Cautions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-3 rounded-md border p-4">
+            <div className="space-y-0.5">
+              <p className="font-medium">Enable maintenance cautions</p>
+              <p className="text-xs text-muted-foreground">
+                Warn planners when cut-over is scheduled during your selected caution window type.
+              </p>
+            </div>
+            <Switch
+              checked={settings.maintenanceCautionsEnabled}
+              onCheckedChange={(checked) => onSettingsChange({ maintenanceCautionsEnabled: checked })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="maintenance-caution-mode">Caution trigger</Label>
+            <Select
+              value={settings.maintenanceCautionMode}
+              onValueChange={(value: 'on-air' | 'off-air') => onSettingsChange({ maintenanceCautionMode: value })}
+            >
+              <SelectTrigger id="maintenance-caution-mode" className="w-full md:w-72">
+                <SelectValue placeholder="Select caution mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="on-air">Warn during ON-AIR windows</SelectItem>
+                <SelectItem value="off-air">Warn during OFF-AIR windows</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="maintenance-programming-block-minutes">Programming block length</Label>
+            <Select
+              value={String(settings.maintenanceProgrammingBlockMinutes ?? 60)}
+              onValueChange={(value) => onSettingsChange({ maintenanceProgrammingBlockMinutes: Number(value) })}
+            >
+              <SelectTrigger id="maintenance-programming-block-minutes" className="w-full md:w-64">
+                <SelectValue placeholder="Select block duration" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">15 minutes</SelectItem>
+                <SelectItem value="30">30 minutes</SelectItem>
+                <SelectItem value="45">45 minutes</SelectItem>
+                <SelectItem value="60">1 hour</SelectItem>
+                <SelectItem value="90">1.5 hours</SelectItem>
+                <SelectItem value="120">2 hours</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Defaults to 1 hour. Each ON-AIR start time opens a caution window for this duration.
+            </p>
+          </div>
+
+          <div className="rounded-md border p-4 space-y-3">
+            <p className="text-sm font-medium">ON-AIR schedule (15-minute format)</p>
+            <p className="text-xs text-muted-foreground">
+              Enter comma-separated times per day in HH:mm (examples: 05:00, 11:00, 23:00). Values are normalized and invalid entries are ignored.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onSettingsChange({ maintenanceOnAirSchedule: ORG_BROADCAST_ON_AIR_TEMPLATE })}
+              >
+                Apply org template
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onSettingsChange({ maintenanceOnAirSchedule: EMPTY_ON_AIR_TEMPLATE })}
+              >
+                Clear all windows
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {scheduleDayLabels.map((day) => (
+                <div key={day.key} className="space-y-1.5">
+                  <Label htmlFor={`maintenance-${day.key}`}>{day.label}</Label>
+                  <Input
+                    id={`maintenance-${day.key}`}
+                    value={(settings.maintenanceOnAirSchedule?.[day.key] ?? []).join(', ')}
+                    placeholder="05:00, 11:00, 18:00"
+                    onChange={(event) =>
+                      onSettingsChange({
+                        maintenanceOnAirSchedule: {
+                          ...settings.maintenanceOnAirSchedule,
+                          [day.key]: normalizeTimeList(event.target.value),
+                        },
+                      })
+                    }
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

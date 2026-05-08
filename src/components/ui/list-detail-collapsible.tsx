@@ -3,7 +3,7 @@ import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsi
 import { cn } from '@/lib/utils';
 
 export interface ListDetailCollapsibleProps {
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   defaultOpen?: boolean;

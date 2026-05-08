@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useAuth } from '@/contexts/AuthContext';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import {
+  ACTIVE_WORKSPACE_STORAGE_KEY,
   getActiveWorkspaceId,
   listWorkspaceSummariesForUser,
   setActiveWorkspaceId as persistActiveWorkspaceId,
@@ -64,6 +65,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setActiveWorkspaceIdState(getActiveWorkspaceId());
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== ACTIVE_WORKSPACE_STORAGE_KEY) return;
+      setActiveWorkspaceIdState(getActiveWorkspaceId());
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured() || authBackend !== 'supabase' || !currentUser?.id || loading) {

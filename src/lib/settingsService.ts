@@ -16,6 +16,16 @@ declare global {
   }
 }
 
+const EMPTY_MAINTENANCE_ON_AIR_SCHEDULE = {
+  sunday: [] as string[],
+  monday: [] as string[],
+  tuesday: [] as string[],
+  wednesday: [] as string[],
+  thursday: [] as string[],
+  friday: [] as string[],
+  saturday: [] as string[],
+};
+
 // Define the settings schema
 export const defaultSettingsSchema = z.object({
   defaultLocation: z.string().optional(),
@@ -45,6 +55,18 @@ export const defaultSettingsSchema = z.object({
   adminNotificationEmail: z.string().email().optional().or(z.literal('')),
   /** Monotonic counter for asset tag sequence (shared across dates). */
   assetIdSequence: z.number().int().min(0).default(0),
+  maintenanceCautionsEnabled: z.boolean().default(true),
+  maintenanceCautionMode: z.enum(['on-air', 'off-air']).default('on-air'),
+  maintenanceProgrammingBlockMinutes: z.number().int().min(15).max(240).default(60),
+  maintenanceOnAirSchedule: z.object({
+    sunday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
+    monday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
+    tuesday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
+    wednesday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
+    thursday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
+    friday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
+    saturday: z.array(z.string().regex(/^\d{2}:\d{2}$/)).default([]),
+  }).default(EMPTY_MAINTENANCE_ON_AIR_SCHEDULE),
   deleteConfirmationByUser: z.record(z.string(), z.boolean()).default({}),
   undoByUser: z.record(z.string(), z.boolean()).default({}),
 });
@@ -111,6 +133,18 @@ export class SettingsService {
       assetIdPrefix: 'AST',
       adminNotificationEmail: '',
       assetIdSequence: 0,
+      maintenanceCautionsEnabled: true,
+      maintenanceCautionMode: 'on-air',
+      maintenanceProgrammingBlockMinutes: 60,
+      maintenanceOnAirSchedule: {
+        sunday: [],
+        monday: [],
+        tuesday: [],
+        wednesday: [],
+        thursday: [],
+        friday: [],
+        saturday: [],
+      },
       deleteConfirmationByUser: {},
       undoByUser: {},
     };

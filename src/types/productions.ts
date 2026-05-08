@@ -18,10 +18,22 @@ export interface ChecklistGroup {
   items: ChecklistItem[];
 }
 
+/** A grouped bundle on a vehicle (usually imported from one production checklist section). */
+export interface VehiclePacklistSection {
+  id: string;
+  title: string;
+  /** Links to checklist group id for checklist-completion warnings in the Vehicles tab. */
+  checklistGroupId?: string;
+  items: ChecklistItem[];
+}
+
 export interface VehiclePacklist {
   id: string;
   vehicleName: string;
+  /** Ungrouped lines (manual or bulk-added). Sections are listed separately. */
   items: ChecklistItem[];
+  /** Checklist-derived packs grouped under one collapsible heading. */
+  sections?: VehiclePacklistSection[];
 }
 
 export interface ProductionCrewMember {

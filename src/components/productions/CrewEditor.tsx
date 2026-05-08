@@ -22,6 +22,8 @@ import {
   POSITION_TEMPLATES_UPDATED_EVENT,
 } from '@/lib/positionTemplatesService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TimeInput } from '@/components/ui/time-input';
+import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsible';
 import { normalizeDateInputValue, normalizeQuarterHourTime } from '@/lib/dateTimeInputs';
 
 interface CrewEditorProps {
@@ -92,7 +94,19 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
   const [newTemplateLabel, setNewTemplateLabel] = useState('');
   const [newDepartmentName, setNewDepartmentName] = useState('');
   const [departmentOrder, setDepartmentOrder] = useState<string[]>([DEFAULT_DEPARTMENT]);
-  const [collapsedDepartmentNames, setCollapsedDepartmentNames] = useState<string[]>([]);
+  const [renameDepartmentDialog, setRenameDepartmentDialog] = useState<{
+    open: boolean;
+    currentName: string;
+    nextName: string;
+    error: string | null;
+  }>({
+    open: false,
+    currentName: '',
+    nextName: '',
+    error: null,
+  });
+  /** Departments start collapsed; user expands one or more to view crew. */
+  const [expandedDepartmentNames, setExpandedDepartmentNames] = useState<string[]>([]);
   const [memberSortMode, setMemberSortMode] = useState<CrewSortMode>('manual');
   const [draggingDepartmentName, setDraggingDepartmentName] = useState<string | null>(null);
   const [draggingMemberId, setDraggingMemberId] = useState<string | null>(null);
@@ -137,6 +151,20 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     });
     if (hasChanged) onChange(nextCrew);
   }, [crew, onChange]);
+
+  const orderedDepartments = useMemo(() => {
+    const memberDepartments = Array.from(new Set(crew.map((member) => normalizeDepartment(member.department))));
+    const merged = [...departmentOrder];
+    for (const memberDepartment of memberDepartments) {
+      if (!merged.includes(memberDepartment)) merged.push(memberDepartment);
+    }
+    return merged;
+  }, [crew, departmentOrder]);
+
+  useEffect(() => {
+    const validNames = new Set(orderedDepartments);
+    setExpandedDepartmentNames((previous) => previous.filter((name) => validNames.has(name)));
+  }, [orderedDepartments]);
 
   useEffect(() => {
     const knownDepartments = new Set(departmentOrder);
@@ -223,9 +251,9 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     const shift = {
       id: crypto.randomUUID(),
       date: draftForMember.date,
-      callTime: draftForMember.callTime || undefined,
-      startTime: draftForMember.startTime || undefined,
-      endTime: draftForMember.endTime || undefined,
+      callTime: draftForMember.callTime ? normalizeQuarterHourTime(draftForMember.callTime) : undefined,
+      startTime: draftForMember.startTime ? normalizeQuarterHourTime(draftForMember.startTime) : undefined,
+      endTime: draftForMember.endTime ? normalizeQuarterHourTime(draftForMember.endTime) : undefined,
       location: draftForMember.location.trim() || undefined,
       notes: draftForMember.notes.trim() || undefined,
     };
@@ -285,27 +313,54 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     setNewDepartmentName('');
   };
 
-  const toggleDepartmentCollapsed = (departmentName: string) => {
-    setCollapsedDepartmentNames((previous) =>
+  const toggleDepartmentExpanded = (departmentName: string) => {
+    setExpandedDepartmentNames((previous) =>
       previous.includes(departmentName)
         ? previous.filter((name) => name !== departmentName)
         : [...previous, departmentName]
     );
   };
 
-  const renameDepartment = (departmentName: string) => {
-    const nextNameRaw = window.prompt('Rename department', departmentName);
-    if (!nextNameRaw) return;
-    const nextName = nextNameRaw.trim();
-    if (!nextName || nextName === departmentName) return;
-    if (orderedDepartments.some((name) => name.toLowerCase() === nextName.toLowerCase())) return;
+  const renameDepartment = (departmentName: string, nextDepartmentNameRaw: string) => {
+    const nextName = nextDepartmentNameRaw.trim();
+    if (!nextName || nextName === departmentName) return { ok: true as const };
+    if (orderedDepartments.some((name) => name.toLowerCase() === nextName.toLowerCase())) {
+      return { ok: false as const, error: 'Department name already exists.' };
+    }
     setDepartmentOrder((previous) => previous.map((name) => (name === departmentName ? nextName : name)));
-    setCollapsedDepartmentNames((previous) => previous.map((name) => (name === departmentName ? nextName : name)));
+    setExpandedDepartmentNames((previous) =>
+      previous.map((name) => (name === departmentName ? nextName : name)),
+    );
     onChange(
       crew.map((member) =>
         normalizeDepartment(member.department) === departmentName ? { ...member, department: nextName } : member
       )
     );
+    return { ok: true as const };
+  };
+
+  const openRenameDepartmentDialog = (departmentName: string) => {
+    setRenameDepartmentDialog({
+      open: true,
+      currentName: departmentName,
+      nextName: departmentName,
+      error: null,
+    });
+  };
+
+  const submitRenameDepartmentDialog = () => {
+    if (!renameDepartmentDialog.currentName) return;
+    const result = renameDepartment(renameDepartmentDialog.currentName, renameDepartmentDialog.nextName);
+    if (!result.ok) {
+      setRenameDepartmentDialog((previous) => ({ ...previous, error: result.error }));
+      return;
+    }
+    setRenameDepartmentDialog({
+      open: false,
+      currentName: '',
+      nextName: '',
+      error: null,
+    });
   };
 
   const deleteDepartment = (departmentName: string) => {
@@ -319,7 +374,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
       : `Delete "${departmentName}"?`;
     if (!window.confirm(confirmMessage)) return;
     setDepartmentOrder((previous) => previous.filter((name) => name !== departmentName));
-    setCollapsedDepartmentNames((previous) => previous.filter((name) => name !== departmentName));
+    setExpandedDepartmentNames((previous) => previous.filter((name) => name !== departmentName));
     if (!hasMembers) return;
     onChange(
       crew.map((member) =>
@@ -348,15 +403,6 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
       )
     );
   };
-
-  const orderedDepartments = useMemo(() => {
-    const memberDepartments = Array.from(new Set(crew.map((member) => normalizeDepartment(member.department))));
-    const merged = [...departmentOrder];
-    for (const memberDepartment of memberDepartments) {
-      if (!merged.includes(memberDepartment)) merged.push(memberDepartment);
-    }
-    return merged;
-  }, [crew, departmentOrder]);
 
   const membersByDepartment = useMemo(() => {
     const grouped = new Map<string, ProductionCrewMember[]>();
@@ -414,7 +460,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
 
       {orderedDepartments.map((departmentName) => {
         const departmentMembers = membersByDepartment.get(departmentName) ?? [];
-        const isCollapsed = collapsedDepartmentNames.includes(departmentName);
+        const isExpanded = expandedDepartmentNames.includes(departmentName);
         return (
           <div
             key={departmentName}
@@ -436,8 +482,8 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
           >
             <div className="mb-2 flex items-center gap-2">
               {!readOnly && <GripVertical className="h-4 w-4 text-muted-foreground" />}
-              <button type="button" className="inline-flex items-center gap-1 text-sm font-medium" onClick={() => toggleDepartmentCollapsed(departmentName)}>
-                {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              <button type="button" className="inline-flex items-center gap-1 text-sm font-medium" onClick={() => toggleDepartmentExpanded(departmentName)}>
+                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 {departmentName}
               </button>
               <span className="text-xs text-muted-foreground">{departmentMembers.length} crew</span>
@@ -448,7 +494,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => renameDepartment(departmentName)}
+                    onClick={() => openRenameDepartmentDialog(departmentName)}
                     title="Rename department"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -466,7 +512,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                 </div>
               )}
             </div>
-            {!isCollapsed && (
+            {isExpanded && (
               <div className="space-y-2">
                 {departmentMembers.map((member) => (
                   <div
@@ -533,15 +579,29 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                             </Select>
                             <Input placeholder="Notes" className="h-7 text-sm" value={member.notes ?? ''} onChange={(event) => updateMember(member.id, { notes: event.target.value })} />
                           </div>
-                          <div className="rounded-md border p-2">
-                            <p className="mb-1 text-[11px] font-medium text-muted-foreground">Assignment shifts</p>
+                          <OptionalFormCollapsible title="Assignment shifts">
                             <div className="space-y-2">
                               {(member.shifts ?? []).map((shift) => (
                                 <div key={shift.id} className="grid grid-cols-6 gap-1 rounded border p-1.5">
                                   <Input className="h-7 text-xs" type="date" value={shift.date} onChange={(event) => updateShiftForMember(member.id, shift.id, { date: normalizeDateInputValue(event.target.value) })} />
-                                  <Input className="h-7 text-xs" type="time" value={shift.callTime ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { callTime: event.target.value || undefined })} onBlur={(event) => updateShiftForMember(member.id, shift.id, { callTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : undefined })} />
-                                  <Input className="h-7 text-xs" type="time" value={shift.startTime ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { startTime: event.target.value || undefined })} onBlur={(event) => updateShiftForMember(member.id, shift.id, { startTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : undefined })} />
-                                  <Input className="h-7 text-xs" type="time" value={shift.endTime ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { endTime: event.target.value || undefined })} onBlur={(event) => updateShiftForMember(member.id, shift.id, { endTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : undefined })} />
+                                  <TimeInput
+                                    className="h-7 text-xs"
+                                    value={shift.callTime ?? ''}
+                                    onChange={(event) => updateShiftForMember(member.id, shift.id, { callTime: event.target.value || undefined })}
+                                    onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { callTime: value })}
+                                  />
+                                  <TimeInput
+                                    className="h-7 text-xs"
+                                    value={shift.startTime ?? ''}
+                                    onChange={(event) => updateShiftForMember(member.id, shift.id, { startTime: event.target.value || undefined })}
+                                    onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { startTime: value })}
+                                  />
+                                  <TimeInput
+                                    className="h-7 text-xs"
+                                    value={shift.endTime ?? ''}
+                                    onChange={(event) => updateShiftForMember(member.id, shift.id, { endTime: event.target.value || undefined })}
+                                    onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { endTime: value })}
+                                  />
                                   <Input className="h-7 text-xs" placeholder="Location" value={shift.location ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { location: event.target.value || undefined })} />
                                   <div className="flex items-center justify-end">
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShiftForMember(member.id, shift.id)}>
@@ -553,15 +613,30 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                               ))}
                               <div className="grid grid-cols-6 gap-1 rounded border border-dashed p-1.5">
                                 <Input className="h-7 text-xs" type="date" value={getShiftDraft(member.id).date} onChange={(event) => updateShiftDraft(member.id, { date: normalizeDateInputValue(event.target.value) })} />
-                                <Input className="h-7 text-xs" type="time" value={getShiftDraft(member.id).callTime} onChange={(event) => updateShiftDraft(member.id, { callTime: event.target.value })} onBlur={(event) => updateShiftDraft(member.id, { callTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : '' })} />
-                                <Input className="h-7 text-xs" type="time" value={getShiftDraft(member.id).startTime} onChange={(event) => updateShiftDraft(member.id, { startTime: event.target.value })} onBlur={(event) => updateShiftDraft(member.id, { startTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : '' })} />
-                                <Input className="h-7 text-xs" type="time" value={getShiftDraft(member.id).endTime} onChange={(event) => updateShiftDraft(member.id, { endTime: event.target.value })} onBlur={(event) => updateShiftDraft(member.id, { endTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : '' })} />
+                                <TimeInput
+                                  className="h-7 text-xs"
+                                  value={getShiftDraft(member.id).callTime}
+                                  onChange={(event) => updateShiftDraft(member.id, { callTime: event.target.value })}
+                                  onBlurCommit={(value) => updateShiftDraft(member.id, { callTime: value ?? '' })}
+                                />
+                                <TimeInput
+                                  className="h-7 text-xs"
+                                  value={getShiftDraft(member.id).startTime}
+                                  onChange={(event) => updateShiftDraft(member.id, { startTime: event.target.value })}
+                                  onBlurCommit={(value) => updateShiftDraft(member.id, { startTime: value ?? '' })}
+                                />
+                                <TimeInput
+                                  className="h-7 text-xs"
+                                  value={getShiftDraft(member.id).endTime}
+                                  onChange={(event) => updateShiftDraft(member.id, { endTime: event.target.value })}
+                                  onBlurCommit={(value) => updateShiftDraft(member.id, { endTime: value ?? '' })}
+                                />
                                 <Input className="h-7 text-xs" placeholder="Location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
                                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift</Button>
                                 <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
                               </div>
                             </div>
-                          </div>
+                          </OptionalFormCollapsible>
                         </>
                       )}
                     </div>
@@ -580,9 +655,9 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
       })}
 
       {!readOnly && (
-        <div className="rounded-md border px-3 py-2">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-muted-foreground">Add crew member</p>
+        <OptionalFormCollapsible title="Add crew member">
+          <div className="space-y-2">
+          <div className="flex items-center justify-end gap-2">
             <Button variant="outline" size="sm" className="h-7 gap-1" onClick={() => setMasterDialogOpen(true)}>
               <Database className="h-3.5 w-3.5" />
               Add from master DB
@@ -630,7 +705,8 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
             <Plus className="h-3.5 w-3.5" />
             Add
           </Button>
-        </div>
+          </div>
+        </OptionalFormCollapsible>
       )}
 
       <Dialog open={masterDialogOpen} onOpenChange={setMasterDialogOpen}>
@@ -658,6 +734,65 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                 );
               })}
               {filteredMasterContacts.length === 0 && <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">No active contacts match your search.</p>}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={renameDepartmentDialog.open}
+        onOpenChange={(open) => {
+          if (open) return;
+          setRenameDepartmentDialog({
+            open: false,
+            currentName: '',
+            nextName: '',
+            error: null,
+          });
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename department</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={renameDepartmentDialog.nextName}
+              onChange={(event) =>
+                setRenameDepartmentDialog((previous) => ({
+                  ...previous,
+                  nextName: event.target.value,
+                  error: null,
+                }))
+              }
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                submitRenameDepartmentDialog();
+              }}
+              autoFocus
+            />
+            {renameDepartmentDialog.error ? (
+              <p className="text-xs font-medium text-destructive">{renameDepartmentDialog.error}</p>
+            ) : null}
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setRenameDepartmentDialog({
+                    open: false,
+                    currentName: '',
+                    nextName: '',
+                    error: null,
+                  })
+                }
+              >
+                Cancel
+              </Button>
+              <Button type="button" onClick={submitRenameDepartmentDialog}>
+                Save
+              </Button>
             </div>
           </div>
         </DialogContent>

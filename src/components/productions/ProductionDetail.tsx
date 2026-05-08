@@ -22,6 +22,7 @@ import { CrewEditor } from './CrewEditor';
 import { ProductionForm } from './ProductionForm';
 import { CrewScheduleCalendar } from './CrewScheduleCalendar';
 import { applyProductionInventoryAction, exportProductionPacklistsToPdf } from '@/lib/productionService';
+import { flattenVehiclePacklistItems } from '@/lib/vehiclePacklistUtils';
 import { toast } from 'sonner';
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
@@ -81,7 +82,7 @@ export function ProductionDetail({
       group.items.forEach((item) => appendItem(item.label, item.quantity));
     });
     production.vehiclePacklists.forEach((packlist) => {
-      packlist.items.forEach((item) => appendItem(item.label, item.quantity));
+      flattenVehiclePacklistItems(packlist).forEach((item) => appendItem(item.label, item.quantity));
     });
     return Array.from(resourceMap.entries()).map(([label, quantity], index) => ({
       id: `${index}-${label}`,
@@ -141,7 +142,8 @@ export function ProductionDetail({
       0
     ) +
     production.vehiclePacklists.reduce(
-      (sum, packlist) => sum + packlist.items.filter((item) => !!item.inventoryItemId).length,
+      (sum, packlist) =>
+        sum + flattenVehiclePacklistItems(packlist).filter((item) => !!item.inventoryItemId).length,
       0
     );
 
@@ -158,12 +160,12 @@ export function ProductionDetail({
     <>
       <Sheet open={Boolean(production)} onOpenChange={(open) => { if (!open) onClose(); }}>
         <SheetContent
-          className="flex w-full flex-col gap-0 p-0 sm:max-w-[min(88vw,1200px)]"
+          className="flex h-[100dvh] max-h-[100dvh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(88vw,1200px)]"
           side="right"
           onPointerDownOutside={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}
         >
-          <SheetHeader className="border-b px-6 py-4">
+          <SheetHeader className="shrink-0 border-b px-6 py-4">
             <div className="flex items-start justify-between gap-3 pr-8">
               <div className="min-w-0 flex-1">
                 <SheetTitle className="leading-snug">{production.name}</SheetTitle>
@@ -251,7 +253,7 @@ export function ProductionDetail({
             onValueChange={(value) => setActiveTab(value as typeof activeTab)}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <TabsList className="mx-6 mt-3 w-auto justify-start rounded-none border-b bg-transparent p-0">
+            <TabsList className="mx-6 mt-3 w-auto shrink-0 justify-start rounded-none border-b bg-transparent p-0">
               {(['overview', 'checklist', 'vehicles', 'crew', 'schedule'] as const).map((tab) => (
                 <TabsTrigger
                   key={tab}
@@ -267,8 +269,9 @@ export function ProductionDetail({
               ))}
             </TabsList>
 
-            <ScrollArea className="flex-1">
-              <div className="p-6">
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="box-border pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-px">
+                <div className="p-6">
                 <TabsContent value="overview" className="mt-0 space-y-4">
                   {production.description && (
                     <div>
@@ -394,6 +397,7 @@ export function ProductionDetail({
                     onChange={handleScheduleChange}
                   />
                 </TabsContent>
+                </div>
               </div>
             </ScrollArea>
           </Tabs>
@@ -410,14 +414,18 @@ export function ProductionDetail({
       <Dialog open={plannerWindowOpen} onOpenChange={setPlannerWindowOpen}>
         <DraggableDialogContent
           dismissOnOutsidePointer={false}
-          className="h-[min(92vh,980px)] w-[min(96vw,1800px)] overflow-hidden p-0"
+          className="flex h-[min(92vh,980px)] w-[min(96vw,1800px)] flex-col overflow-hidden p-0"
         >
-          <DialogHeader className="border-b px-4 py-3">
+          <DialogHeader className="shrink-0 border-b px-4 py-3">
             <DialogTitle>{production.name} — Planning Workspace</DialogTitle>
           </DialogHeader>
-          <div className="h-full overflow-auto p-4">
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
-              <TabsList className="mb-3">
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => setActiveTab(value as typeof activeTab)}
+              className="flex min-h-0 flex-1 flex-col gap-3"
+            >
+              <TabsList className="mb-3 shrink-0">
                 <TabsTrigger value="checklist">Checklist</TabsTrigger>
                 <TabsTrigger value="vehicles">Vehicle Packlists</TabsTrigger>
                 <TabsTrigger value="schedule">Schedule</TabsTrigger>

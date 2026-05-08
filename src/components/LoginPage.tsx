@@ -1,15 +1,31 @@
 import React from 'react';
 import { LoginForm } from '@/components/LoginForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+
+const LAST_ROUTE_STORAGE_KEY = 'trackit:last-route';
 
 export function LoginPage() {
   const { currentUser, loading } = useAuth();
+  const location = useLocation();
 
   // If already authenticated, redirect to dashboard
   if (currentUser && !loading) {
-    return <Navigate to="/" replace />;
+    const state = location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null;
+    const from = state?.from;
+    const fromPath =
+      from?.pathname
+        ? `${from.pathname ?? ''}${from.search ?? ''}${from.hash ?? ''}`
+        : null;
+    let storedPath: string | null = null;
+    try {
+      storedPath = sessionStorage.getItem(LAST_ROUTE_STORAGE_KEY);
+    } catch {
+      storedPath = null;
+    }
+    const destination = fromPath || storedPath || '/';
+    return <Navigate to={destination} replace />;
   }
 
   return (
