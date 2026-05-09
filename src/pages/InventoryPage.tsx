@@ -53,7 +53,7 @@ import { MobileQuickAddDialog } from '@/components/MobileQuickAddDialog';
 import { EditItemDialog } from '@/components/EditItemDialog';
 import { DuplicateItemDialog } from '@/components/DuplicateItemDialog';
 import { ExportDialog } from '@/components/ExportDialog';
-import { ImportDialog } from '@/components/ImportDialog';
+import { ImportDialog, DEFAULT_BULK_IMPORT_UNIT } from '@/components/ImportDialog';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -707,10 +707,11 @@ export default function InventoryPage() {
       const prepared = rows
         .map((row) => {
           const name = row.name != null ? String(row.name).trim() : '';
-          const unit = row.unit != null ? String(row.unit).trim() : '';
+          const unitRaw = row.unit != null ? String(row.unit).trim() : '';
+          const unit = unitRaw || DEFAULT_BULK_IMPORT_UNIT;
           return { row, name, unit };
         })
-        .filter((x) => x.name.length > 0 && x.unit.length > 0);
+        .filter((x) => x.name.length > 0);
 
       const skippedCount = rows.length - prepared.length;
       if (prepared.length === 0) {
@@ -841,6 +842,7 @@ export default function InventoryPage() {
   const uniqueLocations = useMemo(() => locations.map(loc => loc.name), [locations]);
   const uniqueProjects = useMemo(() => projects.map(proj => proj.name), [projects]);
   const uniqueSuppliers = useMemo(() => suppliers.map(sup => sup.name), [suppliers]);
+  const uniqueUnits = useMemo(() => units.map(u => u.name), [units]);
 
   // Update the filtered items to include sorting
   const filteredItems = useMemo(() => {
@@ -2236,17 +2238,25 @@ export default function InventoryPage() {
         isOpen={isBulkImportOpen}
         onClose={() => setIsBulkImportOpen(false)}
         onImport={bulkAddFromPartialRows}
+        userKey={currentUser?.id || currentUser?.username || currentUser?.displayName || null}
+        gridFieldSuggestions={{
+          category: flattenedCategories,
+          location: uniqueLocations,
+          project: uniqueProjects,
+          supplier: uniqueSuppliers,
+          unit: uniqueUnits,
+        }}
         onComplete={(importedCount, skippedCount) => {
           setIsBulkImportOpen(false);
           if (importedCount > 0) {
             const skipPart =
               skippedCount > 0
-                ? ` Skipped ${skippedCount} row${skippedCount === 1 ? '' : 's'} without name and unit.`
+                ? ` Skipped ${skippedCount} row${skippedCount === 1 ? '' : 's'} without a name.`
                 : '';
             toast.success(`Imported ${importedCount} item${importedCount === 1 ? '' : 's'}.${skipPart}`);
           } else if (skippedCount > 0) {
             toast.info('No items were imported.', {
-              description: `${skippedCount} row(s) skipped — each row needs a name and unit.`,
+              description: `${skippedCount} row(s) skipped — each row needs a name.`,
             });
           }
         }}
