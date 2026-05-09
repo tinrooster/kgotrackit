@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MoreHorizontal, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import {
@@ -22,8 +23,10 @@ import {
 import {
   CREW_CONTACTS_UPDATED_EVENT,
   getCrewContacts,
+  saveCrewContacts,
 } from '@/lib/crewContactsService';
 import { canonicalNameKey, parseContactDisplayName } from '@/lib/contactName';
+import { reconcileDirectoryContactDuplicates } from '@/lib/contactReconciliation';
 
 interface DirectoryContactEntry {
   id: string;
@@ -45,6 +48,8 @@ interface OrganizationDirectoryContactsSectionProps {
   authBackend: string;
   canEdit: boolean;
 }
+
+type DirectorySortMode = 'name_asc' | 'name_desc';
 
 const EMPTY_ENTRY: Omit<DirectoryContactEntry, 'id'> = {
   fullName: '',
@@ -82,7 +87,34 @@ export function OrganizationDirectoryContactsSection({
   const [draft, setDraft] = useState<Omit<DirectoryContactEntry, 'id'>>(EMPTY_ENTRY);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DirectoryContactEntry | null>(null);
   const [masterNameKeys, setMasterNameKeys] = useState<Set<string>>(new Set());
+  const [saveToMasterCrew, setSaveToMasterCrew] = useState(false);
+  const [sortMode, setSortMode] = useState<DirectorySortMode>('name_asc');
+  const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
+  const [reconcilingDuplicates, setReconcilingDuplicates] = useState(false);
+
+  const refreshMasterNameKeys = useCallback((): void => {
+    const keys = getCrewContacts()
+      .map((contact) => canonicalNameKey(contact.fullName))
+      .filter(Boolean);
+    setMasterNameKeys(new Set(keys));
+  }, []);
+
+  const isInMasterCrew = useCallback(
+    (fullName: string): boolean => {
+      const key = canonicalNameKey(fullName);
+      if (!key) return false;
+      if (masterNameKeys.has(key)) return true;
+      const liveMasterKeys = new Set(
+        getCrewContacts()
+          .map((contact) => canonicalNameKey(contact.fullName))
+          .filter(Boolean),
+      );
+      return liveMasterKeys.has(key);
+    },
+    [masterNameKeys],
+  );
 
   const loadDirectoryContacts = async (): Promise<void> => {
     if (authBackend !== 'supabase' || !organizationId) {
@@ -135,16 +167,28 @@ export function OrganizationDirectoryContactsSection({
   }, [organizationId, authBackend]);
 
   useEffect(() => {
-    const refreshMasterNameKeys = (): void => {
-      const keys = getCrewContacts()
-        .map((contact) => canonicalNameKey(contact.fullName))
-        .filter(Boolean);
-      setMasterNameKeys(new Set(keys));
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') {
+        refreshMasterNameKeys();
+      }
+    };
+    const handleStorageChange = (event: StorageEvent): void => {
+      if (!event.key || event.key.includes('inventory-crew-contacts')) {
+        refreshMasterNameKeys();
+      }
     };
     refreshMasterNameKeys();
     window.addEventListener(CREW_CONTACTS_UPDATED_EVENT, refreshMasterNameKeys);
-    return () => window.removeEventListener(CREW_CONTACTS_UPDATED_EVENT, refreshMasterNameKeys);
-  }, []);
+    window.addEventListener('focus', refreshMasterNameKeys);
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener(CREW_CONTACTS_UPDATED_EVENT, refreshMasterNameKeys);
+      window.removeEventListener('focus', refreshMasterNameKeys);
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshMasterNameKeys]);
 
   const filteredContacts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -166,6 +210,21 @@ export function OrganizationDirectoryContactsSection({
         .includes(q),
     );
   }, [contacts, search]);
+
+  const sortedFilteredContacts = useMemo(() => {
+    const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+    return [...filteredContacts].sort((left, right) => {
+      const comparison = collator.compare(left.fullName, right.fullName);
+      return sortMode === 'name_desc' ? -comparison : comparison;
+    });
+  }, [filteredContacts, sortMode]);
+
+  const directoryReconcilePreview = useMemo(
+    () => reconcileDirectoryContactDuplicates(contacts),
+    [contacts],
+  );
+  const directoryDuplicateGroups = directoryReconcilePreview.groups;
+  const directoryDuplicateCount = directoryReconcilePreview.mergedDuplicates;
 
   const directoryTally = useMemo(() => {
     const withPhone = contacts.filter((entry) => Boolean(entry.phone)).length;
@@ -250,8 +309,26 @@ export function OrganizationDirectoryContactsSection({
         ? [...contacts, base]
         : contacts.map((entry) => (entry.id === editingId ? base : entry));
     await persistContacts(next);
+    if (saveToMasterCrew) {
+      const copyResult = copyDirectoryContactsToMasterCrew([base]);
+      toast.success('Saved and synced to Master Crew.', {
+        description: `Added ${copyResult.added}, updated ${copyResult.updated}.`,
+      });
+    } else {
+      const baseNameKey = canonicalNameKey(base.fullName);
+      const existingMasterContacts = getCrewContacts();
+      const remainingMasterContacts = existingMasterContacts.filter(
+        (contact) => canonicalNameKey(contact.fullName) !== baseNameKey,
+      );
+      if (remainingMasterContacts.length !== existingMasterContacts.length) {
+        saveCrewContacts(remainingMasterContacts);
+        toast.success('Removed from Master Crew.');
+      }
+    }
+    refreshMasterNameKeys();
     setEditingId(null);
     setDraft(EMPTY_ENTRY);
+    setSaveToMasterCrew(false);
     setEditorOpen(false);
   };
 
@@ -269,18 +346,24 @@ export function OrganizationDirectoryContactsSection({
       sourceSheet: entry.sourceSheet ?? '',
       notes: entry.notes ?? '',
     });
+    setSaveToMasterCrew(isInMasterCrew(entry.fullName));
     setEditorOpen(true);
   };
 
   const handleDelete = async (id: string): Promise<void> => {
-    const shouldDelete = window.confirm('Delete this directory contact?');
-    if (!shouldDelete) return;
     await persistContacts(contacts.filter((entry) => entry.id !== id));
+  };
+
+  const handleConfirmDelete = async (): Promise<void> => {
+    if (!deleteTarget) return;
+    await handleDelete(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
   const handleOpenAddDialog = (): void => {
     setEditingId(null);
     setDraft(EMPTY_ENTRY);
+    setSaveToMasterCrew(false);
     setEditorOpen(true);
   };
 
@@ -378,7 +461,7 @@ export function OrganizationDirectoryContactsSection({
   const handleExportDirectoryCsv = (): void => {
     const exportRows: string[][] = [
       ['Full Name', 'Phone', 'Email', 'Extension', 'Department', 'Job Title', 'Area', 'In Master Crew', 'Notes'],
-      ...filteredContacts.map((entry) => [
+      ...sortedFilteredContacts.map((entry) => [
         entry.fullName,
         entry.phone ?? '',
         entry.email ?? '',
@@ -386,12 +469,32 @@ export function OrganizationDirectoryContactsSection({
         entry.department ?? '',
         entry.jobTitle ?? '',
         entry.functionalArea ?? '',
-        masterNameKeys.has(canonicalNameKey(entry.fullName)) ? 'Yes' : 'No',
+        isInMasterCrew(entry.fullName) ? 'Yes' : 'No',
         entry.notes ?? '',
       ]),
     ];
     const timestamp = new Date().toISOString().slice(0, 10);
     downloadCsv(`organization-directory-${timestamp}.csv`, exportRows);
+  };
+
+  const handleReconcileDirectoryDuplicates = (): void => {
+    if (directoryDuplicateGroups.length === 0) {
+      toast.message('No duplicate name groups found.');
+      return;
+    }
+    setReconcilingDuplicates(true);
+    setReconcileDialogOpen(false);
+    toast.message('Reconciling duplicate directory contacts…');
+    window.setTimeout(async () => {
+      try {
+        await persistContacts(directoryReconcilePreview.contacts);
+        toast.success('Reconciled duplicate directory contacts.', {
+          description: `Merged ${directoryDuplicateCount} duplicate entr${directoryDuplicateCount === 1 ? 'y' : 'ies'} across ${directoryDuplicateGroups.length} name group${directoryDuplicateGroups.length === 1 ? '' : 's'}.`,
+        });
+      } finally {
+        setReconcilingDuplicates(false);
+      }
+    }, 10);
   };
 
   if (authBackend !== 'supabase') {
@@ -430,6 +533,16 @@ export function OrganizationDirectoryContactsSection({
               type="button"
               variant="outline"
               size="sm"
+              onClick={() => setReconcileDialogOpen(true)}
+              disabled={directoryDuplicateGroups.length === 0 || saving}
+            >
+              Reconcile duplicates
+              {directoryDuplicateCount > 0 ? ` (${directoryDuplicateCount})` : ''}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={handleExportDirectoryCsv}
               disabled={filteredContacts.length === 0}
             >
@@ -454,6 +567,24 @@ export function OrganizationDirectoryContactsSection({
           placeholder="Search name, phone, email, area..."
           disabled={loading}
         />
+        <div className="flex items-center justify-end">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="org-directory-sort" className="text-xs text-muted-foreground">
+              Sort
+            </Label>
+            <select
+              id="org-directory-sort"
+              value={sortMode}
+              onChange={(event) =>
+                setSortMode(event.target.value === 'name_desc' ? 'name_desc' : 'name_asc')
+              }
+              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none [&>option]:bg-background [&>option]:text-foreground"
+            >
+              <option value="name_asc">Name A→Z</option>
+              <option value="name_desc">Name Z→A</option>
+            </select>
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-blue-600/20 text-blue-200 border border-blue-500/40">
             Total: {directoryTally.total}
@@ -472,7 +603,7 @@ export function OrganizationDirectoryContactsSection({
           </Badge>
         </div>
         <div className="max-h-80 space-y-2 overflow-y-auto rounded-md border p-2">
-          {filteredContacts.map((entry) => (
+          {sortedFilteredContacts.map((entry) => (
             <div
               key={entry.id}
               className="rounded-md border px-3 py-2 text-sm"
@@ -485,7 +616,7 @@ export function OrganizationDirectoryContactsSection({
                     <p className="mt-0.5 text-xs font-medium text-primary">{entry.jobTitle}</p>
                   ) : null}
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {masterNameKeys.has(canonicalNameKey(entry.fullName)) ? (
+                    {isInMasterCrew(entry.fullName) ? (
                       <Badge className="text-[11px] bg-indigo-600/20 text-indigo-200 border border-indigo-500/40">
                         In Master Crew
                       </Badge>
@@ -529,9 +660,9 @@ export function OrganizationDirectoryContactsSection({
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
                       onSelect={() => handleCopyEntryToMasterCrew(entry)}
-                      disabled={saving || masterNameKeys.has(canonicalNameKey(entry.fullName))}
+                      disabled={saving || isInMasterCrew(entry.fullName)}
                     >
-                      {masterNameKeys.has(canonicalNameKey(entry.fullName))
+                      {isInMasterCrew(entry.fullName)
                         ? 'Already in Master Crew'
                         : 'Copy to Master Crew'}
                     </DropdownMenuItem>
@@ -542,7 +673,7 @@ export function OrganizationDirectoryContactsSection({
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onSelect={() => void handleDelete(entry.id)}
+                      onSelect={() => setDeleteTarget(entry)}
                       disabled={!canEdit || saving}
                     >
                       Delete
@@ -552,7 +683,7 @@ export function OrganizationDirectoryContactsSection({
               </div>
             </div>
           ))}
-          {filteredContacts.length === 0 ? (
+          {sortedFilteredContacts.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               {loading ? 'Loading contacts…' : 'No directory contacts found.'}
             </p>
@@ -567,6 +698,7 @@ export function OrganizationDirectoryContactsSection({
           if (!nextOpen) {
             setEditingId(null);
             setDraft(EMPTY_ENTRY);
+            setSaveToMasterCrew(false);
           }
         }}
       >
@@ -647,6 +779,17 @@ export function OrganizationDirectoryContactsSection({
                 disabled={!canEdit || saving}
               />
             </div>
+            <div className="sm:col-span-2 flex items-center gap-2 rounded-md border px-3 py-2">
+              <Checkbox
+                id="org-directory-save-to-master"
+                checked={saveToMasterCrew}
+                onCheckedChange={(checked) => setSaveToMasterCrew(checked === true)}
+                disabled={!canEdit || saving}
+              />
+              <Label htmlFor="org-directory-save-to-master" className="text-sm font-medium cursor-pointer">
+                Master Crew
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -663,6 +806,68 @@ export function OrganizationDirectoryContactsSection({
               disabled={!canEdit || saving}
             >
               {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add contact'}
+            </Button>
+          </DialogFooter>
+        </DraggableDialogContent>
+      </Dialog>
+      <Dialog open={reconcileDialogOpen} onOpenChange={setReconcileDialogOpen}>
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),560px)]">
+          <DialogHeader>
+            <DialogTitle>Reconcile duplicate directory contacts?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This merges contacts with equivalent canonical names (for example, "Figura, David" and "David Figura").
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Found {directoryDuplicateGroups.length} duplicate group{directoryDuplicateGroups.length === 1 ? '' : 's'} / {directoryDuplicateCount} duplicate entr{directoryDuplicateCount === 1 ? 'y' : 'ies'}.
+          </p>
+          <div className="max-h-52 space-y-2 overflow-y-auto rounded-md border p-2">
+            {directoryDuplicateGroups.map((group) => (
+              <div key={group.canonicalKey} className="rounded border px-2 py-1">
+                <p className="text-xs font-semibold text-foreground">{group.contacts[0]?.fullName ?? group.canonicalKey}</p>
+                <p className="text-xs text-muted-foreground">
+                  {group.contacts.map((contact) => contact.fullName).join('  |  ')}
+                </p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setReconcileDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleReconcileDirectoryDuplicates}
+              disabled={directoryDuplicateGroups.length === 0 || saving || reconcilingDuplicates}
+            >
+              {reconcilingDuplicates ? 'Reconciling…' : 'Reconcile now'}
+            </Button>
+          </DialogFooter>
+        </DraggableDialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <DraggableDialogContent className="w-[min(calc(100vw-1rem),420px)]">
+          <DialogHeader>
+            <DialogTitle>Delete directory contact?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {deleteTarget?.fullName
+              ? `This will remove ${deleteTarget.fullName} from Organization Directory.`
+              : 'This will remove this contact from Organization Directory.'}
+          </p>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void handleConfirmDelete()} disabled={saving}>
+              Delete
             </Button>
           </DialogFooter>
         </DraggableDialogContent>

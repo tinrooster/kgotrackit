@@ -6,6 +6,7 @@ import {
   createCrewContact,
   getCrewContacts,
   removeCrewContact,
+  saveCrewContacts,
   updateCrewContact,
 } from '@/lib/crewContactsService';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { reconcileCrewContactDuplicates } from '@/lib/contactReconciliation';
 
 const EMPTY_DRAFT: CrewContactDraft = {
   fullName: '',
@@ -54,15 +56,21 @@ const normalizePhoneToStandardFormat = (value: string): string => {
 const isStandardPhoneFormat = (value: string): boolean =>
   /^\(\d{3}\)\s\d{3}-\d{4}$/.test(value.trim());
 
+type CrewSortMode = 'name_asc' | 'name_desc';
+
 export default function CrewPage() {
   const [contacts, setContacts] = useState<CrewContact[]>(() => getCrewContacts());
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CrewContact | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CrewContactDraft>(EMPTY_DRAFT);
   const [equipmentPickerOpen, setEquipmentPickerOpen] = useState(false);
   const [equipmentSearchTerm, setEquipmentSearchTerm] = useState('');
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() => getItems());
+  const [sortMode, setSortMode] = useState<CrewSortMode>('name_asc');
+  const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
+  const [reconcilingDuplicates, setReconcilingDuplicates] = useState(false);
 
   useEffect(() => {
     const refresh = () => setContacts(getCrewContacts());
@@ -95,6 +103,38 @@ export default function CrewPage() {
     });
   }, [contacts, searchTerm]);
 
+  const sortedFilteredContacts = useMemo(() => {
+    const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+    return [...filteredContacts].sort((left, right) => {
+      const comparison = collator.compare(left.fullName, right.fullName);
+      return sortMode === 'name_desc' ? -comparison : comparison;
+    });
+  }, [filteredContacts, sortMode]);
+
+  const crewReconcilePreview = useMemo(() => reconcileCrewContactDuplicates(contacts), [contacts]);
+  const duplicateCanonicalGroups = crewReconcilePreview.groups;
+  const duplicateCount = crewReconcilePreview.mergedDuplicates;
+
+  const handleReconcileDuplicates = (): void => {
+    if (duplicateCanonicalGroups.length === 0) {
+      toast.message('No duplicate name groups found.');
+      return;
+    }
+    setReconcilingDuplicates(true);
+    setReconcileDialogOpen(false);
+    toast.message('Reconciling duplicate crew contacts…');
+    window.setTimeout(() => {
+      try {
+        saveCrewContacts(crewReconcilePreview.contacts);
+        toast.success('Reconciled duplicate crew contacts.', {
+          description: `Merged ${duplicateCount} duplicate entr${duplicateCount === 1 ? 'y' : 'ies'} across ${duplicateCanonicalGroups.length} name group${duplicateCanonicalGroups.length === 1 ? '' : 's'}.`,
+        });
+      } finally {
+        setReconcilingDuplicates(false);
+      }
+    }, 10);
+  };
+
   const openCreateDialog = () => {
     setEditingContactId(null);
     setDraft(EMPTY_DRAFT);
@@ -120,6 +160,12 @@ export default function CrewPage() {
       isActive: contact.isActive,
     });
     setDialogOpen(true);
+  };
+
+  const handleConfirmDelete = (): void => {
+    if (!deleteTarget) return;
+    removeCrewContact(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
   const handleSave = () => {
@@ -192,7 +238,7 @@ export default function CrewPage() {
   const handleExportCrewCsv = (): void => {
     const exportRows: string[][] = [
       ['Full Name', 'Status', 'Type', 'Roles', 'Organization', 'Phone', 'Email', 'Base Location', 'Union Status', 'Notes'],
-      ...filteredContacts.map((contact) => [
+      ...sortedFilteredContacts.map((contact) => [
         contact.fullName,
         contact.isActive ? 'Active' : 'Inactive',
         contact.contactType === 'vendor' ? 'Vendor' : 'Crew',
@@ -219,6 +265,14 @@ export default function CrewPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setReconcileDialogOpen(true)}
+            disabled={duplicateCanonicalGroups.length === 0}
+          >
+            Reconcile duplicates
+            {duplicateCount > 0 ? ` (${duplicateCount})` : ''}
+          </Button>
           <Button variant="outline" onClick={handleExportCrewCsv} disabled={filteredContacts.length === 0}>
             Export filtered CSV
           </Button>
@@ -244,8 +298,26 @@ export default function CrewPage() {
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
+          <div className="flex items-center justify-end">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="crew-directory-sort" className="text-xs text-muted-foreground">
+                Sort
+              </Label>
+              <select
+                id="crew-directory-sort"
+                value={sortMode}
+                onChange={(event) =>
+                  setSortMode(event.target.value === 'name_desc' ? 'name_desc' : 'name_asc')
+                }
+                className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none [&>option]:bg-background [&>option]:text-foreground"
+              >
+                <option value="name_asc">Name A→Z</option>
+                <option value="name_desc">Name Z→A</option>
+              </select>
+            </div>
+          </div>
           <div className="space-y-2">
-            {filteredContacts.map((contact) => (
+            {sortedFilteredContacts.map((contact) => (
               <div
                 key={contact.id}
                 className="rounded-md border px-3 py-2"
@@ -310,11 +382,7 @@ export default function CrewPage() {
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onSelect={() => {
-                          const shouldDelete = window.confirm('Delete this crew contact?');
-                          if (!shouldDelete) return;
-                          removeCrewContact(contact.id);
-                        }}
+                        onSelect={() => setDeleteTarget(contact)}
                       >
                         <Trash2 className="mr-2 h-4 w-4 text-destructive" />
                         Delete
@@ -324,7 +392,7 @@ export default function CrewPage() {
                 </div>
               </div>
             ))}
-            {filteredContacts.length === 0 && (
+            {sortedFilteredContacts.length === 0 && (
               <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                 No contacts match current filters.
               </p>
@@ -350,7 +418,7 @@ export default function CrewPage() {
               </Label>
               <select
                 id="contact-type"
-                className="h-9 w-full bg-transparent text-sm outline-none"
+                className="h-9 w-full bg-transparent text-sm text-foreground outline-none [&>option]:bg-background [&>option]:text-foreground"
                 value={draft.contactType}
                 onChange={(event) =>
                   setDraft((prev) => ({
@@ -455,6 +523,68 @@ export default function CrewPage() {
               Cancel
             </Button>
             <Button onClick={handleSave}>{editingContactId ? 'Save Changes' : 'Create Contact'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={reconcileDialogOpen} onOpenChange={setReconcileDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reconcile duplicate crew contacts?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This merges contacts with equivalent canonical names (for example, "Figura, David" and "David Figura").
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Found {duplicateCanonicalGroups.length} duplicate group{duplicateCanonicalGroups.length === 1 ? '' : 's'} / {duplicateCount} duplicate entr{duplicateCount === 1 ? 'y' : 'ies'}.
+          </p>
+          <div className="max-h-52 space-y-2 overflow-y-auto rounded-md border p-2">
+            {duplicateCanonicalGroups.map((group) => (
+              <div key={group.canonicalKey} className="rounded border px-2 py-1">
+                <p className="text-xs font-semibold text-foreground">{group.contacts[0]?.fullName ?? group.canonicalKey}</p>
+                <p className="text-xs text-muted-foreground">
+                  {group.contacts.map((contact) => contact.fullName).join('  |  ')}
+                </p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setReconcileDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleReconcileDuplicates}
+              disabled={duplicateCanonicalGroups.length === 0 || reconcilingDuplicates}
+            >
+              {reconcilingDuplicates ? 'Reconciling…' : 'Reconcile now'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete crew contact?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {deleteTarget?.fullName
+              ? `This will remove ${deleteTarget.fullName} from Master Crew.`
+              : 'This will remove this contact from Master Crew.'}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
