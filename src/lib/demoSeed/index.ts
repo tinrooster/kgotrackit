@@ -17,7 +17,14 @@ export {
   saveDemoSeedManifest,
 } from './manifest';
 
-export { DEMO_SEED_SOURCE, type DemoSeedSourceData } from './seedData';
+export {
+  DEMO_SEED_PROFILE,
+  DEMO_SEED_SOURCE,
+  DEMO_SEED_SOURCE_INTERNAL,
+  DEMO_SEED_SOURCE_PUBLIC,
+  type DemoSeedProfile,
+  type DemoSeedSourceData,
+} from './seedData';
 
 export {
   populateDemoData,

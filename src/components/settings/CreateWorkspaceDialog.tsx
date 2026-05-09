@@ -11,15 +11,21 @@ import {
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { logger as durableLogger } from '@/lib/logging';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS, recordSetupChoiceForWorkspace } from '@/lib/dummyData';
 import { STORAGE_KEYS, type Settings } from '@/lib/storageService';
 import { createWorkspaceWithSnapshot, type WorkspaceSnapshotPayload } from '@/lib/supabase/workspaceData';
+import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
 import { DEMO_SEED_SOURCE, DEMO_SEED_VERSION, recordManifestForWorkspace } from '@/lib/demoSeed';
 
 type WorkspaceDefaultsChoice = 'blank' | 'starter';
+
+/** Select value: create a new organization row instead of linking an existing one. */
+const CREATE_NEW_ORGANIZATION_VALUE = '__create_new_organization__';
 
 interface CreateWorkspaceDialogProps {
   open: boolean;
@@ -37,18 +43,53 @@ export function CreateWorkspaceDialog({
   onCreated,
 }: CreateWorkspaceDialogProps) {
   const { currentUser } = useAuth();
+  const { organizations, activeOrganizationId, loading: organizationLoading } = useOrganization();
   const [name, setName] = React.useState('');
+  const [masterOrganizationChoice, setMasterOrganizationChoice] = React.useState<string>(CREATE_NEW_ORGANIZATION_VALUE);
+  const [newOrganizationName, setNewOrganizationName] = React.useState('');
   const [choice, setChoice] = React.useState<WorkspaceDefaultsChoice>('blank');
   const [includeSampleInventory, setIncludeSampleInventory] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const orgDefaultAppliedForOpenRef = React.useRef(false);
+
+  const sortedOrganizations = React.useMemo(
+    () => [...organizations].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [organizations],
+  );
 
   React.useEffect(() => {
     if (!open) return;
     setName('');
+    setNewOrganizationName('');
     setChoice('blank');
     setIncludeSampleInventory(false);
     setBusy(false);
   }, [open]);
+
+  React.useEffect(() => {
+    if (!open) {
+      orgDefaultAppliedForOpenRef.current = false;
+      return;
+    }
+    if (organizationLoading) return;
+    if (orgDefaultAppliedForOpenRef.current) return;
+    orgDefaultAppliedForOpenRef.current = true;
+    const preferred =
+      activeOrganizationId && sortedOrganizations.some((o) => o.organizationId === activeOrganizationId)
+        ? activeOrganizationId
+        : sortedOrganizations[0]?.organizationId ?? CREATE_NEW_ORGANIZATION_VALUE;
+    setMasterOrganizationChoice(preferred);
+  }, [open, organizationLoading, activeOrganizationId, sortedOrganizations]);
+
+  React.useEffect(() => {
+    if (!open || organizationLoading) return;
+    if (masterOrganizationChoice === CREATE_NEW_ORGANIZATION_VALUE) return;
+    if (!sortedOrganizations.some((o) => o.organizationId === masterOrganizationChoice)) {
+      setMasterOrganizationChoice(
+        sortedOrganizations[0]?.organizationId ?? CREATE_NEW_ORGANIZATION_VALUE,
+      );
+    }
+  }, [open, organizationLoading, masterOrganizationChoice, sortedOrganizations]);
 
   const createWorkspace = async (): Promise<void> => {
     const trimmedName = name.trim();
@@ -111,7 +152,12 @@ export function CreateWorkspaceDialog({
         custom_report_definitions: [],
       };
 
-      const workspaceId = await createWorkspaceWithSnapshot(trimmedName, snapshot);
+      const workspaceOptions =
+        masterOrganizationChoice === CREATE_NEW_ORGANIZATION_VALUE
+          ? { organizationName: newOrganizationName.trim() || undefined }
+          : { existingOrganizationId: masterOrganizationChoice };
+
+      const workspaceId = await createWorkspaceWithSnapshot(trimmedName, snapshot, workspaceOptions);
       recordSetupChoiceForWorkspace(workspaceId, choice);
 
       if (choice === 'starter') {
@@ -139,7 +185,7 @@ export function CreateWorkspaceDialog({
       onClose();
     } catch (error) {
       toast.error('Could not create workspace', {
-        description: error instanceof Error ? error.message : String(error),
+        description: formatSupabaseOrUnknownError(error),
       });
     } finally {
       setBusy(false);
@@ -151,7 +197,9 @@ export function CreateWorkspaceDialog({
       <DraggableDialogContent className="w-[min(calc(100vw-1rem),560px)]">
         <DialogHeader>
           <DialogTitle>Create workspace</DialogTitle>
-          <DialogDescription>Name the workspace and choose how it starts.</DialogDescription>
+          <DialogDescription>
+            Name the workspace, choose which master organization it belongs to, then pick how it starts.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-1.5">
@@ -165,6 +213,56 @@ export function CreateWorkspaceDialog({
             className="placeholder:text-muted-foreground/40"
             disabled={busy}
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="create-workspace-master-org">Master organization</Label>
+          <Select
+            value={masterOrganizationChoice}
+            onValueChange={setMasterOrganizationChoice}
+            disabled={busy || organizationLoading}
+          >
+            <SelectTrigger id="create-workspace-master-org" className="w-full">
+              <SelectValue placeholder={organizationLoading ? 'Loading organizations…' : 'Select organization'} />
+            </SelectTrigger>
+            <SelectContent>
+              {sortedOrganizations.map((organization) => (
+                <SelectItem
+                  key={organization.organizationId}
+                  value={organization.organizationId}
+                  title={`${organization.name} — ${organization.role}`}
+                >
+                  {organization.name}
+                  <span className="ml-1.5 text-xs capitalize text-muted-foreground">({organization.role})</span>
+                </SelectItem>
+              ))}
+              <SelectItem value={CREATE_NEW_ORGANIZATION_VALUE}>Create new organization…</SelectItem>
+            </SelectContent>
+          </Select>
+          {masterOrganizationChoice === CREATE_NEW_ORGANIZATION_VALUE ? (
+            <>
+              <Label htmlFor="create-organization-name" className="pt-1">
+                New organization name
+              </Label>
+              <Input
+                id="create-organization-name"
+                value={newOrganizationName}
+                onChange={(event) => setNewOrganizationName(event.target.value)}
+                autoComplete="off"
+                placeholder="Defaults to workspace name if empty"
+                className="placeholder:text-muted-foreground/40"
+                disabled={busy}
+              />
+              <p className="text-xs text-muted-foreground">
+                A new master org and shared library record are created and linked to this workspace.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              This workspace shares organization library data (contacts, templates, etc.) with other workspaces in the
+              same org.
+            </p>
+          )}
         </div>
 
         <div className="grid gap-3">

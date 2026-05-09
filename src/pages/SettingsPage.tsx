@@ -41,6 +41,7 @@ import { WorkspaceTeamTab } from '@/components/settings/WorkspaceTeamTab'
 import { SupabaseWorkspaceUsersCard } from '@/components/settings/SupabaseWorkspaceUsersCard'
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
 import { OrgMaintenanceBroadcastTemplateSection } from '@/components/settings/OrgMaintenanceBroadcastTemplateSection'
+import { OrganizationMasterPanel } from '@/components/settings/OrganizationMasterPanel'
 import {
   UserDefinedListsSection,
   type UserDefinedPanel,
@@ -357,7 +358,15 @@ export default function SettingsPage() {
   const location = useLocation();
   const { currentUser, authBackend } = useAuth();
   const { activeWorkspaceId, activeWorkspaceRole, workspaces } = useWorkspace();
-  const { activeOrganizationId, activeOrganizationName, activeOrganizationRole } = useOrganization();
+  const {
+    organizations,
+    activeOrganizationId,
+    activeOrganizationName,
+    activeOrganizationRole,
+    loading: organizationsLoading,
+    refreshOrganizations,
+    selectOrganization,
+  } = useOrganization();
   const activeWorkspaceName = activeWorkspaceId
     ? workspaces.find((workspace) => workspace.workspaceId === activeWorkspaceId)?.name ?? null
     : null;
@@ -2135,26 +2144,32 @@ export default function SettingsPage() {
 
         {canManageSharedConfig && (
           <TabsContent value="organization" className="space-y-4">
+            <OrganizationMasterPanel
+              authBackend={authBackend}
+              organizations={organizations}
+              activeOrganizationId={activeOrganizationId}
+              activeOrganizationName={activeOrganizationName}
+              activeOrganizationRole={activeOrganizationRole}
+              loading={organizationsLoading}
+              selectOrganization={selectOrganization}
+              refreshOrganizations={refreshOrganizations}
+            />
+
             <Card>
               <CardHeader>
                 <CardTitle>Organization library</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 text-sm text-muted-foreground">
                 <p>
-                  Shared organization bundles (libraries, lookups, portable metadata tied to your org in Supabase) are exported and imported from Data Management-not from this shortcut card alone.
+                  Shared organization bundles (libraries, lookups, portable metadata tied to your org in Supabase) are
+                  exported and imported from Data Management—not from this shortcut card alone.
                 </p>
-                {authBackend === 'supabase' && activeOrganizationId ? (
-                  <p className="text-foreground">
-                    Active organization:{' '}
-                    <span className="font-medium text-foreground">
-                      {activeOrganizationName ?? activeOrganizationId}
-                    </span>
-                  </p>
-                ) : authBackend === 'supabase' ? (
-                  <p>Select or join a team workspace to associate an organization for library portability.</p>
-                ) : (
+                {authBackend === 'supabase' && !activeOrganizationId ? (
+                  <p>Select an organization above (or join a workspace linked to one) for library portability.</p>
+                ) : null}
+                {authBackend !== 'supabase' ? (
                   <p>Organization-level cloud sync applies when you sign in with Supabase and use team workspaces.</p>
-                )}
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" onClick={() => setSettingsTab('data')}>
                     Open Data Management
@@ -2172,9 +2187,10 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  To stand up a <span className="font-medium text-foreground">new</span> organization for your team,
-                  create a workspace. That ties Supabase org data, portable exports, and org-scoped libraries (including
-                  crew position templates) to a single master org.
+                  The large title at the top of this tab is your current master organization. Use the org buttons there
+                  to switch between organizations you belong to (for example after creating <span className="font-medium text-foreground">ABC Corp</span>).
+                  To stand up a <span className="font-medium text-foreground">new</span> organization, create a workspace so Supabase ties org data,
+                  exports, and org-scoped libraries to that tenant.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" onClick={() => setSettingsTab('workspaces')}>

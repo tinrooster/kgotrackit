@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
@@ -27,6 +27,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeOrganizationId, setActiveOrganizationIdState] = useState<string | null>(() => getActiveOrganizationId());
+  /** Tracks workspace switches so we sync org from workspace only when the active workspace changes, not on every render. */
+  const lastWorkspaceIdForOrgSyncRef = useRef<string | null | undefined>(undefined);
 
   const refreshOrganizations = useCallback(async () => {
     if (!isSupabaseConfigured() || authBackend !== 'supabase' || !currentUser?.id) {
@@ -58,25 +60,50 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     if (organizations.length === 0) {
       persistActiveOrganizationId(null);
       setActiveOrganizationIdState(null);
+      lastWorkspaceIdForOrgSyncRef.current = activeWorkspaceId;
       return;
     }
-    const activeWorkspaceOrganizationId = activeWorkspaceId
+
+    const workspaceOrganizationId = activeWorkspaceId
       ? workspaces.find((workspace) => workspace.workspaceId === activeWorkspaceId)?.organizationId ?? null
       : null;
+
+    const workspaceSwitched = lastWorkspaceIdForOrgSyncRef.current !== activeWorkspaceId;
+    lastWorkspaceIdForOrgSyncRef.current = activeWorkspaceId;
+
+    if (workspaceSwitched) {
+      if (
+        workspaceOrganizationId &&
+        organizations.some((organization) => organization.organizationId === workspaceOrganizationId)
+      ) {
+        persistActiveOrganizationId(workspaceOrganizationId);
+        setActiveOrganizationIdState(workspaceOrganizationId);
+        return;
+      }
+      if (!activeWorkspaceId) {
+        const manualStillValid =
+          activeOrganizationId && organizations.some((organization) => organization.organizationId === activeOrganizationId);
+        if (manualStillValid) {
+          return;
+        }
+      }
+    }
+
+    const activeStillValid =
+      activeOrganizationId && organizations.some((organization) => organization.organizationId === activeOrganizationId);
+    if (activeStillValid) {
+      return;
+    }
+
     if (
-      activeWorkspaceOrganizationId &&
-      organizations.some((organization) => organization.organizationId === activeWorkspaceOrganizationId)
+      workspaceOrganizationId &&
+      organizations.some((organization) => organization.organizationId === workspaceOrganizationId)
     ) {
-      persistActiveOrganizationId(activeWorkspaceOrganizationId);
-      setActiveOrganizationIdState(activeWorkspaceOrganizationId);
+      persistActiveOrganizationId(workspaceOrganizationId);
+      setActiveOrganizationIdState(workspaceOrganizationId);
       return;
     }
-    const hasActiveOrganization = activeOrganizationId
-      ? organizations.some((organization) => organization.organizationId === activeOrganizationId)
-      : false;
-    if (hasActiveOrganization) {
-      return;
-    }
+
     const fallbackOrganizationId = organizations[0]?.organizationId ?? null;
     persistActiveOrganizationId(fallbackOrganizationId);
     setActiveOrganizationIdState(fallbackOrganizationId);

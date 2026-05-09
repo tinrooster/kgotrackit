@@ -35,7 +35,7 @@ export type DraggableDialogContentProps =
     /**
      * Height of the drag zone at the top of the dialog (px). Pointer-down
      * events in this zone (excluding interactive elements) start a drag.
-     * Default 56 — covers a standard DialogHeader.
+     * Default 80 — covers padded top (p-6) plus a standard DialogHeader.
      */
     dragZoneHeight?: number;
     /**
@@ -87,7 +87,7 @@ export const DraggableDialogContent = React.forwardRef<
     minWidth = 320,
     minHeight = 220,
     showOverlay = true,
-    dragZoneHeight = 56,
+    dragZoneHeight = 80,
     dismissOnOutsidePointer = false,
     onPointerDown: externalPointerDown,
     ...props
@@ -222,7 +222,7 @@ export const DraggableDialogContent = React.forwardRef<
     position: "fixed",
     margin: 0,
     maxWidth: "none",
-    maxHeight: "none",
+    // Do not set maxHeight: "none" here — it overrides Tailwind max-h and breaks viewport capping.
     // Before we've measured/centred, fall back to CSS centring
     left: pos?.x ?? "50%",
     top: pos?.y ?? "50%",
@@ -239,8 +239,12 @@ export const DraggableDialogContent = React.forwardRef<
         ref={setRefs}
         style={computedStyle}
         className={cn(
-          // Base layout — consumers control their own overflow
-          "z-50 flex flex-col rounded-lg border border-primary/35 border-t-primary/80 bg-background shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-2 ring-primary/25 outline outline-1 outline-border/90",
+          // Shell: cap height and clip so border/background always match the frame. After a resize,
+          // explicit height + overflow-visible was painting children outside the panel ("overrun").
+          "z-50 flex min-h-0 max-h-[min(92dvh,900px)] flex-col overflow-hidden",
+          // p-6 + extra right inset so titles/descriptions do not run under the absolute close control.
+          "p-6 pr-14",
+          "rounded-lg border border-primary/35 border-t-primary/80 bg-background shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-2 ring-primary/25 outline outline-1 outline-border/90",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -254,9 +258,11 @@ export const DraggableDialogContent = React.forwardRef<
         onFocusOutside={(e) => { if (!dismissOnOutsidePointer) e.preventDefault(); }}
         {...props}
       >
-        <NestedDialogPortalHostContext.Provider value={nestedHost}>
-          {children}
-        </NestedDialogPortalHostContext.Provider>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden overscroll-contain">
+          <NestedDialogPortalHostContext.Provider value={nestedHost}>
+            {children}
+          </NestedDialogPortalHostContext.Provider>
+        </div>
 
         {/* Close button — z-20 sits above every inner element */}
         <DialogPrimitive.Close className="absolute right-3 top-3 z-20 rounded-sm p-0.5 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">

@@ -130,3 +130,135 @@ export async function pushOrganizationSnapshot(
   );
   if (error) throw error;
 }
+
+export type OrganizationBrandingProfile = {
+  address?: string;
+  adminInfo?: string;
+};
+
+export type OrganizationRow = {
+  id: string;
+  name: string;
+  branding: Record<string, unknown>;
+};
+
+export async function fetchOrganizationRow(organizationId: string): Promise<OrganizationRow | null> {
+  const client = getSupabase();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('organizations')
+    .select('id, name, branding')
+    .eq('id', organizationId)
+    .maybeSingle();
+  if (error || !data) {
+    return null;
+  }
+  const row = data as { id: string; name: string; branding: unknown };
+  return {
+    id: row.id,
+    name: row.name,
+    branding:
+      typeof row.branding === 'object' && row.branding !== null && !Array.isArray(row.branding)
+        ? (row.branding as Record<string, unknown>)
+        : {},
+  };
+}
+
+/**
+ * Updates `organizations.name` and/or merges `branding.profile` (address, adminInfo) for the active org record.
+ * Requires org owner or org admin per RLS.
+ */
+/**
+ * Creates an organization owned by the signed-in user, adds them as admin,
+ * and inserts a row in organization_app_data with JSON defaults.
+ * Returns the new organization id.
+ */
+export async function createOrganizationWithDefaults(displayName: string): Promise<string> {
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Supabase client unavailable');
+  }
+  const {
+    data: { user: authUser },
+    error: authErr,
+  } = await client.auth.getUser();
+  if (authErr || !authUser?.id) {
+    throw authErr ?? new Error('No authenticated Supabase user found');
+  }
+  const ownerUserId = authUser.id;
+  const trimmedName = displayName.trim();
+  if (!trimmedName) {
+    throw new Error('Organization name is required');
+  }
+
+  const { data: org, error: orgErr } = await client
+    .from('organizations')
+    .insert({ name: trimmedName, owner_user_id: ownerUserId, branding: {} })
+    .select('id')
+    .single();
+  if (orgErr || !org?.id) {
+    throw orgErr ?? new Error('Failed to create organization');
+  }
+  const organizationId = org.id as string;
+
+  const { error: memberError } = await client.from('organization_members').insert({
+    organization_id: organizationId,
+    user_id: ownerUserId,
+    role: 'admin',
+  });
+  if (memberError) {
+    await client.from('organizations').delete().eq('id', organizationId);
+    throw memberError;
+  }
+
+  const { error: appDataError } = await client.from('organization_app_data').insert({
+    organization_id: organizationId,
+  });
+  if (appDataError) {
+    await client.from('organizations').delete().eq('id', organizationId);
+    throw appDataError;
+  }
+
+  return organizationId;
+}
+
+export async function updateOrganizationRecord(
+  organizationId: string,
+  patch: { name?: string; brandingProfile?: OrganizationBrandingProfile },
+): Promise<void> {
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Supabase client unavailable');
+  }
+  const existing = await fetchOrganizationRow(organizationId);
+  if (!existing) {
+    throw new Error('Organization not found or access denied');
+  }
+  const nextBranding: Record<string, unknown> = { ...existing.branding };
+  if (patch.brandingProfile) {
+    const prevProfile =
+      typeof nextBranding.profile === 'object' && nextBranding.profile !== null && !Array.isArray(nextBranding.profile)
+        ? (nextBranding.profile as Record<string, unknown>)
+        : {};
+    nextBranding.profile = {
+      ...prevProfile,
+      ...(patch.brandingProfile.address !== undefined ? { address: patch.brandingProfile.address } : {}),
+      ...(patch.brandingProfile.adminInfo !== undefined ? { adminInfo: patch.brandingProfile.adminInfo } : {}),
+    };
+  }
+  const updates: Record<string, unknown> = {
+    branding: nextBranding,
+    updated_at: new Date().toISOString(),
+  };
+  if (patch.name !== undefined) {
+    const trimmed = patch.name.trim();
+    if (!trimmed) {
+      throw new Error('Organization name cannot be empty');
+    }
+    updates.name = trimmed;
+  }
+  const { error } = await client.from('organizations').update(updates).eq('id', organizationId);
+  if (error) {
+    throw error;
+  }
+}

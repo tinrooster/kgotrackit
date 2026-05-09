@@ -1,4 +1,11 @@
 import { getSupabase } from '@/lib/supabase/client';
+import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
+import { createOrganizationWithDefaults } from '@/lib/supabase/organizationData';
+
+function asWorkspaceCreateError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  return new Error(formatSupabaseOrUnknownError(error));
+}
 
 export const ACTIVE_WORKSPACE_STORAGE_KEY = 'trackit:active-workspace-id';
 
@@ -352,13 +359,29 @@ export async function pushWorkspaceSnapshot(workspaceId: string, snapshot: Works
   }
 }
 
+export interface CreateWorkspaceWithSnapshotOptions {
+  /**
+   * Link the workspace to an existing organization the caller can access.
+   * When set, no new `organizations` row is created.
+   */
+  existingOrganizationId?: string;
+  /**
+   * Display name for a newly created organization. Ignored when `existingOrganizationId` is set.
+   * When omitted, uses the workspace display name.
+   */
+  organizationName?: string;
+}
+
 /**
  * Creates a workspace, adds caller as admin member, seeds payload from `snapshot`.
+ * When organization tables and `workspaces.organization_id` are available, links the workspace
+ * to `existingOrganizationId` or creates a master organization (owner + empty org app data).
  * Returns new workspace id.
  */
 export async function createWorkspaceWithSnapshot(
   name: string,
   snapshot: WorkspaceSnapshotPayload,
+  options?: CreateWorkspaceWithSnapshotOptions,
 ): Promise<string> {
   const client = getSupabase();
   if (!client) throw new Error('Supabase client unavailable');
@@ -367,26 +390,97 @@ export async function createWorkspaceWithSnapshot(
     error: sessionErr,
   } = await client.auth.getSession();
   if (sessionErr || !session?.access_token) {
-    throw sessionErr ?? new Error('No active Supabase session. Sign in again and retry.');
+    if (sessionErr) throw asWorkspaceCreateError(sessionErr);
+    throw new Error('No active Supabase session. Sign in again and retry.');
   }
   const {
     data: { user: authUser },
     error: authErr,
   } = await client.auth.getUser();
   if (authErr || !authUser?.id) {
-    throw authErr ?? new Error('No authenticated Supabase user found');
+    if (authErr) throw asWorkspaceCreateError(authErr);
+    throw new Error('No authenticated Supabase user found');
   }
   const ownerUserId = authUser.id;
+  const workspaceDisplayName = name.trim() || 'Team workspace';
+  const existingOrgIdRaw = options?.existingOrganizationId?.trim() || '';
+  const organizationDisplayName = options?.organizationName?.trim() || workspaceDisplayName;
 
-  const { data: ws, error: wErr } = await client
-    .from('workspaces')
-    .insert({ name: name.trim() || 'Team workspace', owner_user_id: ownerUserId })
-    .select('id')
-    .single();
-  if (wErr || !ws?.id) {
-    throw wErr ?? new Error('Failed to create workspace');
+  let linkedOrganizationId: string | null = existingOrgIdRaw || null;
+  let createdNewOrganization = false;
+
+  if (!linkedOrganizationId) {
+    try {
+      linkedOrganizationId = await createOrganizationWithDefaults(organizationDisplayName);
+      createdNewOrganization = true;
+    } catch (organizationError) {
+      const code =
+        organizationError && typeof organizationError === 'object' && 'code' in organizationError
+          ? String((organizationError as { code?: string }).code)
+          : '';
+      const message = formatSupabaseOrUnknownError(organizationError);
+      const lower = message.toLowerCase();
+      const looksLikeMissingOrgSchema =
+        code === '42P01' || (lower.includes('relation') && lower.includes('does not exist'));
+      if (!looksLikeMissingOrgSchema) {
+        throw asWorkspaceCreateError(organizationError);
+      }
+      linkedOrganizationId = null;
+    }
   }
-  const workspaceId = ws.id as string;
+
+  const insertWorkspace = async (payload: Record<string, unknown>) => {
+    return client.from('workspaces').insert(payload).select('id').single();
+  };
+
+  let workspaceId: string;
+  if (linkedOrganizationId) {
+    const withOrg = await insertWorkspace({
+      name: workspaceDisplayName,
+      owner_user_id: ownerUserId,
+      organization_id: linkedOrganizationId,
+    });
+    if (
+      withOrg.error &&
+      isMissingOrganizationIdColumnError(withOrg.error as { message?: string; code?: string } | null | undefined)
+    ) {
+      if (createdNewOrganization && linkedOrganizationId) {
+        await client.from('organizations').delete().eq('id', linkedOrganizationId);
+      }
+      linkedOrganizationId = null;
+      const legacy = await insertWorkspace({
+        name: workspaceDisplayName,
+        owner_user_id: ownerUserId,
+      });
+      if (legacy.error || !legacy.data?.id) {
+        throw legacy.error ? asWorkspaceCreateError(legacy.error) : new Error('Failed to create workspace');
+      }
+      workspaceId = legacy.data.id as string;
+    } else if (withOrg.error || !withOrg.data?.id) {
+      if (createdNewOrganization && linkedOrganizationId) {
+        await client.from('organizations').delete().eq('id', linkedOrganizationId);
+      }
+      throw withOrg.error ? asWorkspaceCreateError(withOrg.error) : new Error('Failed to create workspace');
+    } else {
+      workspaceId = withOrg.data.id as string;
+    }
+  } else {
+    const legacy = await insertWorkspace({
+      name: workspaceDisplayName,
+      owner_user_id: ownerUserId,
+    });
+    if (legacy.error || !legacy.data?.id) {
+      throw legacy.error ? asWorkspaceCreateError(legacy.error) : new Error('Failed to create workspace');
+    }
+    workspaceId = legacy.data.id as string;
+  }
+
+  const rollbackWorkspaceAndOrg = async () => {
+    await client.from('workspaces').delete().eq('id', workspaceId);
+    if (createdNewOrganization && linkedOrganizationId) {
+      await client.from('organizations').delete().eq('id', linkedOrganizationId);
+    }
+  };
 
   const { error: mErr } = await client.from('workspace_members').insert({
     workspace_id: workspaceId,
@@ -394,7 +488,8 @@ export async function createWorkspaceWithSnapshot(
     role: 'admin',
   });
   if (mErr) {
-    throw mErr;
+    await rollbackWorkspaceAndOrg();
+    throw asWorkspaceCreateError(mErr);
   }
 
   const { error: dErr } = await client.from('workspace_app_data').insert({
@@ -403,7 +498,8 @@ export async function createWorkspaceWithSnapshot(
     updated_at: new Date().toISOString(),
   });
   if (dErr) {
-    throw dErr;
+    await rollbackWorkspaceAndOrg();
+    throw asWorkspaceCreateError(dErr);
   }
 
   return workspaceId;
