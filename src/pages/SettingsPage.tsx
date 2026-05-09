@@ -1773,15 +1773,56 @@ export default function SettingsPage() {
     let toastMessage = "";
 
     // For singular key name in inventory items (category instead of categories)
-    const itemKey = typeKey.endsWith('ies') ? 
-      typeKey.slice(0, -3) + 'y' : 
-      typeKey.endsWith('s') ? 
-        typeKey.slice(0, -1) : 
-        typeKey;
+    const itemKey = typeKey.endsWith('ies')
+      ? typeKey.slice(0, -3) + 'y'
+      : typeKey.endsWith('s')
+        ? typeKey.slice(0, -1)
+        : typeKey;
+
+    const buildLocationOrProjectAliases = (
+      list: ItemWithSubcategories[],
+      targetName: string,
+    ): Set<string> => {
+      const aliases = new Set<string>([targetName]);
+      for (const parent of list) {
+        const parentMatches = parent.name === targetName;
+        if (parentMatches) {
+          aliases.add(parent.name);
+          aliases.add(parent.id);
+        }
+        for (const child of parent.children ?? []) {
+          if (child.name === targetName || parentMatches) {
+            aliases.add(child.name);
+            aliases.add(child.id);
+            aliases.add(`${parent.id}/${child.id}`);
+            aliases.add(`${parent.name}/${child.name}`);
+          }
+        }
+      }
+      return aliases;
+    };
+
+    const valueAliases =
+      typeKey === 'locations'
+        ? buildLocationOrProjectAliases(settings.locations, value)
+        : typeKey === 'projects'
+          ? buildLocationOrProjectAliases(settings.projects, value)
+          : null;
+
+    const isMatch = (rawValue: unknown): boolean => {
+      const currentValue = typeof rawValue === 'string' ? rawValue : '';
+      if (!currentValue) {
+        return false;
+      }
+      if (valueAliases) {
+        return valueAliases.has(currentValue);
+      }
+      return currentValue === value;
+    };
 
     if (reconcileAction === 'replace' && replacementValue) {
       updatedItems = items.map(item => {
-        if (item[itemKey as keyof InventoryItem] === value) {
+        if (isMatch(item[itemKey as keyof InventoryItem])) {
           return { ...item, [itemKey]: replacementValue };
         }
         return item;
@@ -1789,7 +1830,7 @@ export default function SettingsPage() {
       toastMessage = `Updated ${affectedItemsCount} items: Replaced "${value}" with "${replacementValue}" in ${typeKey}.`;
     } else { // 'delete' action
       updatedItems = items.map(item => {
-        if (item[itemKey as keyof InventoryItem] === value) {
+        if (isMatch(item[itemKey as keyof InventoryItem])) {
           const newItem = { ...item };
           delete newItem[itemKey as keyof InventoryItem];
           return newItem;

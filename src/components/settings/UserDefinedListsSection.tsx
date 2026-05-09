@@ -29,6 +29,29 @@ interface SettingsListsState {
 
 type SettingsKey = keyof SettingsListsState;
 
+function buildLocationOrProjectAliases(
+  list: ItemWithSubcategories[],
+  targetName: string,
+): Set<string> {
+  const aliases = new Set<string>([targetName]);
+  for (const parent of list) {
+    const parentMatches = parent.name === targetName;
+    if (parentMatches) {
+      aliases.add(parent.name);
+      aliases.add(parent.id);
+    }
+    for (const child of parent.children ?? []) {
+      if (child.name === targetName || parentMatches) {
+        aliases.add(child.name);
+        aliases.add(child.id);
+        aliases.add(`${parent.id}/${child.id}`);
+        aliases.add(`${parent.name}/${child.name}`);
+      }
+    }
+  }
+  return aliases;
+}
+
 const LIST_NAV: { id: Exclude<UserDefinedPanel, 'overview'>; label: string }[] = [
   { id: 'categories', label: 'Categories' },
   { id: 'units', label: 'Units' },
@@ -79,6 +102,25 @@ export function UserDefinedListsSection({
 
   const requestReconcile = (type: string, value: string, affectedCount: number) => {
     onRequestDeleteReconcile({ type, value, affectedCount });
+  };
+
+  const getAffectedCountForListValue = (
+    type: 'Categories' | 'Units' | 'Locations' | 'Projects',
+    value: string,
+  ): number => {
+    const items = getItems();
+    if (type === 'Categories') {
+      return items.filter((item) => item.category === value).length;
+    }
+    if (type === 'Units') {
+      return items.filter((item) => item.unit === value).length;
+    }
+    if (type === 'Locations') {
+      const aliases = buildLocationOrProjectAliases(settings.locations, value);
+      return items.filter((item) => Boolean(item.location) && aliases.has(String(item.location))).length;
+    }
+    const aliases = buildLocationOrProjectAliases(settings.projects, value);
+    return items.filter((item) => Boolean(item.project) && aliases.has(String(item.project))).length;
   };
 
   return (
@@ -138,10 +180,9 @@ export function UserDefinedListsSection({
                   title="Categories"
                   showColorPicker
                   onCheckBeforeDelete={(value, onSafeToDelete) => {
-                    const items = getItems();
-                    const affectedItems = items.filter((item) => item.category === value);
-                    if (affectedItems.length > 0) {
-                      requestReconcile('Categories', value, affectedItems.length);
+                    const affectedCount = getAffectedCountForListValue('Categories', value);
+                    if (affectedCount > 0) {
+                      requestReconcile('Categories', value, affectedCount);
                     } else {
                       onSafeToDelete();
                     }
@@ -164,10 +205,9 @@ export function UserDefinedListsSection({
                   setItems={(newItems) => updateSettingsList('units', newItems)}
                   title="Units"
                   onCheckBeforeDelete={(value, onSafeToDelete) => {
-                    const items = getItems();
-                    const affectedItems = items.filter((item) => item.unit === value);
-                    if (affectedItems.length > 0) {
-                      requestReconcile('Units', value, affectedItems.length);
+                    const affectedCount = getAffectedCountForListValue('Units', value);
+                    if (affectedCount > 0) {
+                      requestReconcile('Units', value, affectedCount);
                     } else {
                       onSafeToDelete();
                     }
@@ -198,10 +238,9 @@ export function UserDefinedListsSection({
                   colorPickerLabel="Location color"
                   locationRackExtension
                   onCheckBeforeDelete={(value, onSafeToDelete) => {
-                    const items = getItems();
-                    const affectedItems = items.filter((item) => item.location === value);
-                    if (affectedItems.length > 0) {
-                      requestReconcile('Locations', value, affectedItems.length);
+                    const affectedCount = getAffectedCountForListValue('Locations', value);
+                    if (affectedCount > 0) {
+                      requestReconcile('Locations', value, affectedCount);
                     } else {
                       onSafeToDelete();
                     }
@@ -226,10 +265,9 @@ export function UserDefinedListsSection({
                   showColorPicker
                   colorPickerLabel="Project color"
                   onCheckBeforeDelete={(value, onSafeToDelete) => {
-                    const items = getItems();
-                    const affectedItems = items.filter((item) => item.project === value);
-                    if (affectedItems.length > 0) {
-                      requestReconcile('Projects', value, affectedItems.length);
+                    const affectedCount = getAffectedCountForListValue('Projects', value);
+                    if (affectedCount > 0) {
+                      requestReconcile('Projects', value, affectedCount);
                     } else {
                       onSafeToDelete();
                     }
