@@ -250,6 +250,11 @@ export function SystemLogs() {
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">
+        Entries here live in this browser only (they are not synced to other computers). Inventory data itself syncs
+        through Supabase when you use a team workspace; on another device open the same workspace and use Pull latest
+        cloud data on Settings → Workspaces if counts or rows look stale.
+      </p>
       <div className="flex items-center justify-end">
         <div className="flex items-center gap-2">
           <Button

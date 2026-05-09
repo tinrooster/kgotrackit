@@ -10,6 +10,7 @@ import BatchOperations from '@/components/BatchOperations';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import { getSettings, getItems, saveItems, SETTINGS_UPDATED_EVENT, STORAGE_KEYS } from '@/lib/storageService';
+import { CLOUD_HYDRATED_EVENT } from '@/lib/cloudSyncEvents';
 import {
   applyInventoryState,
   canRedoInventory,
@@ -259,7 +260,15 @@ export default function InventoryPage() {
 
   // State for inventory items
   const [items, setItems] = useLocalStorage<InventoryItem[]>('inventoryItems', []);
-  
+
+  useEffect(() => {
+    const syncItemsAfterCloudHydrate = () => {
+      setItems(getItems());
+    };
+    window.addEventListener(CLOUD_HYDRATED_EVENT, syncItemsAfterCloudHydrate);
+    return () => window.removeEventListener(CLOUD_HYDRATED_EVENT, syncItemsAfterCloudHydrate);
+  }, [setItems]);
+
   // State for search and filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(categoryFilter);

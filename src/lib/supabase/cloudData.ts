@@ -33,7 +33,9 @@ import {
   setActiveOrganizationId,
   type OrganizationSnapshotPayload,
 } from '@/lib/supabase/organizationData';
+import { getProductions, PRODUCTIONS_UPDATED_EVENT } from '@/lib/productionService';
 import { dispatchCloudHydrated } from '@/lib/cloudSyncEvents';
+import { toast } from 'sonner';
 import { getCrewContacts } from '@/lib/crewContactsService';
 import { getPositionTemplates, savePositionTemplates } from '@/lib/positionTemplatesService';
 import type { PositionTemplate } from '@/types/productions';
@@ -344,6 +346,9 @@ export async function applySnapshotToLocal(row: CloudSnapshotPayload): Promise<v
     } catch {
       // quota or private mode
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(PRODUCTIONS_UPDATED_EVENT, { detail: getProductions() }));
+    }
   }
 
   if ('crew_contacts' in row && row.crew_contacts !== undefined) {
@@ -366,29 +371,48 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
   if (wsId) {
     const role = await fetchWorkspaceMemberRole(wsId, userId);
     if (!role || role === 'viewer') {
+      console.warn(
+        '[cloud sync] Skipping workspace push: need admin or editor membership in this workspace. Resolved role:',
+        role ?? 'none',
+        'workspace:',
+        wsId,
+      );
       return;
     }
     const organizationId = await fetchWorkspaceOrganizationId(wsId);
     if (organizationId) {
       setActiveOrganizationId(organizationId);
-      const existingOrganizationRow = await pullOrganizationAppData(organizationId);
-      await pushOrganizationSnapshot(organizationId, {
-        contacts: snapshot.crew_contacts ?? [],
-        position_templates: getPositionTemplates(),
-        inventory_baseline: Array.isArray(existingOrganizationRow?.inventory_baseline)
-          ? existingOrganizationRow.inventory_baseline
-          : [],
-        role_tags: Array.isArray(existingOrganizationRow?.role_tags) ? existingOrganizationRow.role_tags : [],
-        branding:
-          existingOrganizationRow?.branding && typeof existingOrganizationRow.branding === 'object'
-            ? existingOrganizationRow.branding
-            : {},
-        maintenance_on_air_template: parseMaintenanceOnAirScheduleFromUnknown(
-          existingOrganizationRow?.maintenance_on_air_template,
-        ),
-      } satisfies OrganizationSnapshotPayload);
+    } else {
+      setActiveOrganizationId(null);
     }
+    // Workspace payload (inventory, productions, settings, …) must upload even when organization_app_data fails
+    // (RLS, missing migration, network). Previously org upsert ran first and aborted the whole push on error.
     await pushWorkspaceSnapshot(wsId, snapshot as WorkspaceSnapshotPayload);
+    if (organizationId) {
+      try {
+        const existingOrganizationRow = await pullOrganizationAppData(organizationId);
+        await pushOrganizationSnapshot(organizationId, {
+          contacts: snapshot.crew_contacts ?? [],
+          position_templates: getPositionTemplates(),
+          inventory_baseline: Array.isArray(existingOrganizationRow?.inventory_baseline)
+            ? existingOrganizationRow.inventory_baseline
+            : [],
+          role_tags: Array.isArray(existingOrganizationRow?.role_tags) ? existingOrganizationRow.role_tags : [],
+          branding:
+            existingOrganizationRow?.branding && typeof existingOrganizationRow.branding === 'object'
+              ? existingOrganizationRow.branding
+              : {},
+          maintenance_on_air_template: parseMaintenanceOnAirScheduleFromUnknown(
+            existingOrganizationRow?.maintenance_on_air_template,
+          ),
+        } satisfies OrganizationSnapshotPayload);
+      } catch (orgError) {
+        console.error('[cloud sync] Workspace snapshot saved; organization snapshot failed:', orgError);
+        toast.warning('Inventory synced, but organization data (contacts, templates) did not save to the cloud.', {
+          description: orgError instanceof Error ? orgError.message : String(orgError),
+        });
+      }
+    }
     return;
   }
   const payloadWithContacts = {
@@ -514,24 +538,30 @@ export async function bootstrapCloudData(userId: string): Promise<void> {
 let pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let pushInFlight = false;
 
+const PUSH_RETRY_WHEN_BUSY_MS = 400;
+
+async function runDebouncedPush(userId: string): Promise<void> {
+  if (pushInFlight) {
+    scheduleDebouncedPushToSupabase(userId, PUSH_RETRY_WHEN_BUSY_MS);
+    return;
+  }
+  pushInFlight = true;
+  try {
+    await pushFullSnapshotToSupabase(userId);
+  } catch (error) {
+    console.error('Supabase sync push failed:', error);
+    toast.error('Could not save changes to the cloud. Check your connection and workspace permissions.');
+  } finally {
+    pushInFlight = false;
+  }
+}
+
 export function scheduleDebouncedPushToSupabase(userId: string, delayMs = 1200): void {
   if (pushDebounceTimer) {
     clearTimeout(pushDebounceTimer);
   }
   pushDebounceTimer = setTimeout(() => {
     pushDebounceTimer = null;
-    void (async () => {
-      if (pushInFlight) {
-        return;
-      }
-      pushInFlight = true;
-      try {
-        await pushFullSnapshotToSupabase(userId);
-      } catch (error) {
-        console.error('Supabase sync push failed:', error);
-      } finally {
-        pushInFlight = false;
-      }
-    })();
+    void runDebouncedPush(userId);
   }, delayMs);
 }

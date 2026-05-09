@@ -226,6 +226,7 @@ export function WorkspaceTeamTab() {
                   setBusy(true);
                   try {
                     await bootstrapCloudData(currentUser.id);
+                    await refreshWorkspaces();
                     toast.success('Pulled latest cloud data');
                   } catch (error) {
                     toast.error('Could not pull cloud data', { description: formatWorkspaceError(error) });

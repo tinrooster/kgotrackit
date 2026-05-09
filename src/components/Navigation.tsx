@@ -14,7 +14,7 @@ export function Navigation() {
   const location = useLocation()
   const { authBackend, currentUser } = useAuth()
   const { activeWorkspaceId, activeWorkspaceRole, workspaces } = useWorkspace()
-  const { activeOrganizationName, activeOrganizationOwnerUserId } = useOrganization()
+  const { activeOrganizationName } = useOrganization()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navContainerRef = useRef<HTMLDivElement | null>(null)
   const [mobileTabletUi, setMobileTabletUi] = useState(
@@ -81,11 +81,6 @@ export function Navigation() {
     !!activeWorkspaceId &&
     !!currentUser?.id &&
     activeWorkspaceRow?.ownerUserId === currentUser.id
-  const activeOrganizationIsOwned =
-    !!activeOrganizationOwnerUserId &&
-    !!currentUser?.id &&
-    activeOrganizationOwnerUserId === currentUser.id
-
   const navItems = [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
     { path: "/inventory", label: "Inventory", icon: List },
@@ -122,12 +117,12 @@ export function Navigation() {
                 className="truncate rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
                 title={
                   activeWorkspaceId
-                    ? `Organization: ${activeOrganizationName ?? 'Organization'}${activeOrganizationIsOwned ? ' (you own this org)' : ''} · Team workspace: ${activeWorkspaceName ?? activeWorkspaceId}${activeWorkspaceIsOwned ? ' (you own this workspace)' : ''}`
+                    ? `Organization: ${activeOrganizationName ?? 'Organization'} · Team workspace: ${activeWorkspaceName ?? activeWorkspaceId}${activeWorkspaceIsOwned ? ' (you own this workspace)' : ''}`
                     : 'Personal inventory (your user_app_data row)'
                 }
               >
                 {activeWorkspaceId
-                  ? `${activeOrganizationName ?? 'Organization'}${activeOrganizationIsOwned ? ' · Org yours' : ''} · ${activeWorkspaceName ?? 'Workspace'}${activeWorkspaceIsOwned ? ' · Yours' : ''}`
+                  ? `${activeOrganizationName ?? 'Organization'} · ${activeWorkspaceName ?? 'Workspace'}${activeWorkspaceIsOwned ? ' · Yours' : ''}`
                   : 'Personal'}
               </span>
             ) : null}
