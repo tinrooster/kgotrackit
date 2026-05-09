@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pencil, CalendarDays, MapPin, FileText } from 'lucide-react';
+import { Pencil, CalendarDays, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   Production,
@@ -22,6 +22,12 @@ import { VehiclePacklistEditor } from './VehiclePacklistEditor';
 import { CrewEditor } from './CrewEditor';
 import { ProductionForm } from './ProductionForm';
 import { CrewScheduleCalendar } from './CrewScheduleCalendar';
+import { ProductionFusedStripProgress } from '@/components/dashboard/ProductionDashboardProgress';
+import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
+import {
+  ProductionSheetDragHandle,
+  useProductionSheetEdgeDrag,
+} from '@/components/productions/ProductionSheetDragHandle';
 import { applyProductionInventoryAction, exportProductionPacklistsToPdf } from '@/lib/productionService';
 import { flattenVehiclePacklistItems } from '@/lib/vehiclePacklistUtils';
 import { toast } from 'sonner';
@@ -67,6 +73,15 @@ export function ProductionDetail({
   const [confirmListDeletes, setConfirmListDeletes] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'vehicles' | 'crew' | 'schedule'>('overview');
   const navigate = useNavigate();
+  const plannerProductionId = production?.id ?? '';
+  const sheetEdgeDrag = useProductionSheetEdgeDrag({
+    onRequestClose: onClose,
+    onRequestOpenPlanner: () => {
+      if (!plannerProductionId) return;
+      navigate(`/productions/planner?productionId=${plannerProductionId}`);
+      onClose();
+    },
+  });
   const scheduleResources = useMemo(() => {
     if (!production) return [];
     const resourceMap = new Map<string, number>();
@@ -90,6 +105,8 @@ export function ProductionDetail({
   }, [production]);
 
   if (!production) return null;
+
+  const progressSnapshot = getProductionProgressSnapshot(production);
 
   const handleChecklistChange = (checklistGroups: ChecklistGroup[]) => {
     onUpdate(production.id, { checklistGroups });
@@ -159,6 +176,14 @@ export function ProductionDetail({
           onPointerDownOutside={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}
         >
+          <div className="flex h-full min-h-0 w-full" style={sheetEdgeDrag.contentStyle}>
+            <ProductionSheetDragHandle
+              onPointerDown={sheetEdgeDrag.handlePointerDown}
+              onPointerMove={sheetEdgeDrag.handlePointerMove}
+              onPointerUp={sheetEdgeDrag.handlePointerUp}
+              onPointerCancel={sheetEdgeDrag.handlePointerCancel}
+            />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <SheetHeader className="shrink-0 border-b px-6 py-4">
             <div className="flex items-start justify-between gap-3 pr-8">
               <div className="min-w-0 flex-1">
@@ -191,12 +216,9 @@ export function ProductionDetail({
                   {production.location}
                 </div>
               )}
-              {totalItems > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <FileText className="h-3.5 w-3.5" />
-                  {doneItems}/{totalItems} checklist items done
-                </div>
-              )}
+            </div>
+            <div className="mt-3 max-w-2xl pr-1">
+              <ProductionFusedStripProgress metrics={progressSnapshot} density="comfortable" />
             </div>
             <div className="mt-2 flex gap-2">
               <Button variant="outline" size="sm" className="h-7 gap-1" onClick={() => setEditOpen(true)}>
@@ -379,6 +401,8 @@ export function ProductionDetail({
               </div>
             </ScrollArea>
           </Tabs>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 

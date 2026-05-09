@@ -11,20 +11,6 @@ import { isSupabaseConfigured } from '@/lib/supabase/client'
 import { DEV_MENU_UPDATED_EVENT, getDevMenuPreference, isDevMenuEnabled, setDevMenuEnabled as persistDevMenuEnabled } from '@/lib/devMenu'
 import { APP_BRANDING_UPDATED_EVENT, loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding'
 
-const LAST_PLANNER_ROUTE_STORAGE_KEY = 'trackit:last-planner-route'
-
-function getProductionsNavPath(): string {
-  try {
-    const savedPlannerPath = sessionStorage.getItem(LAST_PLANNER_ROUTE_STORAGE_KEY)
-    if (savedPlannerPath && savedPlannerPath.startsWith('/productions/planner')) {
-      return savedPlannerPath
-    }
-  } catch {
-    /* ignore */
-  }
-  return '/productions'
-}
-
 export function Navigation() {
   const location = useLocation()
   const { authBackend, currentUser } = useAuth()
@@ -116,7 +102,7 @@ export function Navigation() {
   const navItems = [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
     { path: "/inventory", label: "Inventory", icon: List },
-    { path: getProductionsNavPath(), label: "Productions", icon: Clapperboard, activeBasePath: '/productions' },
+    { path: '/productions', label: "Productions", icon: Clapperboard, activeBasePath: '/productions' },
     { path: "/checkout", label: "Check-In/Out", icon: ShoppingCart },
     { path: "/reports", label: "Reports", icon: FileText },
     { path: "/settings", label: "Settings", icon: Settings }

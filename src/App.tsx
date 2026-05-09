@@ -22,6 +22,7 @@ import HelpPage from './pages/HelpPage';
 import AboutPage from './pages/AboutPage';
 import ProductionsPage from './pages/ProductionsPage';
 import TimePickerLabPage from './pages/TimePickerLabPage';
+import ProductionProgressLabPage from './pages/ProductionProgressLabPage';
 import UiDiagnosticsPage from './pages/UiDiagnosticsPage';
 import DevMenuPage from './pages/DevMenuPage';
 import PlannerWorkspacePage from './pages/PlannerWorkspacePage';
@@ -264,6 +265,14 @@ export default function App() {
                 }
               />
               <Route
+                path="/dev/production-progress-lab"
+                element={
+                  <ProtectedRoute>
+                    <ProductionProgressLabPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/dev/ui-diagnostics"
                 element={
                   <ProtectedRoute>
@@ -272,6 +281,10 @@ export default function App() {
                 }
               />
               <Route path="/time-picker-lab" element={<Navigate to="/dev/time-picker-lab" replace />} />
+              <Route
+                path="/production-progress-lab"
+                element={<Navigate to="/dev/production-progress-lab" replace />}
+              />
               <Route path="/ui-diagnostics" element={<Navigate to="/dev/ui-diagnostics" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

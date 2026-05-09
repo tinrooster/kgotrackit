@@ -22,8 +22,10 @@ const PATH_LABELS: Record<string, string> = {
   '/about': 'About',
   '/dev': 'Dev',
   '/dev/time-picker-lab': 'Time Picker Lab',
+  '/dev/production-progress-lab': 'Production progress lab',
   '/dev/ui-diagnostics': 'UI Diagnostics',
   '/time-picker-lab': 'Time Picker Lab',
+  '/production-progress-lab': 'Production progress lab',
   '/ui-diagnostics': 'UI Diagnostics',
 };
 

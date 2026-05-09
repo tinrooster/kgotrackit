@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, FileText, MapPin } from 'lucide-react';
+import { CalendarDays, ChevronLeft, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +10,8 @@ import { ChecklistEditor } from '@/components/productions/ChecklistEditor';
 import { VehiclePacklistEditor } from '@/components/productions/VehiclePacklistEditor';
 import { CrewEditor } from '@/components/productions/CrewEditor';
 import { CrewScheduleCalendar } from '@/components/productions/CrewScheduleCalendar';
+import { ProductionFusedStripProgress } from '@/components/dashboard/ProductionDashboardProgress';
+import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
 import {
   getProductions,
   PRODUCTIONS_UPDATED_EVENT,
@@ -222,12 +224,9 @@ export default function PlannerWorkspacePage() {
                 {selectedProduction.location}
               </span>
             )}
-            {selectedProduction.checklistGroups.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <FileText className="h-3.5 w-3.5" />
-                {selectedProduction.checklistGroups.reduce((sum, group) => sum + group.items.length, 0)} checklist items
-              </span>
-            )}
+          </div>
+          <div className="max-w-md">
+            <ProductionFusedStripProgress metrics={getProductionProgressSnapshot(selectedProduction)} density="comfortable" />
           </div>
 
           <Tabs

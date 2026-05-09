@@ -1,4 +1,4 @@
-import { CalendarDays, MapPin, User, CheckSquare, MoreHorizontal, Copy, Pencil, Trash2 } from 'lucide-react';
+import { CalendarDays, MapPin, MoreHorizontal, Copy, Pencil, Trash2 } from 'lucide-react';
 import { Production, PRODUCTION_STATUS_LABELS, ProductionStatus } from '@/types/productions';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ProductionFusedStripProgress } from '@/components/dashboard/ProductionDashboardProgress';
+import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
 
 const STATUS_VARIANT: Record<ProductionStatus, string> = {
   planning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -27,18 +29,6 @@ interface ProductionCardProps {
   onDelete?: (production: Production) => void;
 }
 
-function countChecklistProgress(production: Production): { done: number; total: number } {
-  let done = 0;
-  let total = 0;
-  for (const group of production.checklistGroups) {
-    for (const item of group.items) {
-      total++;
-      if (item.completed) done++;
-    }
-  }
-  return { done, total };
-}
-
 function formatDateRange(startDate?: string, endDate?: string): string | null {
   if (!startDate && !endDate) return null;
   const fmt = (d: string) =>
@@ -50,10 +40,9 @@ function formatDateRange(startDate?: string, endDate?: string): string | null {
 }
 
 export function ProductionCard({ production, onClick, onEdit, onClone, onDelete }: ProductionCardProps) {
-  const { done, total } = countChecklistProgress(production);
   const dateRange = formatDateRange(production.startDate, production.endDate);
-  const crewCount = production.crew.length;
   const vehicleCount = production.vehiclePacklists.length;
+  const progressSnapshot = getProductionProgressSnapshot(production);
 
   return (
     <Card
@@ -124,29 +113,16 @@ export function ProductionCard({ production, onClick, onEdit, onClone, onDelete 
             <span className="truncate">{production.location}</span>
           </div>
         )}
-        <div className="flex flex-wrap gap-3 pt-1">
-          {total > 0 && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <CheckSquare className="h-3.5 w-3.5 shrink-0" />
-              <span>
-                {done}/{total} items
-              </span>
-            </div>
-          )}
-          {crewCount > 0 && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <User className="h-3.5 w-3.5 shrink-0" />
-              <span>
-                {crewCount} crew
-              </span>
-            </div>
-          )}
-          {vehicleCount > 0 && (
+        <div className="pt-2">
+          <ProductionFusedStripProgress metrics={progressSnapshot} density="compact" />
+        </div>
+        {vehicleCount > 0 && (
+          <div className="flex flex-wrap gap-3 pt-1.5">
             <Badge variant="outline" className="h-5 px-1.5 text-xs">
               {vehicleCount} vehicle{vehicleCount !== 1 ? 's' : ''}
             </Badge>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

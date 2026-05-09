@@ -54,10 +54,10 @@ function buildLocationOrProjectAliases(
 
 const LIST_NAV: { id: Exclude<UserDefinedPanel, 'overview'>; label: string }[] = [
   { id: 'categories', label: 'Categories' },
-  { id: 'units', label: 'Units' },
   { id: 'locations', label: 'Locations' },
   { id: 'projects', label: 'Projects' },
   { id: 'financial', label: 'Expense Codes' },
+  { id: 'units', label: 'Units' },
 ];
 
 export interface UserDefinedListsSectionProps {

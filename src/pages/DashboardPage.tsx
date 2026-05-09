@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { InventoryItem } from '@/types/inventory';
 import { Plus, Filter, Clapperboard } from 'lucide-react';
@@ -12,9 +11,9 @@ import { getSettings } from '@/lib/storageService';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
 import { resolveProjectDisplay } from '@/lib/projectOptions';
 import { getProductions, PRODUCTIONS_UPDATED_EVENT } from '@/lib/productionService';
-import { flattenVehiclePacklistItems } from '@/lib/vehiclePacklistUtils';
+import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
 import { Production, ProductionStatus, PRODUCTION_STATUS_LABELS } from '@/types/productions';
-import { Progress } from '@/components/ui/progress';
+import { ProductionDashboardProgress } from '@/components/dashboard/ProductionDashboardProgress';
 import { cn } from '@/lib/utils';
 
 const ACTIVE_PRODUCTION_STATUS_FILTERS: ProductionStatus[] = ['planning', 'confirmed', 'in_progress'];
@@ -25,41 +24,6 @@ const PRODUCTION_STATUS_BADGE_CLASSES: Record<ProductionStatus, string> = {
   completed: 'border-muted-foreground/30 bg-muted text-muted-foreground',
   cancelled: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
 };
-
-function getChecklistProgress(production: Production): { done: number; total: number; percent: number } {
-  let done = 0;
-  let total = 0;
-  for (const group of production.checklistGroups) {
-    for (const item of group.items) {
-      total += 1;
-      if (item.completed) done += 1;
-    }
-  }
-  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-  return { done, total, percent };
-}
-
-function getPacklistProgress(production: Production): { done: number; total: number; percent: number } {
-  let done = 0;
-  let total = 0;
-  for (const packlist of production.vehiclePacklists) {
-    for (const item of flattenVehiclePacklistItems(packlist)) {
-      total += 1;
-      if (item.completed) done += 1;
-    }
-  }
-  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-  return { done, total, percent };
-}
-
-function getCrewCoverage(production: Production): { scheduled: number; crewCount: number; percent: number } {
-  const crewCount = production.crew.length;
-  if (crewCount === 0) return { scheduled: 0, crewCount: 0, percent: 0 };
-  const scheduledCrewIds = new Set((production.crewSchedule ?? []).map((entry) => entry.crewMemberId));
-  const scheduled = production.crew.filter((member) => scheduledCrewIds.has(member.id)).length;
-  const percent = Math.round((scheduled / crewCount) * 100);
-  return { scheduled, crewCount, percent };
-}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -586,15 +550,13 @@ export default function DashboardPage() {
                   ) : (
                     <div className="grid gap-3 sm:grid-cols-2">
                       {filteredProductions.map((production) => {
-                        const checklist = getChecklistProgress(production);
-                        const packlists = getPacklistProgress(production);
-                        const crew = getCrewCoverage(production);
+                        const progressSnapshot = getProductionProgressSnapshot(production);
                         return (
                         <button
                           key={production.id}
                           type="button"
                           onClick={() => navigate(`/productions?productionId=${encodeURIComponent(production.id)}`)}
-                          className="rounded-md border p-3 text-left transition-colors hover:bg-accent"
+                          className="rounded-lg border border-border/70 bg-card p-3 text-left shadow-sm shadow-black/10 outline-none ring-offset-background transition-[box-shadow,background-color,border-color] hover:border-border hover:bg-card hover:shadow-md hover:shadow-black/15 focus-visible:ring-2 focus-visible:ring-ring dark:border-border/50 dark:bg-card/90 dark:shadow-black/35 dark:hover:shadow-black/45"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <p className="font-medium">{production.name}</p>
@@ -611,39 +573,8 @@ export default function DashboardPage() {
                             {production.startDate ? `Start: ${production.startDate}` : 'Start date not set'}
                             {production.location ? ` • ${production.location}` : ''}
                           </p>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            <Badge variant="outline" className="text-[11px]">
-                              Checklist {checklist.percent}% ({checklist.done}/{checklist.total})
-                            </Badge>
-                            <Badge variant="outline" className="text-[11px]">
-                              Packlists {packlists.percent}% ({packlists.done}/{packlists.total})
-                            </Badge>
-                            <Badge variant="outline" className="text-[11px]">
-                              Crew {crew.percent}% ({crew.scheduled}/{crew.crewCount})
-                            </Badge>
-                          </div>
-                          <div className="mt-3 space-y-2">
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                                <span>Checklist</span>
-                                <span>{checklist.percent}%</span>
-                              </div>
-                              <Progress value={checklist.percent} className="h-1.5" />
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                                <span>Packlists</span>
-                                <span>{packlists.percent}%</span>
-                              </div>
-                              <Progress value={packlists.percent} className="h-1.5" />
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                                <span>Crew</span>
-                                <span>{crew.percent}%</span>
-                              </div>
-                              <Progress value={crew.percent} className="h-1.5" />
-                            </div>
+                          <div className="mt-3">
+                            <ProductionDashboardProgress metrics={progressSnapshot} />
                           </div>
                         </button>
                         );

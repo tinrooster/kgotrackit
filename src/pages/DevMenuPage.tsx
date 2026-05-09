@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FlaskConical, Wrench } from 'lucide-react';
+import { FlaskConical, Gauge, Wrench } from 'lucide-react';
 
 const devItems = [
   {
@@ -8,6 +8,12 @@ const devItems = [
     description: 'Compare and validate time selection UX patterns.',
     path: '/dev/time-picker-lab',
     icon: FlaskConical,
+  },
+  {
+    title: 'Production progress lab',
+    description: 'Compact progress patterns for dashboard production cards.',
+    path: '/dev/production-progress-lab',
+    icon: Gauge,
   },
   {
     title: 'UI Diagnostics',
