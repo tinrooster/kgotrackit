@@ -9,6 +9,8 @@
  */
 
 import { type InventoryItem } from '@/types/inventory';
+import type { CrewContact } from '@/types/crewContacts';
+import type { PositionTemplate, Production } from '@/types/productions';
 import { STORAGE_KEYS } from './storageService';
 import { getItems, getSettings } from './storageService';
 import { getActiveWorkspaceId } from './supabase/workspaceData';
@@ -46,6 +48,38 @@ export const DUMMY_INVENTORY_DATA: InventoryItem[] = DEMO_SEED_SOURCE.inventory.
     [DEMO_SEED_FIELD]: { version: DEMO_SEED_VERSION, fingerprint },
   } as InventoryItem;
 });
+
+/** Pre-stamped demo productions, ready to write into a workspace snapshot. */
+export const DUMMY_PRODUCTIONS_DATA: Production[] = DEMO_SEED_SOURCE.productions.map((source) => {
+  const cloned = cloneTemplate(source);
+  const fingerprint = fingerprintEntity(cloned, 'production');
+  return {
+    ...cloned,
+    [DEMO_SEED_FIELD]: { version: DEMO_SEED_VERSION, fingerprint },
+  } as Production;
+});
+
+/** Pre-stamped demo crew contacts (mirrored into both workspace + organization snapshots). */
+export const DUMMY_CREW_CONTACTS_DATA: CrewContact[] = DEMO_SEED_SOURCE.crewContacts.map((source) => {
+  const cloned = cloneTemplate(source);
+  const fingerprint = fingerprintEntity(cloned, 'crewContact');
+  return {
+    ...cloned,
+    [DEMO_SEED_FIELD]: { version: DEMO_SEED_VERSION, fingerprint },
+  } as CrewContact;
+});
+
+/** Pre-stamped demo position templates, written into the new organization's app data row. */
+export const DUMMY_POSITION_TEMPLATES_DATA: PositionTemplate[] = DEMO_SEED_SOURCE.positionTemplates.map(
+  (source) => {
+    const cloned = cloneTemplate(source);
+    const fingerprint = fingerprintEntity(cloned, 'positionTemplate');
+    return {
+      ...cloned,
+      [DEMO_SEED_FIELD]: { version: DEMO_SEED_VERSION, fingerprint },
+    } as PositionTemplate;
+  },
+);
 
 /** Initial lookup-list defaults keyed by storage key (legacy shape). */
 export const INITIAL_SETTINGS = {

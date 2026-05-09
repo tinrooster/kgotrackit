@@ -16,9 +16,21 @@ import { toast } from 'sonner';
 import { logger as durableLogger } from '@/lib/logging';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS, recordSetupChoiceForWorkspace } from '@/lib/dummyData';
+import {
+  DUMMY_CREW_CONTACTS_DATA,
+  DUMMY_INVENTORY_DATA,
+  DUMMY_POSITION_TEMPLATES_DATA,
+  DUMMY_PRODUCTIONS_DATA,
+  INITIAL_SETTINGS,
+  recordSetupChoiceForWorkspace,
+} from '@/lib/dummyData';
 import { STORAGE_KEYS, type Settings } from '@/lib/storageService';
-import { createWorkspaceWithSnapshot, type WorkspaceSnapshotPayload } from '@/lib/supabase/workspaceData';
+import {
+  createWorkspaceWithSnapshot,
+  fetchWorkspaceOrganizationId,
+  type WorkspaceSnapshotPayload,
+} from '@/lib/supabase/workspaceData';
+import { pushOrganizationSnapshot } from '@/lib/supabase/organizationData';
 import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
 import { DEMO_SEED_SOURCE, DEMO_SEED_VERSION, recordManifestForWorkspace } from '@/lib/demoSeed';
 
@@ -126,19 +138,23 @@ export function CreateWorkspaceDialog({
               expenseCodes: [],
             };
 
-      const items =
-        choice === 'starter' && includeSampleInventory
-          ? cloneJson(
-              DUMMY_INVENTORY_DATA.map((item) => ({
-                ...item,
-                lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : item.lastUpdated,
-                expectedDeliveryDate:
-                  item.expectedDeliveryDate instanceof Date
-                    ? item.expectedDeliveryDate.toISOString()
-                    : item.expectedDeliveryDate,
-              })),
-            )
-          : [];
+      const includeDemoContent = choice === 'starter' && includeSampleInventory;
+
+      const items = includeDemoContent
+        ? cloneJson(
+            DUMMY_INVENTORY_DATA.map((item) => ({
+              ...item,
+              lastUpdated: item.lastUpdated instanceof Date ? item.lastUpdated.toISOString() : item.lastUpdated,
+              expectedDeliveryDate:
+                item.expectedDeliveryDate instanceof Date
+                  ? item.expectedDeliveryDate.toISOString()
+                  : item.expectedDeliveryDate,
+            })),
+          )
+        : [];
+
+      const productions = includeDemoContent ? cloneJson(DUMMY_PRODUCTIONS_DATA) : [];
+      const crewContacts = includeDemoContent ? cloneJson(DUMMY_CREW_CONTACTS_DATA) : [];
 
       const snapshot: WorkspaceSnapshotPayload = {
         items,
@@ -150,6 +166,8 @@ export function CreateWorkspaceDialog({
         ui_defaults: null,
         general_settings: null,
         custom_report_definitions: [],
+        productions,
+        crew_contacts: crewContacts,
       };
 
       const workspaceOptions =
@@ -159,6 +177,38 @@ export function CreateWorkspaceDialog({
 
       const workspaceId = await createWorkspaceWithSnapshot(trimmedName, snapshot, workspaceOptions);
       recordSetupChoiceForWorkspace(workspaceId, choice);
+
+      // Seed organization-scoped demo content (contacts + position templates) only when a NEW
+      // master org was created for this workspace. For an existing org we leave its library alone.
+      if (
+        includeDemoContent &&
+        masterOrganizationChoice === CREATE_NEW_ORGANIZATION_VALUE
+      ) {
+        try {
+          const organizationId = await fetchWorkspaceOrganizationId(workspaceId);
+          if (organizationId) {
+            await pushOrganizationSnapshot(organizationId, {
+              contacts: cloneJson(DUMMY_CREW_CONTACTS_DATA),
+              position_templates: cloneJson(DUMMY_POSITION_TEMPLATES_DATA),
+              inventory_baseline: [],
+              role_tags: [],
+              branding: {},
+              maintenance_on_air_template: null,
+            });
+          }
+        } catch (orgSeedError) {
+          // Non-fatal: workspace already exists with productions/crew. Surface a soft warning.
+          durableLogger.warn(
+            'audit',
+            'WORKSPACE_DEMO_ORG_SEED_FAILED',
+            {
+              workspaceId,
+              reason: formatSupabaseOrUnknownError(orgSeedError),
+            },
+            'CreateWorkspaceDialog',
+          );
+        }
+      }
 
       if (choice === 'starter') {
         recordManifestForWorkspace(workspaceId, {
@@ -300,12 +350,14 @@ export function CreateWorkspaceDialog({
                 onCheckedChange={(checked) => setIncludeSampleInventory(Boolean(checked))}
                 disabled={busy}
               />
-              Include sample inventory items (test data)
+              Include sample demo content (inventory, productions, crew)
             </label>
             <p className="mt-2 text-xs text-muted-foreground">
               {includeSampleInventory
-                ? 'Starter lists and sample inventory rows will be created.'
-                : 'Starter lists will be created. Inventory stays empty.'}
+                ? masterOrganizationChoice === CREATE_NEW_ORGANIZATION_VALUE
+                  ? 'Starter lists, sample inventory, productions, and crew + position templates will be created.'
+                  : 'Starter lists, sample inventory, and productions will be created. The selected organization\u2019s contacts and templates are left untouched.'
+                : 'Starter lists will be created. Inventory, productions, and crew stay empty.'}
             </p>
           </div>
         )}
