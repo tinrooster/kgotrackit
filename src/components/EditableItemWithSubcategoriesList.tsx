@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +15,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Pencil,
   Trash2,
   GripVertical,
   Plus,
@@ -23,6 +23,7 @@ import {
   ChevronRight,
   ChevronUp,
   Warehouse,
+  Menu,
 } from 'lucide-react';
 import {
   DndContext,
@@ -45,6 +46,12 @@ import { ItemWithSubcategories } from '@/types/inventory';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { getRackOptionsForFlatLocationLabel, getRackOptionsForSubLocationKey } from '@/lib/rackLocationsConfig';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 function supplierProfileHasContent(row: ItemWithSubcategories): boolean {
   const t = (v: string | undefined) => (v ?? '').trim();
@@ -402,16 +409,51 @@ function SortableItem({
           )}
         </div>
         <div className="flex shrink-0 justify-end gap-1 sm:gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 px-0 sm:h-9 sm:w-9"
-            onClick={() => setIsEditing(true)}
-            title={`Edit ${item.name}`}
-            aria-label={`Edit ${item.name}`}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 px-0 sm:h-9 sm:w-9"
+                title={`Actions for ${item.name}`}
+                aria-label={`Actions for ${item.name}`}
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setIsEditing(true);
+                }}
+              >
+                Edit
+              </DropdownMenuItem>
+              {enableSubcategories ? (
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setSubAddOpen(true);
+                  }}
+                >
+                  Add subcategory
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                disabled={!canDeleteItems}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  if (canDeleteItems) {
+                    onRequestDeleteParent(item.id);
+                  }
+                }}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {locationRackExtension && onPatchItem && !(item.children && item.children.length > 0) ? (
             <RackConfigPopover
               rackLocationEnabled={item.rackLocationEnabled}
@@ -422,37 +464,18 @@ function SortableItem({
               locationLabel={item.name}
             />
           ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="delete-action-btn h-8 w-8 px-0 sm:h-9 sm:w-9"
-            onClick={() => canDeleteItems && onRequestDeleteParent(item.id)}
-            disabled={!canDeleteItems}
-            title={canDeleteItems ? 'Delete item' : 'Only admins can delete list entries'}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
           {enableSubcategories && (
-            <Popover
+            <Dialog
               open={subAddOpen}
               onOpenChange={(open) => {
                 setSubAddOpen(open);
                 if (!open) setNewSubcategory('');
               }}
             >
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Add subcategory"
-                  aria-label={`Add subcategory under ${item.name}`}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[min(100vw-2rem,20rem)] p-3" align="end">
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Add subcategory</DialogTitle>
+                </DialogHeader>
                 <div className="space-y-2">
                   <Input
                     type="text"
@@ -468,17 +491,24 @@ function SortableItem({
                     }}
                     autoFocus
                   />
-          <div className="flex justify-end gap-2">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => { setSubAddOpen(false); setNewSubcategory(''); }}>
-                      Cancel
-                    </Button>
-                    <Button type="button" size="sm" onClick={handleAddSubcategory}>
-                      Add
-                    </Button>
-                  </div>
                 </div>
-              </PopoverContent>
-            </Popover>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setSubAddOpen(false);
+                      setNewSubcategory('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={handleAddSubcategory}>
+                    Add
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           )}
           {perItemSupplierProfileFields && onPatchItem && (
             <Popover open={supplierDetailsOpen} onOpenChange={setSupplierDetailsOpen}>
@@ -689,19 +719,6 @@ function SortableItem({
                     >
                       <ChevronDown className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 px-0 sm:h-9 sm:w-9"
-                      onClick={() => {
-                        setEditValue(child.name);
-                        setEditingSubcategory(child.name);
-                      }}
-                      title={`Edit subcategory ${child.name}`}
-                      aria-label={`Edit subcategory ${child.name}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
                     {locationRackExtension && onPatchChild ? (
                       <RackConfigPopover
                         rackLocationEnabled={child.rackLocationEnabled}
@@ -712,16 +729,42 @@ function SortableItem({
                         locationLabel={`${item.name} / ${child.name}`}
                       />
                     ) : null}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="delete-action-btn h-8 w-8 px-0 sm:h-9 sm:w-9"
-                      onClick={() => canDeleteItems && onRequestDeleteSubcategory(item.id, child.name)}
-                      disabled={!canDeleteItems}
-                      title={canDeleteItems ? 'Delete subcategory' : 'Only admins can delete list entries'}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 px-0 sm:h-9 sm:w-9"
+                          title={`Actions for ${child.name}`}
+                          aria-label={`Actions for ${child.name}`}
+                        >
+                          <Menu className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            setEditValue(child.name);
+                            setEditingSubcategory(child.name);
+                          }}
+                        >
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          disabled={!canDeleteItems}
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            if (canDeleteItems) {
+                              onRequestDeleteSubcategory(item.id, child.name);
+                            }
+                          }}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </>
               )}

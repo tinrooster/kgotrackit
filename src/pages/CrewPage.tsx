@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Users, Truck, PackageSearch } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Truck, PackageSearch, MoreHorizontal } from 'lucide-react';
 import { CrewContact, CrewContactDraft } from '@/types/crewContacts';
 import {
   CREW_CONTACTS_UPDATED_EVENT,
@@ -18,6 +18,13 @@ import { Label } from '@/components/ui/label';
 import { getItems } from '@/lib/storageService';
 import { InventoryItem } from '@/types/inventory';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 const EMPTY_DRAFT: CrewContactDraft = {
   fullName: '',
@@ -35,6 +42,17 @@ const EMPTY_DRAFT: CrewContactDraft = {
   unionStatus: '',
   isActive: true,
 };
+
+const normalizePhoneToStandardFormat = (value: string): string => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return '';
+  const digits = trimmedValue.replace(/\D/g, '');
+  if (digits.length !== 10) return trimmedValue;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
+
+const isStandardPhoneFormat = (value: string): boolean =>
+  /^\(\d{3}\)\s\d{3}-\d{4}$/.test(value.trim());
 
 export default function CrewPage() {
   const [contacts, setContacts] = useState<CrewContact[]>(() => getCrewContacts());
@@ -108,10 +126,19 @@ export default function CrewPage() {
     if (!draft.fullName.trim()) {
       return;
     }
+    const normalizedPhone = draft.phone.trim() ? normalizePhoneToStandardFormat(draft.phone) : '';
+    if (normalizedPhone && !isStandardPhoneFormat(normalizedPhone)) {
+      toast.error('Phone number is invalid. Use format (xxx) xxx-xxxx.');
+      return;
+    }
+    const draftToSave: CrewContactDraft = {
+      ...draft,
+      phone: normalizedPhone,
+    };
     if (editingContactId) {
-      updateCrewContact(editingContactId, draft);
+      updateCrewContact(editingContactId, draftToSave);
     } else {
-      createCrewContact(draft);
+      createCrewContact(draftToSave);
     }
     setDialogOpen(false);
   };
@@ -147,6 +174,41 @@ export default function CrewPage() {
     });
   };
 
+  const escapeCsvValue = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+
+  const downloadCsv = (fileName: string, rows: string[][]): void => {
+    const csvText = rows.map((row) => row.map((value) => escapeCsvValue(value)).join(',')).join('\n');
+    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  const handleExportCrewCsv = (): void => {
+    const exportRows: string[][] = [
+      ['Full Name', 'Status', 'Type', 'Roles', 'Organization', 'Phone', 'Email', 'Base Location', 'Union Status', 'Notes'],
+      ...filteredContacts.map((contact) => [
+        contact.fullName,
+        contact.isActive ? 'Active' : 'Inactive',
+        contact.contactType === 'vendor' ? 'Vendor' : 'Crew',
+        (contact.roleTags ?? []).join('|'),
+        contact.organizationName ?? '',
+        contact.phone ? normalizePhoneToStandardFormat(contact.phone) : '',
+        contact.email ?? '',
+        contact.baseLocation ?? '',
+        contact.unionStatus ?? '',
+        contact.notes ?? '',
+      ]),
+    ];
+    const timestamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`crew-directory-${timestamp}.csv`, exportRows);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -156,10 +218,15 @@ export default function CrewPage() {
             Shared workspace contact database for all productions.
           </p>
         </div>
-        <Button onClick={openCreateDialog} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Contact
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportCrewCsv} disabled={filteredContacts.length === 0}>
+            Export filtered CSV
+          </Button>
+          <Button onClick={openCreateDialog} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Contact
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -179,17 +246,32 @@ export default function CrewPage() {
           />
           <div className="space-y-2">
             {filteredContacts.map((contact) => (
-              <div key={contact.id} className="rounded-md border px-3 py-2">
+              <div
+                key={contact.id}
+                className="rounded-md border px-3 py-2"
+                onDoubleClick={() => openEditDialog(contact)}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-sm font-medium">{contact.fullName}</p>
-                      <Badge variant={contact.isActive ? 'default' : 'outline'}>
+                      <Badge className={contact.isActive
+                        ? 'bg-emerald-600/20 text-emerald-200 border border-emerald-500/40'
+                        : 'bg-slate-600/20 text-slate-200 border border-slate-500/40'
+                      }>
                         {contact.isActive ? 'Active' : 'Inactive'}
                       </Badge>
-                      <Badge variant="outline">{contact.contactType === 'vendor' ? 'Vendor' : 'Crew'}</Badge>
+                      <Badge className={contact.contactType === 'vendor'
+                        ? 'bg-amber-600/20 text-amber-200 border border-amber-500/40'
+                        : 'bg-blue-600/20 text-blue-200 border border-blue-500/40'
+                      }>
+                        {contact.contactType === 'vendor' ? 'Vendor' : 'Crew'}
+                      </Badge>
                       {(contact.roleTags ?? []).slice(0, 3).map((roleTag) => (
-                        <Badge key={`${contact.id}-${roleTag}`} variant="secondary">
+                        <Badge
+                          key={`${contact.id}-${roleTag}`}
+                          className="bg-fuchsia-600/20 text-fuchsia-200 border border-fuchsia-500/40"
+                        >
                           {roleTag}
                         </Badge>
                       ))}
@@ -216,18 +298,29 @@ export default function CrewPage() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(contact)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeCrewContact(contact.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => openEditDialog(contact)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          const shouldDelete = window.confirm('Delete this crew contact?');
+                          if (!shouldDelete) return;
+                          removeCrewContact(contact.id);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             ))}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, User, Database, ChevronDown, ChevronRight, GripVertical, Pencil } from 'lucide-react';
+import { Plus, Trash2, User, Database, ChevronDown, ChevronRight, GripVertical, MoreHorizontal } from 'lucide-react';
 import { PositionTemplate, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TimeInput } from '@/components/ui/time-input';
 import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsible';
 import { normalizeDateInputValue, normalizeQuarterHourTime } from '@/lib/dateTimeInputs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface CrewEditorProps {
   crew: ProductionCrewMember[];
@@ -488,27 +494,33 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
               </button>
               <span className="text-xs text-muted-foreground">{departmentMembers.length} crew</span>
               {!readOnly && (
-                <div className="ml-auto flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => openRenameDepartmentDialog(departmentName)}
-                    title="Rename department"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => deleteDepartment(departmentName)}
-                    title="Delete department"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
+                <div className="ml-auto">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Department actions">
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          openRenameDepartmentDialog(departmentName);
+                        }}
+                      >
+                        Rename department
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          deleteDepartment(departmentName);
+                        }}
+                      >
+                        Delete department
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )}
             </div>
@@ -641,9 +653,24 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                       )}
                     </div>
                     {!readOnly && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 border border-red-500/40 bg-red-500/10 hover:bg-red-500/20" onClick={() => runDeleteAction(member.id)} title="Remove crew member">
-                        <Trash2 className="h-3.5 w-3.5 text-red-300" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="Crew member actions">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              runDeleteAction(member.id);
+                            }}
+                          >
+                            Remove crew member
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 ))}

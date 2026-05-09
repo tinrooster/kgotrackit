@@ -17,6 +17,14 @@ import { cn } from '@/lib/utils'; // Import the cn function
 type SettingsKey = 'CATEGORIES' | 'UNITS' | 'LOCATIONS' | 'SUPPLIERS' | 'PROJECTS';
 type ItemField = 'category' | 'unit' | 'location' | 'supplier' | 'project';
 
+const SETTING_TYPE_LABEL: Record<SettingsKey, string> = {
+  CATEGORIES: 'category',
+  UNITS: 'unit',
+  LOCATIONS: 'location',
+  SUPPLIERS: 'supplier',
+  PROJECTS: 'project',
+};
+
 interface ReassignSettingDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -68,7 +76,7 @@ export function ReassignSettingDialog({
     onClose();
   };
 
-  const settingTypeName = settingType.toLowerCase().slice(0, -1); // e.g., "category"
+  const settingTypeName = SETTING_TYPE_LABEL[settingType];
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

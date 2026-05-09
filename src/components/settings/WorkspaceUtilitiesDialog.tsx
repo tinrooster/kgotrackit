@@ -245,6 +245,19 @@ export function WorkspaceUtilitiesDialog({
     }
   };
 
+  const handleNavigateToDataManagement = (): void => {
+    try {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('st', 'data');
+      window.history.pushState({}, '', currentUrl.toString());
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      onClose();
+    } catch {
+      // Fallback for malformed URL environments.
+      window.location.assign('/settings?st=data');
+    }
+  };
+
   const totalDemoEntities = demoSummary
     ? demoSummary.inventory + demoSummary.productions + demoSummary.crewContacts + demoSummary.positionTemplates
     : 0;
@@ -402,6 +415,22 @@ export function WorkspaceUtilitiesDialog({
                   disabled={populateBusy || stripBusy}
                 >
                   {populateBusy ? 'Populating…' : 'Populate demo data'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 space-y-2">
+              <Label className="text-sm">Data files & contact imports</Label>
+              <p className="text-xs text-muted-foreground">
+                Open Data Management to import organization JSON bundles or review import/export files.
+              </p>
+              <div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleNavigateToDataManagement}
+                >
+                  Open Data Management
                 </Button>
               </div>
             </div>

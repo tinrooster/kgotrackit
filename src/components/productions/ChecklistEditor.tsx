@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, GripVertical, Link2, Unlink, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Link2, Unlink, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { ChecklistGroup, ChecklistItem } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ChecklistEditorProps {
   groups: ChecklistGroup[];
@@ -270,15 +276,24 @@ export function ChecklistEditor({
               />
             )}
             {!readOnly && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0"
-                onClick={() => runDeleteAction(`group:${group.id}`, () => removeGroup(group.id))}
-                title="Delete group"
-              >
-                <Trash2 className="h-3.5 w-3.5 text-red-400" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" title="Group actions">
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      runDeleteAction(`group:${group.id}`, () => removeGroup(group.id));
+                    }}
+                  >
+                    Delete section
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
           {expandedGroupIds.includes(group.id) && <div className="divide-y">
@@ -388,43 +403,44 @@ export function ChecklistEditor({
                           onSelect={(inv) => linkInventoryItem(group.id, item.id, inv)}
                         />
                       )}
-                      {item.inventoryItemId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          title="Unlink inventory item"
-                          onClick={() => updateItem(group.id, item.id, { inventoryItemId: undefined })}
-                        >
-                          <Unlink className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0"
-                        title="Edit item label"
-                        onClick={() => {
-                          setEditingItem({ groupId: group.id, itemId: item.id });
-                          setEditingLabel(item.label);
-                        }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          'h-8 w-8 shrink-0 border',
-                          'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
-                        )}
-                        onClick={() =>
-                          runDeleteAction(`item:${item.id}`, () => removeItem(group.id, item.id))
-                        }
-                        title="Delete item"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-red-300" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Item actions">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {item.inventoryItemId ? (
+                            <DropdownMenuItem
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                updateItem(group.id, item.id, { inventoryItemId: undefined });
+                              }}
+                            >
+                              <Unlink className="mr-2 h-3.5 w-3.5" />
+                              Unlink item
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuItem
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              setEditingItem({ groupId: group.id, itemId: item.id });
+                              setEditingLabel(item.label);
+                            }}
+                          >
+                            Edit label
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              runDeleteAction(`item:${item.id}`, () => removeItem(group.id, item.id));
+                            }}
+                          >
+                            Delete item
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </>
                   )}
                 </div>

@@ -1,4 +1,4 @@
-export const ORGANIZATION_SETTINGS_SUB_TAB_IDS = ['overview', 'crew', 'maintenance'] as const;
+export const ORGANIZATION_SETTINGS_SUB_TAB_IDS = ['overview', 'crew', 'directory', 'maintenance'] as const;
 export type OrganizationSettingsSubTabId = (typeof ORGANIZATION_SETTINGS_SUB_TAB_IDS)[number];
 
 export function readOrganizationSubTabFromSearch(): OrganizationSettingsSubTabId {

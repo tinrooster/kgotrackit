@@ -97,12 +97,29 @@ interface EditableItemListProps {
   description?: string;
 }
 
+function singularFormForListTitle(title: string): string {
+  const lower = title.trim().toLowerCase();
+  const irregular: Record<string, string> = {
+    categories: 'category',
+    suppliers: 'supplier',
+    units: 'unit',
+    locations: 'location',
+    projects: 'project',
+  };
+  if (irregular[lower]) return irregular[lower];
+  if (lower.endsWith('ies')) return `${lower.slice(0, -3)}y`;
+  if (lower.endsWith('s') && lower.length > 1) return lower.slice(0, -1);
+  return lower;
+}
+
 export function EditableItemList({
   items,
   setItems,
   title,
   description,
 }: EditableItemListProps) {
+  const itemLabel = singularFormForListTitle(title);
+  const addPlaceholder = `Add new ${itemLabel}`;
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -120,7 +137,7 @@ export function EditableItemList({
   };
 
   const handleAddItem = () => {
-    const input = document.querySelector(`input[placeholder="Add new ${title.toLowerCase().slice(0, -1)}"]`) as HTMLInputElement;
+    const input = document.querySelector(`input[placeholder="${addPlaceholder}"]`) as HTMLInputElement;
     if (input && input.value.trim()) {
       setItems([...items, input.value.trim()]);
       input.value = '';
@@ -155,7 +172,7 @@ export function EditableItemList({
         <Input
           type="text"
           className="flex-1"
-          placeholder={`Add new ${title.toLowerCase().slice(0, -1)}`}
+          placeholder={addPlaceholder}
           onKeyDown={handleKeyDown}
         />
         <Button onClick={handleAddItem}>

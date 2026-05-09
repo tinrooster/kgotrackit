@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger, createTabsScope } from '@/components/ui/tabs';
 import { OrgMaintenanceBroadcastTemplateSection } from '@/components/settings/OrgMaintenanceBroadcastTemplateSection';
+import { OrganizationDirectoryContactsSection } from '@/components/settings/OrganizationDirectoryContactsSection';
 import { OrganizationMasterPanel } from '@/components/settings/OrganizationMasterPanel';
 import type { OrganizationSummary } from '@/lib/supabase/organizationData';
 import type { MaintenanceOnAirSchedule } from '@/lib/settingsService';
@@ -61,12 +62,15 @@ export function OrganizationSettingsSection({
         value={organizationSubTab}
         onValueChange={(value) => onOrganizationSubTabChange(value as OrganizationSettingsSubTabId)}
       >
-        <TabsList __scopeTabs={orgTabsScope} className="grid h-auto w-full grid-cols-1 sm:grid-cols-3">
+        <TabsList __scopeTabs={orgTabsScope} className="grid h-auto w-full grid-cols-1 sm:grid-cols-4">
           <TabsTrigger __scopeTabs={orgTabsScope} value="overview">
             Overview
           </TabsTrigger>
           <TabsTrigger __scopeTabs={orgTabsScope} value="crew">
             Master crew
+          </TabsTrigger>
+          <TabsTrigger __scopeTabs={orgTabsScope} value="directory">
+            Directory
           </TabsTrigger>
           <TabsTrigger __scopeTabs={orgTabsScope} value="maintenance">
             Maintenance cautions
@@ -150,6 +154,14 @@ export function OrganizationSettingsSection({
             shoot; attach names from this roster when building a crew list.
           </p>
           <CrewPage />
+        </TabsContent>
+
+        <TabsContent __scopeTabs={orgTabsScope} value="directory" className="space-y-3 pt-4 focus-visible:outline-none">
+          <OrganizationDirectoryContactsSection
+            organizationId={activeOrganizationId}
+            authBackend={authBackend}
+            canEdit={activeOrganizationRole === 'admin' || activeOrganizationRole === 'editor'}
+          />
         </TabsContent>
 
         <TabsContent __scopeTabs={orgTabsScope} value="maintenance" className="pt-4 focus-visible:outline-none">

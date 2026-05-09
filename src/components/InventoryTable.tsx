@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { InventoryItem } from "@/types/inventory";
 import { format } from "date-fns";
-import { Pencil, ArrowUpDown, FileDown, DollarSign, LayoutList, LayoutGrid, Box, Lock, BarChart2, StickyNote } from "lucide-react";
+import { Pencil, ArrowUpDown, FileDown, DollarSign, LayoutList, LayoutGrid, Box, Lock, BarChart2, StickyNote, Menu, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { exportToExcel } from "@/lib/exportUtils";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type SortConfig = {
   key: keyof InventoryItem | 'totalValue' | 'cabinet';
@@ -390,17 +396,41 @@ export function InventoryTable({
                       return (
                         <TableCell key={column} className="text-right">
                           {showActions && (
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onEdit(item)}
-                                title={`Edit ${item.name}`}
-                                aria-label={`Edit ${item.name}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title={`Actions for ${item.name}`}
+                                  aria-label={`Actions for ${item.name}`}
+                                >
+                                  <Menu className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onSelect={(event) => {
+                                    event.preventDefault();
+                                    onEdit(item);
+                                  }}
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                {onDelete ? (
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onSelect={(event) => {
+                                      event.preventDefault();
+                                      onDelete(item);
+                                    }}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                ) : null}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </TableCell>
                       );

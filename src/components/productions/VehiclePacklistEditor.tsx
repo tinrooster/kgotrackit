@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Truck, Unlink, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Truck, Unlink, AlertTriangle, MoreHorizontal } from 'lucide-react';
 import { VehiclePacklist, VehiclePacklistSection, ChecklistItem, ChecklistGroup } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsible';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   ensureVehiclePacklistShape,
   removeVehiclePacklistItemById,
@@ -312,27 +318,36 @@ export function VehiclePacklistEditor({
           title="Link inventory item to packlist"
         />
       ) : null}
-      {!readOnly && item.inventoryItemId ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          title="Unlink inventory item"
-          onClick={() => updateItemById(packlistId, item.id, { inventoryItemId: undefined })}
-        >
-          <Unlink className="h-3.5 w-3.5" />
-        </Button>
-      ) : null}
       {!readOnly && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn('h-8 w-8 shrink-0 border', 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20')}
-          onClick={() => runDeleteAction(`item:${packlistId}:${item.id}`, () => removeItem(packlistId, item.id))}
-          title="Delete item"
-        >
-          <Trash2 className="h-3.5 w-3.5 text-red-300" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Item actions">
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {item.inventoryItemId ? (
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  updateItemById(packlistId, item.id, { inventoryItemId: undefined });
+                }}
+              >
+                <Unlink className="mr-2 h-3.5 w-3.5" />
+                Unlink item
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={(event) => {
+                event.preventDefault();
+                runDeleteAction(`item:${packlistId}:${item.id}`, () => removeItem(packlistId, item.id));
+              }}
+            >
+              Delete item
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
     </div>
   );
@@ -401,15 +416,24 @@ export function VehiclePacklistEditor({
                 {doneCount}/{allFlat.length} packed
               </span>
               {!readOnly && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 shrink-0"
-                  onClick={() => runDeleteAction(`packlist:${packlist.id}`, () => removePacklist(packlist.id))}
-                  title="Delete packlist"
-                >
-                  <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" title="Packlist actions">
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        runDeleteAction(`packlist:${packlist.id}`, () => removePacklist(packlist.id));
+                      }}
+                    >
+                      Delete packlist
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
 

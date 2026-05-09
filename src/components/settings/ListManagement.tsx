@@ -30,6 +30,21 @@ interface ListManagementProps {
   onUpdate: (type: string, items: ListItem[]) => void;
 }
 
+function singularTypeLabel(type: string): string {
+  const normalizedType = type.trim().toLowerCase();
+  const mapped: Record<string, string> = {
+    categories: 'category',
+    units: 'unit',
+    locations: 'location',
+    suppliers: 'supplier',
+    projects: 'project',
+  };
+  if (mapped[normalizedType]) return mapped[normalizedType];
+  if (normalizedType.endsWith('ies')) return `${normalizedType.slice(0, -3)}y`;
+  if (normalizedType.endsWith('s') && normalizedType.length > 1) return normalizedType.slice(0, -1);
+  return normalizedType || 'item';
+}
+
 export function ListManagement({
   categories,
   units,
@@ -93,7 +108,7 @@ export function ListManagement({
       }
     }
 
-    toast.success(`${deleteDialog.type.slice(0, -1)} deleted`);
+    toast.success(`${singularTypeLabel(deleteDialog.type)} deleted`);
   };
 
   const renderCategoryItem = (item: ListItem, level = 0) => (

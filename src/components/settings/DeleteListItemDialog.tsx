@@ -24,6 +24,14 @@ interface DeleteListItemDialogProps {
 
 const LEAVE_AS_IS_VALUE = "__LEAVE_AS_IS__";
 
+const LIST_FIELD_MAP: Record<string, keyof InventoryItem> = {
+  categories: 'category',
+  units: 'unit',
+  locations: 'location',
+  suppliers: 'supplier',
+  projects: 'project',
+};
+
 export function DeleteListItemDialog({
   open,
   onOpenChange,
@@ -36,14 +44,17 @@ export function DeleteListItemDialog({
   const [selectedReassignId, setSelectedReassignId] = useState<string>(LEAVE_AS_IS_VALUE);
   const [affectedItems, setAffectedItems] = useState<InventoryItem[]>([]);
 
+  const singularType = LIST_FIELD_MAP[listType] ?? (listType.endsWith('ies') ? `${listType.slice(0, -3)}y` : listType.slice(0, -1));
+  const itemField = (LIST_FIELD_MAP[listType] ?? singularType) as keyof InventoryItem;
+
   // Find items that use the list item to be deleted
   useEffect(() => {
     const affected = inventoryItems.filter(item => {
-      const value = item[listType.slice(0, -1) as keyof InventoryItem];
+      const value = item[itemField];
       return value === itemToDelete.id || value === itemToDelete.name;
     });
     setAffectedItems(affected);
-  }, [itemToDelete, listType, inventoryItems]);
+  }, [itemToDelete, itemField, inventoryItems]);
 
   const otherItems = allItems.filter(item => item.id !== itemToDelete.id);
 
@@ -51,14 +62,14 @@ export function DeleteListItemDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
         <DialogHeader>
-          <DialogTitle>Delete {listType.slice(0, -1)}</DialogTitle>
+          <DialogTitle>Delete {singularType}</DialogTitle>
           <DialogDescription>
             Are you sure you want to delete "{itemToDelete.name}"?
             {affectedItems.length > 0 && (
               <>
                 <br /><br />
-                This {listType.slice(0, -1)} is used by {affectedItems.length} item{affectedItems.length !== 1 ? 's' : ''}.
-                You can reassign these items to another {listType.slice(0, -1)} or leave them as is.
+                This {singularType} is used by {affectedItems.length} item{affectedItems.length !== 1 ? 's' : ''}.
+                You can reassign these items to another {singularType} or leave them as is.
               </>
             )}
           </DialogDescription>
@@ -72,7 +83,7 @@ export function DeleteListItemDialog({
               onValueChange={setSelectedReassignId}
             >
               <SelectTrigger>
-                <SelectValue placeholder={`Select ${listType.slice(0, -1)}`} />
+                <SelectValue placeholder={`Select ${singularType}`} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={LEAVE_AS_IS_VALUE}>Leave as is</SelectItem>

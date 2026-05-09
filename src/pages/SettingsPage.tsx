@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Library, Building2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,10 +34,12 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import { useLocation } from 'react-router-dom'
 import { Label } from "@/components/ui/label"
+import { Checkbox } from '@/components/ui/checkbox'
 import { getPasswordError } from '@/utils/passwordUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { DataBackupTab } from "@/components/settings/DataBackupTab"
 import { WorkspaceTeamTab } from '@/components/settings/WorkspaceTeamTab'
+import { WorkspaceUtilitiesDialog } from '@/components/settings/WorkspaceUtilitiesDialog'
 import { SupabaseWorkspaceUsersCard } from '@/components/settings/SupabaseWorkspaceUsersCard'
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
 import { OrganizationSettingsSection } from '@/components/settings/OrganizationSettingsSection'
@@ -70,14 +72,37 @@ import {
   type OrganizationImportStrategy,
   type OrganizationImportSections,
 } from '@/lib/supabase/organizationPortability'
-import { pullOrganizationAppData } from '@/lib/supabase/organizationData'
+import {
+  pullOrganizationAppData,
+  pushOrganizationSnapshot,
+  type OrganizationSnapshotPayload,
+} from '@/lib/supabase/organizationData'
 import { parseMaintenanceOnAirScheduleFromUnknown, type MaintenanceOnAirSchedule } from '@/lib/settingsService'
+import { getCrewContacts, saveCrewContacts } from '@/lib/crewContactsService'
 import {
   normalizeLookupListPayload,
   mergeLookupListEntries,
   type NormalizedImportPayload,
 } from '@/lib/importListNormalization'
 import { ImportPayloadPreview } from '@/components/settings/ImportPayloadPreview'
+import {
+  promoteProductionCrewToDirectory,
+  type PromoteProductionCrewResult,
+} from '@/lib/crewDirectoryMigration'
+import { parseContactWorkbookFile, type ParsedContactCandidate } from '@/lib/contactWorkbookImport'
+import { canonicalNameKey, parseContactDisplayName } from '@/lib/contactName'
+
+type ParsedContactDestination = 'production' | 'org_directory';
+
+interface ParsedContactImportRow extends ParsedContactCandidate {
+  rowId: string;
+  include: boolean;
+  destination: ParsedContactDestination;
+  matchedMasterContactId?: string;
+  matchedMasterContactName?: string;
+}
+
+type ParsedRowIssue = 'invalid_name' | 'phone_in_name' | 'handle_in_name' | 'possible_duplicate';
 
 interface SettingsState {
   categories: ItemWithSubcategories[];
@@ -505,6 +530,150 @@ export default function SettingsPage() {
     fileType: 'json' | 'excel';
     file: File;
   } | null>(null);
+  const [workspaceUtilitiesOpen, setWorkspaceUtilitiesOpen] = useState(false);
+  const [crewPromotionBusy, setCrewPromotionBusy] = useState(false);
+  const [lastCrewPromotionResult, setLastCrewPromotionResult] =
+    useState<PromoteProductionCrewResult | null>(null);
+  const [contactParseBusy, setContactParseBusy] = useState(false);
+  const [contactImportBusy, setContactImportBusy] = useState(false);
+  const [parsedContactCandidates, setParsedContactCandidates] = useState<ParsedContactCandidate[]>([]);
+  const [parsedContactRows, setParsedContactRows] = useState<ParsedContactImportRow[]>([]);
+  const [parsedContactSourceSummary, setParsedContactSourceSummary] = useState<{
+    files: number;
+    sheets: number;
+    rows: number;
+    sheetSummaries: Array<{
+      fileName: string;
+      sheetName: string;
+      candidatesFound: number;
+    }>;
+  } | null>(null);
+  const [contactPreviewOpen, setContactPreviewOpen] = useState(false);
+  const [contactPreviewFilter, setContactPreviewFilter] = useState<
+    'all' | 'included' | 'production' | 'org_directory' | 'flagged'
+  >('all');
+  const [contactPreviewSort, setContactPreviewSort] = useState<
+    'name_asc' | 'name_desc' | 'destination'
+  >('name_asc');
+  const [contactPreviewSourceFilter, setContactPreviewSourceFilter] = useState<string>('all');
+  const [contactParseProgress, setContactParseProgress] = useState<{
+    fileName: string;
+    fileIndex: number;
+    fileTotal: number;
+    sheetName: string;
+    sheetIndex: number;
+    sheetTotal: number;
+  } | null>(null);
+  const contactExcelImportRef = useRef<HTMLInputElement>(null);
+
+  const isLikelyPhoneToken = (value: string): boolean => value.replace(/\D/g, '').length >= 7;
+  const isLikelyHandleToken = (value: string): boolean => /^@/.test(value.trim()) || /twitter|facebook|instagram|tiktok/i.test(value);
+  const normalizedNameForDupes = (value: string): string => canonicalNameKey(value);
+
+  const parsedRowIssues = useMemo(() => {
+    const issuesByRowId = new Map<string, ParsedRowIssue[]>();
+    const masterContacts = getCrewContacts();
+    const normalizedMasterNames = masterContacts.map((contact) => normalizedNameForDupes(contact.fullName));
+
+    for (const row of parsedContactRows) {
+      const issues: ParsedRowIssue[] = [];
+      const fullName = row.fullName.trim();
+      const normalizedName = normalizedNameForDupes(fullName);
+      const nameTokens = normalizedName.split(' ').filter(Boolean);
+
+      if (!fullName || nameTokens.length < 2) {
+        issues.push('invalid_name');
+      }
+      if (isLikelyPhoneToken(fullName)) {
+        issues.push('phone_in_name');
+      }
+      if (isLikelyHandleToken(fullName)) {
+        issues.push('handle_in_name');
+      }
+      if (!row.matchedMasterContactId && normalizedName) {
+        const possibleMatch = normalizedMasterNames.some((existingName) => {
+          if (existingName === normalizedName) return false;
+          const existingTokens = existingName.split(' ').filter(Boolean);
+          if (existingTokens.length < 2 || nameTokens.length < 2) return false;
+          const sameLastName = existingTokens[existingTokens.length - 1] === nameTokens[nameTokens.length - 1];
+          const sameFirstInitial = existingTokens[0]?.[0] === nameTokens[0]?.[0];
+          return sameLastName && sameFirstInitial;
+        });
+        if (possibleMatch) {
+          issues.push('possible_duplicate');
+        }
+      }
+      issuesByRowId.set(row.rowId, issues);
+    }
+
+    return issuesByRowId;
+  }, [parsedContactRows]);
+
+  const contactPreviewSourceOptions = useMemo(() => {
+    const sources = Array.from(
+      new Set(
+        parsedContactRows
+          .map((row) => row.sourceFile?.trim() ?? '')
+          .filter((value) => value.length > 0),
+      ),
+    ).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
+    return ['all', ...sources];
+  }, [parsedContactRows]);
+
+  const previewRows = useMemo(() => {
+    let rows = [...parsedContactRows];
+    if (contactPreviewFilter === 'included') {
+      rows = rows.filter((row) => row.include);
+    } else if (contactPreviewFilter === 'production') {
+      rows = rows.filter((row) => row.destination === 'production');
+    } else if (contactPreviewFilter === 'org_directory') {
+      rows = rows.filter((row) => row.destination === 'org_directory');
+    } else if (contactPreviewFilter === 'flagged') {
+      rows = rows.filter((row) => (parsedRowIssues.get(row.rowId)?.length ?? 0) > 0);
+    }
+    if (contactPreviewSourceFilter !== 'all') {
+      rows = rows.filter((row) => (row.sourceFile?.trim() ?? '') === contactPreviewSourceFilter);
+    }
+
+    rows.sort((a, b) => {
+      if (contactPreviewSort === 'name_asc') {
+        return a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' });
+      }
+      if (contactPreviewSort === 'name_desc') {
+        return b.fullName.localeCompare(a.fullName, undefined, { sensitivity: 'base' });
+      }
+      if (a.destination === b.destination) {
+        return a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' });
+      }
+      return a.destination === 'production' ? -1 : 1;
+    });
+    return rows;
+  }, [parsedContactRows, contactPreviewFilter, contactPreviewSort, contactPreviewSourceFilter, parsedRowIssues]);
+
+  const previewTally = useMemo(() => {
+    const total = parsedContactRows.length;
+    const included = parsedContactRows.filter((row) => row.include).length;
+    const flagged = parsedContactRows.filter((row) => (parsedRowIssues.get(row.rowId)?.length ?? 0) > 0).length;
+    const matchedMaster = parsedContactRows.filter((row) => Boolean(row.matchedMasterContactId)).length;
+    const productionTotal = parsedContactRows.filter((row) => row.destination === 'production').length;
+    const productionIncluded = parsedContactRows.filter(
+      (row) => row.destination === 'production' && row.include,
+    ).length;
+    const directoryTotal = parsedContactRows.filter((row) => row.destination === 'org_directory').length;
+    const directoryIncluded = parsedContactRows.filter(
+      (row) => row.destination === 'org_directory' && row.include,
+    ).length;
+    return {
+      total,
+      included,
+      flagged,
+      matchedMaster,
+      productionTotal,
+      productionIncluded,
+      directoryTotal,
+      directoryIncluded,
+    };
+  }, [parsedContactRows, parsedRowIssues]);
 
   useEffect(() => {
     const search = new URLSearchParams(location.search);
@@ -1096,6 +1265,441 @@ export default function SettingsPage() {
     }
     await resetOrganizationLibraryMetadata(activeOrganizationId);
     toast.success('Organization settings-only data reset');
+  };
+
+  const handlePromoteProductionCrew = (): void => {
+    setCrewPromotionBusy(true);
+    try {
+      const result = promoteProductionCrewToDirectory();
+      setLastCrewPromotionResult(result);
+      toast.success('Production crew migration completed.', {
+        description:
+          result.addedContacts > 0
+            ? `Added ${result.addedContacts} contact${result.addedContacts === 1 ? '' : 's'} to the Master Crew Directory.`
+            : 'No new contacts were added.',
+      });
+    } catch (error) {
+      toast.error('Could not migrate production crew.', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setCrewPromotionBusy(false);
+    }
+  };
+
+  const inferParsedContactDestination = (candidate: ParsedContactCandidate): ParsedContactDestination => {
+    const source = `${candidate.functionalArea ?? ''} ${candidate.sourceSheet ?? ''}`.toLowerCase();
+    const generalSignals = [
+      'facilities',
+      'building',
+      'security',
+      'janitorial',
+      'mail room',
+      'travel',
+      'reservation',
+      'manager',
+      'engineering',
+      'it',
+      'tie lines',
+    ];
+    const productionSignals = [
+      'anchor',
+      'reporter',
+      'producer',
+      'assignment',
+      'weather',
+      'photog',
+      'news',
+    ];
+    if (generalSignals.some((token) => source.includes(token))) return 'org_directory';
+    if (productionSignals.some((token) => source.includes(token))) return 'production';
+    return 'org_directory';
+  };
+
+  const mergeNotesWithExtension = (notes: string | undefined, extension: string | undefined): string | undefined => {
+    const trimmedNotes = notes?.trim() || '';
+    const trimmedExtension = extension?.trim() || '';
+    if (!trimmedExtension) {
+      return trimmedNotes || undefined;
+    }
+    const extensionToken = `Extension: ${trimmedExtension}`;
+    if (!trimmedNotes) {
+      return extensionToken;
+    }
+    if (trimmedNotes.toLowerCase().includes(extensionToken.toLowerCase())) {
+      return trimmedNotes;
+    }
+    return `${trimmedNotes} | ${extensionToken}`;
+  };
+
+  const mergeRoleTags = (currentRoleTags: string[] | undefined, incomingTags: string[]): string[] => {
+    const result = new Set<string>();
+    for (const roleTag of currentRoleTags ?? []) {
+      const normalizedRoleTag = roleTag.trim();
+      if (normalizedRoleTag) result.add(normalizedRoleTag);
+    }
+    for (const roleTag of incomingTags) {
+      const normalizedRoleTag = roleTag.trim();
+      if (normalizedRoleTag) result.add(normalizedRoleTag);
+    }
+    return Array.from(result);
+  };
+
+  const handleParseContactExcelFiles = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    if (contactExcelImportRef.current) {
+      contactExcelImportRef.current.value = '';
+    }
+    if (selectedFiles.length === 0) return;
+
+    setContactParseBusy(true);
+    setContactParseProgress(null);
+    try {
+      const parseResults: Array<Awaited<ReturnType<typeof parseContactWorkbookFile>>> = [];
+      for (let fileIndex = 0; fileIndex < selectedFiles.length; fileIndex += 1) {
+        const selectedFile = selectedFiles[fileIndex];
+        const parsed = await parseContactWorkbookFile(selectedFile, {
+          onProgress: (progress) => {
+            setContactParseProgress({
+              fileName: selectedFile.name,
+              fileIndex: fileIndex + 1,
+              fileTotal: selectedFiles.length,
+              sheetName: progress.sheetName,
+              sheetIndex: progress.sheetIndex,
+              sheetTotal: progress.totalSheets,
+            });
+          },
+        });
+        parseResults.push(parsed);
+      }
+      const mergedByName = new Map<string, ParsedContactCandidate>();
+      let totalSheets = 0;
+      let totalRows = 0;
+      for (const result of parseResults) {
+        totalSheets += result.sheetsScanned;
+        totalRows += result.rowsScanned;
+        for (const candidate of result.contacts) {
+          const normalizedFullName = parseContactDisplayName(candidate.fullName);
+          const key = canonicalNameKey(normalizedFullName);
+          if (!key) continue;
+          const existing = mergedByName.get(key);
+          if (!existing) {
+            mergedByName.set(key, {
+              ...candidate,
+              fullName: normalizedFullName,
+            });
+            continue;
+          }
+          mergedByName.set(key, {
+            ...existing,
+            fullName: normalizedFullName,
+            phone: existing.phone || candidate.phone,
+            extension: existing.extension || candidate.extension,
+            email: existing.email || candidate.email,
+            functionalArea: existing.functionalArea || candidate.functionalArea,
+          });
+        }
+      }
+
+      const parsedContacts = Array.from(mergedByName.values());
+      const existingMasterContacts = getCrewContacts();
+      const existingMasterByName = new Map(
+        existingMasterContacts.map((contact) => [canonicalNameKey(contact.fullName), contact]),
+      );
+      setParsedContactCandidates(parsedContacts);
+      setParsedContactRows(
+        parsedContacts.map((candidate) => {
+          const matchedMaster = existingMasterByName.get(canonicalNameKey(candidate.fullName));
+          return {
+            ...candidate,
+            rowId: crypto.randomUUID(),
+            include: true,
+            destination: matchedMaster ? 'production' : inferParsedContactDestination(candidate),
+            matchedMasterContactId: matchedMaster?.id,
+            matchedMasterContactName: matchedMaster?.fullName,
+          };
+        }),
+      );
+      setParsedContactSourceSummary({
+        files: selectedFiles.length,
+        sheets: totalSheets,
+        rows: totalRows,
+        sheetSummaries: parseResults.flatMap((result, index) =>
+          result.sheetSummaries.map((summary) => ({
+            fileName: selectedFiles[index]?.name ?? 'Unknown file',
+            sheetName: summary.sheetName,
+            candidatesFound: summary.candidatesFound,
+          })),
+        ),
+      });
+      setContactPreviewOpen(true);
+      toast.success('Parsed contact workbook files.', {
+        description: `Detected ${parsedContacts.length} candidate contact${parsedContacts.length === 1 ? '' : 's'} across ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}.`,
+      });
+    } catch (error) {
+      toast.error('Could not parse contact workbooks.', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setContactParseBusy(false);
+      setContactParseProgress(null);
+    }
+  };
+
+  const handleImportParsedContactsToMaster = async (): Promise<void> => {
+    if (parsedContactRows.length === 0) {
+      toast.error('No parsed contacts available to import.');
+      return;
+    }
+    const selectedRows = parsedContactRows.filter((row) => row.include);
+    if (selectedRows.length === 0) {
+      toast.error('No parsed contacts selected for import.');
+      return;
+    }
+    const productionRows = selectedRows.filter((row) => row.destination === 'production');
+    const orgDirectoryRows = selectedRows.filter((row) => row.destination === 'org_directory');
+
+    setContactImportBusy(true);
+    try {
+      const existingContacts = getCrewContacts();
+      const existingByName = new Map(
+        existingContacts.map((contact) => [canonicalNameKey(contact.fullName), contact]),
+      );
+      const nextContacts = [...existingContacts];
+
+      let added = 0;
+      let updated = 0;
+      let unchanged = 0;
+
+      for (const candidate of productionRows) {
+        const normalizedFullName = parseContactDisplayName(candidate.fullName);
+        const nameKey = canonicalNameKey(normalizedFullName);
+        if (!nameKey) continue;
+        const existing = existingByName.get(nameKey);
+        if (!existing) {
+          const nowIso = new Date().toISOString();
+          nextContacts.push({
+            id: crypto.randomUUID(),
+            fullName: normalizedFullName,
+            contactType: 'crew',
+            roleTags: mergeRoleTags([], ['production']),
+            defaultEquipmentItemIds: [],
+            organizationName: undefined,
+            functionalArea: candidate.functionalArea?.trim() || undefined,
+            preferredVehicle: undefined,
+            vehicleNotes: undefined,
+            phone: candidate.phone?.trim() || undefined,
+            email: candidate.email?.trim() || undefined,
+            notes: mergeNotesWithExtension(undefined, candidate.extension),
+            baseLocation: undefined,
+            unionStatus: undefined,
+            isActive: true,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          });
+          added += 1;
+          continue;
+        }
+
+        const nextPhone = candidate.phone?.trim() || existing.phone;
+        const nextEmail = candidate.email?.trim() || existing.email;
+        const nextFunctionalArea = candidate.functionalArea?.trim() || existing.functionalArea;
+        const nextNotes = mergeNotesWithExtension(existing.notes, candidate.extension);
+        const nextRoleTags = mergeRoleTags(existing.roleTags, ['production']);
+
+        const changed =
+          nextPhone !== existing.phone ||
+          nextEmail !== existing.email ||
+          nextFunctionalArea !== existing.functionalArea ||
+          nextNotes !== existing.notes ||
+          nextRoleTags.join('|').toLowerCase() !== (existing.roleTags ?? []).join('|').toLowerCase();
+
+        if (!changed) {
+          unchanged += 1;
+          continue;
+        }
+
+        const updatedContact = {
+          ...existing,
+          phone: nextPhone,
+          email: nextEmail,
+          functionalArea: nextFunctionalArea,
+          notes: nextNotes,
+          roleTags: nextRoleTags,
+          updatedAt: new Date().toISOString(),
+        };
+        const index = nextContacts.findIndex((contact) => contact.id === existing.id);
+        if (index >= 0) {
+          nextContacts[index] = updatedContact;
+          updated += 1;
+        } else {
+          nextContacts.push(updatedContact);
+          updated += 1;
+        }
+      }
+
+      saveCrewContacts(nextContacts);
+
+      let orgDirectoryAdded = 0;
+      let orgDirectoryUpdated = 0;
+      if (activeOrganizationId) {
+        const currentRow = await pullOrganizationAppData(activeOrganizationId);
+        const currentBranding =
+          currentRow?.branding && typeof currentRow.branding === 'object' && !Array.isArray(currentRow.branding)
+            ? ({ ...currentRow.branding } as Record<string, unknown>)
+            : {};
+        const existingDirectoryContacts = Array.isArray(currentBranding.directoryContacts)
+          ? (currentBranding.directoryContacts as Array<Record<string, unknown>>)
+          : [];
+        const directoryByName = new Map(
+          existingDirectoryContacts
+            .filter((entry) => typeof entry.fullName === 'string')
+            .map((entry) => [canonicalNameKey(String(entry.fullName)), entry]),
+        );
+        const nextDirectoryContacts = [...existingDirectoryContacts];
+
+        for (const candidate of orgDirectoryRows) {
+          const normalizedFullName = parseContactDisplayName(candidate.fullName);
+          const key = canonicalNameKey(normalizedFullName);
+          if (!key) continue;
+          const existingEntry = directoryByName.get(key);
+          if (!existingEntry) {
+            nextDirectoryContacts.push({
+              id: crypto.randomUUID(),
+              fullName: normalizedFullName,
+              phone: candidate.phone?.trim() || undefined,
+              email: candidate.email?.trim() || undefined,
+              extension: candidate.extension?.trim() || undefined,
+              functionalArea: candidate.functionalArea?.trim() || undefined,
+              sourceFile: candidate.sourceFile,
+              sourceSheet: candidate.sourceSheet,
+              updatedAt: new Date().toISOString(),
+            });
+            orgDirectoryAdded += 1;
+            continue;
+          }
+          const updatedEntry = {
+            ...existingEntry,
+            phone: (existingEntry.phone as string | undefined) || candidate.phone?.trim() || undefined,
+            email: (existingEntry.email as string | undefined) || candidate.email?.trim() || undefined,
+            extension:
+              (existingEntry.extension as string | undefined) || candidate.extension?.trim() || undefined,
+            functionalArea:
+              (existingEntry.functionalArea as string | undefined) ||
+              candidate.functionalArea?.trim() ||
+              undefined,
+            updatedAt: new Date().toISOString(),
+          };
+          const existingIndex = nextDirectoryContacts.findIndex(
+            (entry) => canonicalNameKey(String(entry.fullName ?? '')) === key,
+          );
+          if (existingIndex >= 0) {
+            nextDirectoryContacts[existingIndex] = updatedEntry;
+            orgDirectoryUpdated += 1;
+          }
+        }
+
+        currentBranding.directoryContacts = nextDirectoryContacts;
+        await pushOrganizationSnapshot(activeOrganizationId, {
+          contacts: nextContacts,
+          position_templates: Array.isArray(currentRow?.position_templates)
+            ? currentRow.position_templates
+            : [],
+          inventory_baseline: Array.isArray(currentRow?.inventory_baseline)
+            ? currentRow.inventory_baseline
+            : [],
+          role_tags: Array.isArray(currentRow?.role_tags) ? currentRow.role_tags : [],
+          branding: currentBranding,
+          maintenance_on_air_template: currentRow?.maintenance_on_air_template ?? null,
+        } as OrganizationSnapshotPayload);
+      }
+
+      toast.success('Master Crew Directory updated from parsed contacts.', {
+        description:
+          `Production contacts — added ${added}, updated ${updated}, unchanged ${unchanged}. ` +
+          `Org directory contacts — added ${orgDirectoryAdded}, updated ${orgDirectoryUpdated}.`,
+      });
+    } catch (error) {
+      toast.error('Could not import parsed contacts.', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setContactImportBusy(false);
+    }
+  };
+
+  const handleDownloadParsedContactsAsOrganizationJson = (): void => {
+    if (parsedContactRows.length === 0) {
+      toast.error('No parsed contacts available to export.');
+      return;
+    }
+    const selectedRows = parsedContactRows.filter((row) => row.include);
+    if (selectedRows.length === 0) {
+      toast.error('No parsed contacts selected for export.');
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    const productionContacts = selectedRows
+      .filter((row) => row.destination === 'production')
+      .map((candidate) => ({
+      id: crypto.randomUUID(),
+      fullName: candidate.fullName.trim(),
+      contactType: 'crew' as const,
+      roleTags: [] as string[],
+      defaultEquipmentItemIds: [] as string[],
+      organizationName: undefined,
+      functionalArea: candidate.functionalArea?.trim() || undefined,
+      preferredVehicle: undefined,
+      vehicleNotes: undefined,
+      phone: candidate.phone?.trim() || undefined,
+      email: candidate.email?.trim() || undefined,
+      notes: mergeNotesWithExtension(undefined, candidate.extension),
+      baseLocation: undefined,
+      unionStatus: undefined,
+      isActive: true,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    }));
+    const directoryContacts = selectedRows
+      .filter((row) => row.destination === 'org_directory')
+      .map((candidate) => ({
+        id: crypto.randomUUID(),
+        fullName: candidate.fullName.trim(),
+        phone: candidate.phone?.trim() || undefined,
+        email: candidate.email?.trim() || undefined,
+        extension: candidate.extension?.trim() || undefined,
+        functionalArea: candidate.functionalArea?.trim() || undefined,
+        sourceFile: candidate.sourceFile,
+        sourceSheet: candidate.sourceSheet,
+        updatedAt: nowIso,
+      }));
+
+    const payload = {
+      version: 'trackit-organization-export-v1',
+      exportedAt: nowIso,
+      organizationId: activeOrganizationId || 'unassigned-organization',
+      data: {
+        contacts: productionContacts,
+        position_templates: [],
+        inventory_baseline: [],
+        role_tags: [],
+        branding: {
+          directoryContacts,
+        },
+        maintenance_on_air_template: null,
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `trackIT-org-contacts-from-excel-${nowIso.split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Parsed contacts exported as organization JSON.', {
+      description: `Exported ${productionContacts.length} production contact(s) and ${directoryContacts.length} org directory contact(s).`,
+    });
   };
 
   const saveUsers = (newUsers: User[]) => {
@@ -2310,6 +2914,137 @@ export default function SettingsPage() {
         {canAccessWorkspacesTab && (
           <TabsContent value="workspaces" className="space-y-6">
             <WorkspaceTeamTab />
+            <Card>
+              <CardHeader>
+                <CardTitle>Workspace Utilities</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Run workspace-level utility actions and migrate assigned production crew into the
+                  Master Crew Directory.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setWorkspaceUtilitiesOpen(true)}
+                    disabled={!activeWorkspaceId}
+                  >
+                    Open Workspace Utilities
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handlePromoteProductionCrew}
+                    disabled={crewPromotionBusy}
+                  >
+                    {crewPromotionBusy
+                      ? 'Migrating…'
+                      : 'Promote Production Crew to Master Directory'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => contactExcelImportRef.current?.click()}
+                    disabled={contactParseBusy}
+                  >
+                    {contactParseBusy ? 'Parsing…' : 'Parse Contact Excel Files'}
+                  </Button>
+                  <input
+                    type="file"
+                    ref={contactExcelImportRef}
+                    accept=".xlsx,.xls"
+                    multiple
+                    onChange={(event) => void handleParseContactExcelFiles(event)}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void handleImportParsedContactsToMaster()}
+                    disabled={contactImportBusy || parsedContactRows.length === 0}
+                  >
+                    {contactImportBusy ? 'Importing…' : 'Import Parsed Contacts to Master'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setContactPreviewOpen(true)}
+                    disabled={parsedContactRows.length === 0}
+                  >
+                    Preview Parsed Contacts
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDownloadParsedContactsAsOrganizationJson}
+                    disabled={parsedContactRows.length === 0}
+                  >
+                    Download Parsed Contacts as Org JSON
+                  </Button>
+                </div>
+                {!activeWorkspaceId ? (
+                  <p className="text-xs text-muted-foreground">
+                    Select an active team workspace to open Workspace Utilities.
+                  </p>
+                ) : null}
+                {parsedContactSourceSummary ? (
+                  <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                    <p>
+                      Parsed {parsedContactRows.length} contact candidate
+                      {parsedContactRows.length === 1 ? '' : 's'} from{' '}
+                      {parsedContactSourceSummary.files} file
+                      {parsedContactSourceSummary.files === 1 ? '' : 's'}, {' '}
+                      {parsedContactSourceSummary.sheets} sheet
+                      {parsedContactSourceSummary.sheets === 1 ? '' : 's'}, {' '}
+                      {parsedContactSourceSummary.rows} scanned row
+                      {parsedContactSourceSummary.rows === 1 ? '' : 's'}.
+                    </p>
+                    <div className="mt-2 max-h-24 overflow-y-auto rounded border border-border/50 bg-background/40 p-2">
+                      {parsedContactSourceSummary.sheetSummaries.map((summary) => (
+                        <p key={`${summary.fileName}-${summary.sheetName}`}>
+                          {summary.fileName} → {summary.sheetName}: {summary.candidatesFound} candidate
+                          {summary.candidatesFound === 1 ? '' : 's'}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {contactParseBusy && contactParseProgress ? (
+                  <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                    <p className="font-medium text-foreground">
+                      Parsing in progress — you can keep using the app while this runs.
+                    </p>
+                    <p className="mt-1">
+                      File {contactParseProgress.fileIndex} of {contactParseProgress.fileTotal}:{' '}
+                      {contactParseProgress.fileName}
+                    </p>
+                    <p>
+                      Sheet {contactParseProgress.sheetIndex} of {contactParseProgress.sheetTotal}:{' '}
+                      {contactParseProgress.sheetName}
+                    </p>
+                  </div>
+                ) : null}
+                {lastCrewPromotionResult ? (
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    <p>
+                      Scanned: {lastCrewPromotionResult.scannedCrewMembers} crew member
+                      {lastCrewPromotionResult.scannedCrewMembers === 1 ? '' : 's'}
+                    </p>
+                    <p>
+                      Added: {lastCrewPromotionResult.addedContacts} contact
+                      {lastCrewPromotionResult.addedContacts === 1 ? '' : 's'}
+                    </p>
+                    <p>
+                      Skipped existing: {lastCrewPromotionResult.skippedExistingContacts}
+                    </p>
+                    <p>
+                      Skipped invalid: {lastCrewPromotionResult.skippedInvalidCrewMembers}
+                    </p>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
 
@@ -2351,13 +3086,325 @@ export default function SettingsPage() {
         />
       )}
 
+      {activeWorkspaceId ? (
+        <WorkspaceUtilitiesDialog
+          open={workspaceUtilitiesOpen}
+          workspaceId={activeWorkspaceId}
+          workspaceName={activeWorkspaceName ?? 'Active workspace'}
+          onClose={() => setWorkspaceUtilitiesOpen(false)}
+          onApplied={() => void 0}
+        />
+      ) : null}
+
+      <Dialog open={contactPreviewOpen} onOpenChange={setContactPreviewOpen}>
+        <DraggableDialogContent className="flex h-[min(90vh,860px)] max-h-[min(90vh,860px)] w-[min(calc(100vw-1rem),980px)] flex-col gap-0 overflow-hidden p-0">
+          <div className="shrink-0 border-b border-border/60 px-6 pb-3 pt-6">
+            <DialogHeader className="space-y-2 p-0 text-left">
+              <DialogTitle>Parsed Contact Preview</DialogTitle>
+              <DialogDescription>
+                Choose which contacts to import and route each row to Production Master Crew or the org-level
+                directory bucket.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 py-4">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setParsedContactRows((previous) => previous.map((row) => ({ ...row, include: true })))
+                }
+              >
+                Select all
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setParsedContactRows((previous) => previous.map((row) => ({ ...row, include: false })))
+                }
+              >
+                Clear all
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setParsedContactRows((previous) =>
+                    previous.map((row) => ({
+                      ...row,
+                      include: (parsedRowIssues.get(row.rowId)?.length ?? 0) === 0 ? row.include : false,
+                    })),
+                  )
+                }
+              >
+                Exclude flagged
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setParsedContactRows((previous) =>
+                    previous.map((row) => ({
+                      ...row,
+                      include: (parsedRowIssues.get(row.rowId)?.length ?? 0) > 0 ? true : row.include,
+                    })),
+                  )
+                }
+              >
+                Include flagged
+              </Button>
+              <div className="mx-1 h-8 w-px bg-border" />
+              <Button
+                type="button"
+                variant={contactPreviewFilter === 'all' ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => setContactPreviewFilter('all')}
+              >
+                All
+              </Button>
+              <Button
+                type="button"
+                variant={contactPreviewFilter === 'included' ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => setContactPreviewFilter('included')}
+              >
+                Included
+              </Button>
+              <Button
+                type="button"
+                variant={contactPreviewFilter === 'production' ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => setContactPreviewFilter('production')}
+              >
+                Production
+              </Button>
+              <Button
+                type="button"
+                variant={contactPreviewFilter === 'org_directory' ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => setContactPreviewFilter('org_directory')}
+              >
+                Org Directory
+              </Button>
+              <Button
+                type="button"
+                variant={contactPreviewFilter === 'flagged' ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => setContactPreviewFilter('flagged')}
+              >
+                Flagged
+              </Button>
+              <div className="mx-1 h-8 w-px bg-border" />
+              {contactPreviewSourceOptions.map((sourceOption) => (
+                <Button
+                  key={sourceOption}
+                  type="button"
+                  variant={contactPreviewSourceFilter === sourceOption ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => setContactPreviewSourceFilter(sourceOption)}
+                  title={sourceOption === 'all' ? 'All source files' : sourceOption}
+                >
+                  {sourceOption === 'all'
+                    ? 'All Sources'
+                    : sourceOption.length > 24
+                    ? `${sourceOption.slice(0, 24)}…`
+                    : sourceOption}
+                </Button>
+              ))}
+              <Select
+                value={contactPreviewSort}
+                onValueChange={(value) =>
+                  setContactPreviewSort(
+                    value === 'name_desc'
+                      ? 'name_desc'
+                      : value === 'destination'
+                      ? 'destination'
+                      : 'name_asc',
+                  )
+                }
+              >
+                <SelectTrigger className="h-8 w-[220px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name_asc">Sort: Name A-Z</SelectItem>
+                  <SelectItem value="name_desc">Sort: Name Z-A</SelectItem>
+                  <SelectItem value="destination">Sort: Destination (chips)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Badge className="bg-blue-600/20 text-blue-200 border border-blue-500/40">
+                Total: {previewTally.total}
+              </Badge>
+              <Badge className="bg-emerald-600/20 text-emerald-200 border border-emerald-500/40">
+                Included: {previewTally.included}
+              </Badge>
+              <Badge className="bg-amber-600/20 text-amber-200 border border-amber-500/40">
+                Flagged: {previewTally.flagged}
+              </Badge>
+              <Badge className="bg-violet-600/20 text-violet-200 border border-violet-500/40">
+                Matched master: {previewTally.matchedMaster}
+              </Badge>
+              <Badge className="bg-cyan-600/20 text-cyan-200 border border-cyan-500/40">
+                Production: {previewTally.productionIncluded}/{previewTally.productionTotal}
+              </Badge>
+              <Badge className="bg-fuchsia-600/20 text-fuchsia-200 border border-fuchsia-500/40">
+                Org Directory: {previewTally.directoryIncluded}/{previewTally.directoryTotal}
+              </Badge>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border/60">
+              <table className="w-full border-collapse text-xs">
+                <thead className="sticky top-0 bg-muted/90 text-left">
+                  <tr className="border-b border-border/60">
+                    <th className="px-2 py-2">Use</th>
+                    <th className="px-2 py-2">Name</th>
+                    <th className="px-2 py-2">Phone</th>
+                    <th className="px-2 py-2">Ext</th>
+                    <th className="px-2 py-2">Email</th>
+                    <th className="px-2 py-2">Area</th>
+                    <th className="px-2 py-2">Match</th>
+                    <th className="px-2 py-2">Issues</th>
+                    <th className="px-2 py-2">Destination</th>
+                    <th className="px-2 py-2">Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((row) => (
+                    <tr key={row.rowId} className="border-b border-border/40 align-top">
+                      <td className="px-2 py-2">
+                        <Checkbox
+                          checked={row.include}
+                          onCheckedChange={(checked) =>
+                            setParsedContactRows((previous) =>
+                              previous.map((candidateRow) =>
+                                candidateRow.rowId === row.rowId
+                                  ? { ...candidateRow, include: Boolean(checked) }
+                                  : candidateRow,
+                              ),
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="px-2 py-2">{row.fullName}</td>
+                      <td className="px-2 py-2">{row.phone ?? ''}</td>
+                      <td className="px-2 py-2">{row.extension ?? ''}</td>
+                      <td className="px-2 py-2">{row.email ?? ''}</td>
+                      <td className="px-2 py-2">{row.functionalArea ?? ''}</td>
+                      <td className="px-2 py-2">
+                        {row.matchedMasterContactId ? (
+                          <Badge className="bg-violet-600/20 text-violet-200 border border-violet-500/40">
+                            Matched master
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-slate-600/20 text-slate-200 border border-slate-500/40">New</Badge>
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {(parsedRowIssues.get(row.rowId) ?? []).map((issue) => (
+                            <Badge
+                              key={`${row.rowId}-${issue}`}
+                              className="bg-amber-600/20 text-amber-200 border border-amber-500/40"
+                            >
+                              {issue === 'invalid_name'
+                                ? 'Invalid name'
+                                : issue === 'phone_in_name'
+                                ? 'Phone in name'
+                                : issue === 'handle_in_name'
+                                ? 'Handle in name'
+                                : 'Possible duplicate'}
+                            </Badge>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Badge
+                          className={`mb-1 border ${
+                            row.destination === 'production'
+                              ? 'bg-cyan-600/20 text-cyan-200 border-cyan-500/40'
+                              : 'bg-fuchsia-600/20 text-fuchsia-200 border-fuchsia-500/40'
+                          }`}
+                        >
+                          {row.destination === 'production' ? 'Production' : 'Org Directory'}
+                        </Badge>
+                        <Select
+                          value={row.destination}
+                          onValueChange={(value) =>
+                            setParsedContactRows((previous) =>
+                              previous.map((candidateRow) =>
+                                candidateRow.rowId === row.rowId
+                                  ? {
+                                      ...candidateRow,
+                                      destination:
+                                        value === 'production' ? 'production' : 'org_directory',
+                                    }
+                                  : candidateRow,
+                              ),
+                            )
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-[180px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="production">Production Master Crew</SelectItem>
+                            <SelectItem value="org_directory">Org Directory (non-production)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2">
+                        {row.sourceSheet}
+                        <div className="text-[11px] text-muted-foreground">{row.sourceFile}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="shrink-0 border-t border-border/60 px-6 py-4">
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setContactPreviewOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DraggableDialogContent>
+      </Dialog>
+
       {/* Reconciliation Dialog */}
       <Dialog open={showReconcileDialog} onOpenChange={setShowReconcileDialog}>
         <DraggableDialogContent className="w-[min(calc(100vw-1rem),480px)]">
+          {(() => {
+            const toSingularLabel = (rawType?: string): string => {
+              const value = (rawType ?? '').trim().toLowerCase();
+              const singularMap: Record<string, string> = {
+                categories: 'category',
+                units: 'unit',
+                locations: 'location',
+                suppliers: 'supplier',
+                projects: 'project',
+                expensecodes: 'expense code',
+              };
+              if (singularMap[value]) return singularMap[value];
+              if (value.endsWith('ies')) return `${value.slice(0, -3)}y`;
+              if (value.endsWith('s') && value.length > 1) return value.slice(0, -1);
+              return value || 'value';
+            };
+            const singularTypeLabel = toSingularLabel(itemToDelete?.type);
+            return (
+              <>
           <DialogHeader>
             <DialogTitle>Confirm Removal</DialogTitle>
             <DialogDescription>
-              The {itemToDelete?.type.toLowerCase().slice(0, -1)} "{itemToDelete?.value}" is used by {affectedItemsCount} inventory items.
+              The {singularTypeLabel} "{itemToDelete?.value}" is used by {affectedItemsCount} inventory items.
               What would you like to do?
             </DialogDescription>
           </DialogHeader>
@@ -2375,7 +3422,7 @@ export default function SettingsPage() {
               <div>
                 <label htmlFor="delete-option" className="font-medium text-foreground">Remove from items</label>
                 <p className="text-sm text-muted-foreground">
-                  Remove this {itemToDelete?.type.toLowerCase().slice(0, -1)} from all items that use it.
+                  Remove this {singularTypeLabel} from all items that use it.
                 </p>
               </div>
             </div>
@@ -2392,7 +3439,7 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <label htmlFor="replace-option" className="font-medium text-foreground">Replace with another value</label>
                 <p className="text-sm text-muted-foreground mb-2">
-                  Replace with another {itemToDelete?.type.toLowerCase().slice(0, -1)} in all affected items.
+                  Replace with another {singularTypeLabel} in all affected items.
                 </p>
 
                 {reconcileAction === 'replace' && itemToDelete && (
@@ -2424,6 +3471,9 @@ export default function SettingsPage() {
               Confirm
             </Button>
           </DialogFooter>
+              </>
+            );
+          })()}
         </DraggableDialogContent>
       </Dialog>
 
