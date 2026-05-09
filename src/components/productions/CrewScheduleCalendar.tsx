@@ -312,6 +312,7 @@ export function CrewScheduleCalendar({
       return 'detailed';
     }
   });
+  const [localDayBoardDate, setLocalDayBoardDate] = useState('');
   const [draft, setDraft] = useState<Omit<CrewScheduleEntry, 'id'>>({
     crewMemberId: '',
     date: projectedDate,
@@ -962,7 +963,21 @@ export function CrewScheduleCalendar({
     return format(new Date(), 'yyyy-MM-dd');
   }, [schedule, projectStartDate]);
 
-  const dayFilter = clampDateToProjectRange(dayBoardDate || selectedDay, projectStartDate, projectEndDate);
+  useEffect(() => {
+    if (dayBoardDate) {
+      return;
+    }
+    const clampedSelectedDay = clampDateToProjectRange(selectedDay, projectStartDate, projectEndDate);
+    setLocalDayBoardDate((previous) => {
+      if (!previous) {
+        return clampedSelectedDay;
+      }
+      return clampDateToProjectRange(previous, projectStartDate, projectEndDate);
+    });
+  }, [dayBoardDate, selectedDay, projectStartDate, projectEndDate]);
+
+  const effectiveDayBoardDate = dayBoardDate || localDayBoardDate || selectedDay;
+  const dayFilter = clampDateToProjectRange(effectiveDayBoardDate, projectStartDate, projectEndDate);
   const isDateEditingLocked = (date: string): boolean => Boolean(dayLocksByDate[date]) && !lockOverridesByDate[date];
   const requestLockOverride = (date: string, actionLabel: string, onConfirm: () => void): boolean => {
     if (!isDateEditingLocked(date)) return true;
@@ -997,6 +1012,7 @@ export function CrewScheduleCalendar({
     const clamped = clampDateToProjectRange(nextDayValue, projectStartDate, projectEndDate);
     if (!clamped) return;
     if (clamped === dayFilter) return;
+    setLocalDayBoardDate(clamped);
     onDayBoardDateChange?.(clamped);
   };
 
