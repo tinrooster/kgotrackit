@@ -44,6 +44,70 @@ function isRole(value: unknown): value is WorkspaceMemberRole {
   return value === 'admin' || value === 'editor' || value === 'viewer';
 }
 
+const AUTH_LIST_PER_PAGE = 1000;
+const AUTH_LIST_MAX_PAGES = 500;
+
+/**
+ * Resolves an auth user id by email. The JS client's listUsers({ page: 1 }) only sees the first
+ * page; existing users beyond that were misclassified as "new" and inviteUserByEmail failed.
+ * Uses GoTrue `filter` query when available, then paginates as fallback.
+ */
+async function findAuthUserIdByEmail(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  adminClient: ReturnType<typeof createClient>,
+  email: string
+): Promise<{ userId: string | null; errorMessage: string | null }> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) {
+    return { userId: null, errorMessage: null };
+  }
+
+  const base = supabaseUrl.replace(/\/$/, '');
+  try {
+    const filterUrl = new URL(`${base}/auth/v1/admin/users`);
+    filterUrl.searchParams.set('page', '1');
+    filterUrl.searchParams.set('per_page', '200');
+    filterUrl.searchParams.set('filter', normalized);
+
+    const filterResponse = await fetch(filterUrl.toString(), {
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+      },
+    });
+    if (filterResponse.ok) {
+      const body = (await filterResponse.json()) as { users?: Array<{ id?: string; email?: string }> };
+      const exact = (body.users ?? []).find((u) => String(u.email ?? '').toLowerCase() === normalized);
+      if (exact?.id) {
+        return { userId: exact.id, errorMessage: null };
+      }
+    }
+  } catch {
+    /* fall through to full scan */
+  }
+
+  for (let page = 1; page <= AUTH_LIST_MAX_PAGES; page += 1) {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage: AUTH_LIST_PER_PAGE,
+    });
+    if (error) {
+      return { userId: null, errorMessage: error.message };
+    }
+    const users = data?.users ?? [];
+    const match = users.find((u) => String(u.email ?? '').toLowerCase() === normalized);
+    if (match?.id) {
+      return { userId: match.id, errorMessage: null };
+    }
+    if (users.length < AUTH_LIST_PER_PAGE) {
+      return { userId: null, errorMessage: null };
+    }
+  }
+
+  return { userId: null, errorMessage: null };
+}
+
 function getBearerToken(request: Request): string | null {
   const authHeader = request.headers.get('Authorization') || request.headers.get('authorization');
   if (!authHeader) return null;
@@ -206,12 +270,24 @@ Deno.serve(async (request) => {
     if (!workspaceId) {
       return jsonResponse(400, { error: 'workspaceId is required.' });
     }
-    const { data: workspaceRow } = await adminClient
+    const { data: workspaceRow, error: workspaceRowError } = await adminClient
       .from('workspaces')
-      .select('name')
+      .select('name, owner_user_id')
       .eq('id', workspaceId)
       .maybeSingle();
-    const workspaceName = typeof workspaceRow?.name === 'string' ? workspaceRow.name : undefined;
+    if (workspaceRowError) {
+      return jsonResponse(500, { error: workspaceRowError.message });
+    }
+    if (!workspaceRow) {
+      return jsonResponse(404, { error: 'Workspace not found.' });
+    }
+    const workspaceName = typeof workspaceRow.name === 'string' ? workspaceRow.name : undefined;
+    const rawOwnerId = (workspaceRow as { owner_user_id?: unknown }).owner_user_id;
+    const ownerUserId =
+      rawOwnerId !== null && rawOwnerId !== undefined && String(rawOwnerId).trim() !== ''
+        ? String(rawOwnerId).trim()
+        : '';
+    const isWorkspaceOwner = ownerUserId !== '' && ownerUserId === actor.id;
 
     const { data: actorMembership, error: actorMembershipError } = await adminClient
       .from('workspace_members')
@@ -222,8 +298,27 @@ Deno.serve(async (request) => {
     if (actorMembershipError) {
       return jsonResponse(500, { error: actorMembershipError.message });
     }
-    if (!actorMembership || actorMembership.role !== 'admin') {
-      return jsonResponse(403, { error: 'Admin role required for workspace member management.' });
+    const isMemberAdmin = actorMembership?.role === 'admin';
+    const canManageWorkspaceMembers = isMemberAdmin || isWorkspaceOwner;
+    if (!canManageWorkspaceMembers) {
+      return jsonResponse(403, {
+        error:
+          'Workspace admin membership or workspace ownership is required. Editors cannot manage members. Confirm workspaces.owner_user_id is your user id, or ask a workspace admin to upgrade your role.',
+      });
+    }
+
+    if (isWorkspaceOwner && actorMembership?.role !== 'admin') {
+      const { error: healMembershipError } = await adminClient.from('workspace_members').upsert(
+        {
+          workspace_id: workspaceId,
+          user_id: actor.id,
+          role: 'admin',
+        },
+        { onConflict: 'workspace_id,user_id' },
+      );
+      if (healMembershipError) {
+        return jsonResponse(500, { error: healMembershipError.message });
+      }
     }
 
     if (payload.action === 'list_members') {
@@ -272,19 +367,17 @@ Deno.serve(async (request) => {
         return jsonResponse(400, { error: 'role must be admin, editor, or viewer.' });
       }
 
-      let targetUserId: string | null = null;
-      const { data: listUsersData, error: listUsersError } = await adminClient.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
-      if (listUsersError) {
-        return jsonResponse(500, { error: listUsersError.message });
-      }
-      const matchedUser = (listUsersData?.users || []).find(
-        (authUser) => String(authUser.email || '').toLowerCase() === email
+      const { userId: resolvedUserId, errorMessage: lookupError } = await findAuthUserIdByEmail(
+        supabaseUrl,
+        serviceRoleKey,
+        adminClient,
+        email
       );
-      targetUserId = matchedUser?.id ?? null;
-      const existingUserMatched = !!matchedUser;
+      if (lookupError) {
+        return jsonResponse(500, { error: lookupError });
+      }
+      let targetUserId: string | null = resolvedUserId;
+      const existingUserMatched = !!targetUserId;
       if (!targetUserId) {
         const redirectTo = resolveInviteRedirectUrl(request);
         const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
@@ -488,7 +581,7 @@ Deno.serve(async (request) => {
         return jsonResponse(404, { error: 'Workspace not found.' });
       }
       const isOwner = workspaceRow.owner_user_id === actor.id;
-      const isAdmin = actorMembership.role === 'admin';
+      const isAdmin = actorMembership?.role === 'admin';
       if (!isOwner && !isAdmin) {
         return jsonResponse(403, { error: 'Workspace admin role required to delete workspace.' });
       }
@@ -515,7 +608,7 @@ Deno.serve(async (request) => {
           organization_id: workspaceRow.organization_id || null,
           deleted_by_user_id: actor.id,
           deleted_by_email: actor.email || null,
-          deleted_by_role: actorMembership.role || null,
+          deleted_by_role: actorMembership?.role || (isOwner ? 'admin' : null),
           member_count: memberCountValue,
           had_workspace_app_data: hadWorkspaceAppData,
           deletion_source: 'workspace-member-admin',

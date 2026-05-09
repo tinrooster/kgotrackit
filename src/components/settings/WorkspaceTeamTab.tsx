@@ -19,6 +19,7 @@ import {
 } from '@/lib/supabase/workspaceMemberAdmin';
 import { setActiveWorkspaceId } from '@/lib/supabase/workspaceData';
 import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
+import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Key, Users } from 'lucide-react';
 import { logger as durableLogger } from '@/lib/logging';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -137,6 +138,17 @@ export function WorkspaceTeamTab() {
     () => new Set(manageableWorkspaces.map((w) => w.workspaceId)),
     [manageableWorkspaces],
   );
+  const managedWorkspaceName = manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name || '';
+  const isDeleteNameConfirmed =
+    confirmWorkspaceName.trim().toLowerCase() !== '' &&
+    confirmWorkspaceName.trim().toLowerCase() === managedWorkspaceName.trim().toLowerCase();
+
+  React.useEffect(() => {
+    if (!manageDialogOpen) return;
+    if (manageWorkspaceId && manageableWorkspaceIdSet.has(manageWorkspaceId)) return;
+    const fallbackWorkspaceId = manageableWorkspaces[0]?.workspaceId || '';
+    setManageWorkspaceId(fallbackWorkspaceId);
+  }, [manageDialogOpen, manageWorkspaceId, manageableWorkspaceIdSet, manageableWorkspaces]);
 
   const loadMembers = React.useCallback(async () => {
     const workspaceId = manageDialogOpen ? manageWorkspaceId : activeWorkspaceId;
@@ -183,6 +195,16 @@ export function WorkspaceTeamTab() {
                   {activeWorkspaceRow?.name ?? 'Workspace'}
                 </span>
                 {activeWorkspaceRole ? ` · your role: ${activeWorkspaceRole}` : ''}
+                {activeWorkspaceRow?.organizationName ? (
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    Organization{' '}
+                    <span className="font-medium text-foreground">{activeWorkspaceRow.organizationName}</span>
+                  </span>
+                ) : activeWorkspaceRow?.organizationId ? (
+                  <span className="mt-1 block font-mono text-[11px] text-muted-foreground/90" title="Organization id">
+                    Org {activeWorkspaceRow.organizationId}
+                  </span>
+                ) : null}
                 <span className="mt-1 block font-mono text-[11px] text-muted-foreground/90" title="Workspace id">
                   {activeWorkspaceId}
                 </span>
@@ -243,9 +265,18 @@ export function WorkspaceTeamTab() {
               workspaces.map((w) => {
                 const isSelected = targetWorkspaceId === w.workspaceId;
                 const isActive = w.workspaceId === activeWorkspaceId;
+                const isRowOwner = !!currentUser?.id && w.ownerUserId === currentUser.id;
                 const createdLabel = w.createdAt ? new Date(w.createdAt).toLocaleDateString() : '—';
                 const recordCount = typeof w.recordCount === 'number' ? w.recordCount : 0;
-                const createdBy = w.ownerUserId === currentUser?.id ? 'you' : w.ownerUserId.slice(0, 8);
+                const createdBy = isRowOwner ? 'you' : w.ownerUserId.slice(0, 8);
+                const memberSummary = w.memberCounts
+                  ? `Members A${w.memberCounts.admin} · E${w.memberCounts.editor} · V${w.memberCounts.viewer}`
+                  : 'Members —';
+                const orgLabel = w.organizationName
+                  ? `Org ${w.organizationName}`
+                  : w.organizationId
+                    ? `Org ${w.organizationId.slice(0, 8)}…`
+                    : null;
                 return (
                   <button
                     key={w.workspaceId}
@@ -257,18 +288,47 @@ export function WorkspaceTeamTab() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-foreground">{w.name}</div>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">{w.name}</span>
+                          {isRowOwner ? (
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 border-emerald-500/50 bg-emerald-500/10 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
+                              title="You are the workspace owner (created this workspace)."
+                            >
+                              Owner
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="secondary"
+                              className="shrink-0 text-[10px] font-semibold uppercase tracking-wide"
+                              title="Another account owns this workspace; you were invited as a member."
+                            >
+                              Shared
+                            </Badge>
+                          )}
+                        </div>
                         <div className="mt-0.5 text-xs text-muted-foreground">
-                          Created {createdLabel} · Owner {createdBy} · Records {recordCount} · Productions {w.productionCount ?? 0}
+                          {orgLabel ? (
+                            <>
+                              <span className="font-medium text-foreground/90">{orgLabel}</span>
+                              <span className="text-muted-foreground"> · </span>
+                            </>
+                          ) : null}
+                          Created {createdLabel} · Owner {createdBy} · Records {recordCount} · Productions{' '}
+                          {w.productionCount ?? 0}
+                        </div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {memberSummary}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted-foreground">
                         {isActive ? (
                           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-300">
                             Active
                           </span>
                         ) : null}
-                        <span>{w.role}</span>
+                        <span className="uppercase tracking-wide">{w.role}</span>
                       </div>
                     </div>
                   </button>
@@ -352,11 +412,16 @@ export function WorkspaceTeamTab() {
                   <SelectValue placeholder="Select a workspace" />
                 </SelectTrigger>
                 <SelectContent>
-                  {manageableWorkspaces.map((w) => (
-                    <SelectItem key={w.workspaceId} value={w.workspaceId}>
-                      {w.name}
-                    </SelectItem>
-                  ))}
+                  {manageableWorkspaces.map((w) => {
+                    const itemOwner = !!currentUser?.id && w.ownerUserId === currentUser.id;
+                    return (
+                      <SelectItem key={w.workspaceId} value={w.workspaceId}>
+                        {w.name}
+                        {w.organizationName ? ` — ${w.organizationName}` : ''}
+                        {itemOwner ? ' · Owner' : ' · Shared'}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -526,7 +591,7 @@ export function WorkspaceTeamTab() {
                     id="confirm-workspace-delete-admin"
                     value={confirmWorkspaceName}
                     onChange={(event) => setConfirmWorkspaceName(event.target.value)}
-                    placeholder={manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name || 'Workspace name'}
+                    placeholder={managedWorkspaceName || 'Workspace name'}
                     autoComplete="off"
                     disabled={!manageWorkspaceId || deletingWorkspace}
                   />
@@ -537,7 +602,7 @@ export function WorkspaceTeamTab() {
                   disabled={
                     deletingWorkspace ||
                     !manageWorkspaceId ||
-                    confirmWorkspaceName.trim() !== (manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name || '')
+                    !isDeleteNameConfirmed
                   }
                   onClick={() => {
                     setDeleteWorkspaceDialogOpen(true);
@@ -637,10 +702,7 @@ export function WorkspaceTeamTab() {
               disabled={
                 deletingWorkspace ||
                 !(manageWorkspaceId || activeWorkspaceId) ||
-                confirmWorkspaceName.trim() !==
-                  (manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name ||
-                    activeWorkspaceRow?.name ||
-                    '')
+                !isDeleteNameConfirmed
               }
               onClick={async (event) => {
                 event.preventDefault();

@@ -38,6 +38,11 @@ export function SupabaseWorkspaceUsersCard({
   const [resetPassword, setResetPassword] = React.useState('');
 
   const loadMembers = React.useCallback(async () => {
+    if (!canManageUsers) {
+      setMembers([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const nextMembers = await listWorkspaceMembers(workspaceId);
@@ -50,7 +55,7 @@ export function SupabaseWorkspaceUsersCard({
     } finally {
       setLoading(false);
     }
-  }, [workspaceId, resetUserId]);
+  }, [workspaceId, resetUserId, canManageUsers]);
 
   React.useEffect(() => {
     void loadMembers();
@@ -61,7 +66,8 @@ export function SupabaseWorkspaceUsersCard({
       <CardHeader className="space-y-1">
         <CardTitle>Workspace User Management</CardTitle>
         <CardDescription>
-          Admins can invite members, set role/status, reset passwords, and remove access for the selected workspace.
+          Workspace admins and owners can invite members, set role/status, reset passwords, and remove access for
+          the selected workspace.
         </CardDescription>
         <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
           Target workspace: <span className="font-medium text-foreground">{workspaceName || workspaceId}</span>
@@ -71,7 +77,7 @@ export function SupabaseWorkspaceUsersCard({
       <CardContent className="space-y-4">
         {!canManageUsers ? (
           <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
-            Only workspace admins can manage users.
+            Only workspace admins and owners can manage users (editors use other settings tabs).
           </div>
         ) : (
           <>
@@ -185,13 +191,24 @@ export function SupabaseWorkspaceUsersCard({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">Members</p>
-            <Button type="button" variant="ghost" size="sm" onClick={() => void loadMembers()} disabled={loading}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void loadMembers()}
+              disabled={loading || !canManageUsers}
+              title={!canManageUsers ? 'Only workspace admins and owners can load this list' : undefined}
+            >
               Refresh
             </Button>
           </div>
 
           {loading ? (
             <p className="text-xs text-muted-foreground">Loading users…</p>
+          ) : !canManageUsers ? (
+            <p className="text-xs text-muted-foreground">
+              Member list is only loaded for workspace admins and owners (same rule as the server).
+            </p>
           ) : members.length === 0 ? (
             <p className="text-xs text-muted-foreground">No users found for this workspace.</p>
           ) : (

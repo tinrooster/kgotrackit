@@ -137,7 +137,7 @@ type User = {
   username: string;
   displayName: string;
   password: string;
-  role: 'admin' | 'user' | 'viewer';
+  role: 'admin' | 'editor' | 'user' | 'viewer';
   securityQuestion: string;
   securityAnswer: string;
   phoneExtension?: string;
@@ -308,7 +308,6 @@ const ADMIN_ONLY_SETTINGS_TABS: SettingsPrimaryTabId[] = [
   'libraries',
   'organization',
   'users',
-  'workspaces',
   'logs',
 ];
 const URL_SYNC_EVENT = 'trackit:url-sync';
@@ -361,7 +360,8 @@ function readLibrariesPanelFromSearch(): LibrariesPanel {
 export default function SettingsPage() {
   const location = useLocation();
   const { currentUser, authBackend } = useAuth();
-  const { activeWorkspaceId, activeWorkspaceRole, workspaces } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspaceRole, workspaces, loading: workspacesLoading, lastWorkspaceError } =
+    useWorkspace();
   const {
     organizations,
     activeOrganizationId,
@@ -460,8 +460,20 @@ export default function SettingsPage() {
   const librariesPanelRef = useRef(librariesPanel);
   librariesPanelRef.current = librariesPanel;
   const canManageSharedConfig = activeWorkspaceId
-    ? activeWorkspaceRole === 'admin'
-    : currentUser?.role === 'admin';
+    ? activeWorkspaceRole === 'admin' || activeWorkspaceRole === 'editor'
+    : currentUser?.role === 'admin' || currentUser?.role === 'editor';
+  const activeWorkspaceOwnerUserId = activeWorkspaceId
+    ? workspaces.find((w) => w.workspaceId === activeWorkspaceId)?.ownerUserId ?? null
+    : null;
+  const isActiveWorkspaceOwner = !!currentUser?.id && activeWorkspaceOwnerUserId === currentUser.id;
+  /** Member admin UI is backed by workspace-member-admin, which allows workspace admin or owner (not editors). */
+  const canManageWorkspaceUsers =
+    !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isActiveWorkspaceOwner);
+  const canAccessWorkspacesTab = authBackend === 'supabase';
+  const activeWorkspaceMissingFromList =
+    !!activeWorkspaceId &&
+    !workspacesLoading &&
+    !workspaces.some((w) => w.workspaceId === activeWorkspaceId);
 
   const listUndoStackRef = useRef<ListUndoSnapshot[]>([]);
   const listRedoStackRef = useRef<ListUndoSnapshot[]>([]);
@@ -2113,7 +2125,7 @@ export default function SettingsPage() {
               <span data-settings-tab-long>Data Management</span>
               <span data-settings-tab-short>Data</span>
             </TabsTrigger>
-            {canManageSharedConfig && (
+            {canAccessWorkspacesTab && (
               <TabsTrigger value="workspaces" title="Workspaces" className="inline-flex items-center gap-1.5">
                 <Wrench className="settings-tab-icon h-4 w-4 shrink-0 opacity-90" aria-hidden />
                 <span data-settings-tab-long>Workspaces</span>
@@ -2211,12 +2223,44 @@ export default function SettingsPage() {
           <TabsContent value="users">
             {authBackend === 'supabase' ? (
               activeWorkspaceId ? (
-                <SupabaseWorkspaceUsersCard
-                  workspaceId={activeWorkspaceId}
-                  workspaceName={activeWorkspaceName}
-                  currentUserId={currentUser?.id || ''}
-                  canManageUsers={canManageSharedConfig}
-                />
+                <div className="space-y-4">
+                  {activeWorkspaceMissingFromList ? (
+                    <div className="rounded-md border border-amber-500/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-100">
+                      <p className="font-medium text-amber-50">
+                        This browser&apos;s active workspace id is not in the workspace list returned for your account.
+                      </p>
+                      <p className="mt-1 text-amber-100/90">
+                        User management calls the API with that id; if the row does not exist in Supabase you will see
+                        errors or empty members. Open{' '}
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto p-0 text-amber-200 underline"
+                          onClick={() => setSettingsTab('workspaces')}
+                        >
+                          Workspaces
+                        </Button>{' '}
+                        and activate the correct team, or compare{' '}
+                        <code className="rounded bg-black/30 px-1">VITE_SUPABASE_URL</code> with the project you query in
+                        the SQL editor. To list real ids:{' '}
+                        <code className="mt-1 block rounded bg-black/30 px-1 font-mono text-xs">
+                          select id, name, owner_user_id from workspaces order by created_at desc;
+                        </code>
+                      </p>
+                    </div>
+                  ) : null}
+                  {lastWorkspaceError ? (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      Workspace list error: {lastWorkspaceError}
+                    </div>
+                  ) : null}
+                  <SupabaseWorkspaceUsersCard
+                    workspaceId={activeWorkspaceId}
+                    workspaceName={activeWorkspaceName}
+                    currentUserId={currentUser?.id || ''}
+                    canManageUsers={canManageWorkspaceUsers}
+                  />
+                </div>
               ) : (
                 <Card>
                   <CardHeader>
@@ -2263,7 +2307,7 @@ export default function SettingsPage() {
           />
         </TabsContent>
 
-        {canManageSharedConfig && (
+        {canAccessWorkspacesTab && (
           <TabsContent value="workspaces" className="space-y-6">
             <WorkspaceTeamTab />
           </TabsContent>

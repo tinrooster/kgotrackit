@@ -14,6 +14,58 @@ interface WorkspaceMemberAdminResponse {
   members?: WorkspaceMemberView[];
 }
 
+function getFunctionsHttpResponse(error: unknown): Response | null {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  const ctx = (error as { context?: unknown }).context;
+  if (ctx instanceof Response) {
+    return ctx;
+  }
+  if (
+    ctx &&
+    typeof ctx === 'object' &&
+    'response' in ctx &&
+    (ctx as { response: unknown }).response instanceof Response
+  ) {
+    return (ctx as { response: Response }).response;
+  }
+  return null;
+}
+
+async function readEdgeFunctionFailureMessage(error: unknown, data: unknown): Promise<string> {
+  if (data && typeof data === 'object' && data !== null && 'error' in data) {
+    const raw = (data as { error?: unknown }).error;
+    if (typeof raw === 'string' && raw.trim()) {
+      return raw.trim();
+    }
+  }
+
+  const response = getFunctionsHttpResponse(error);
+  if (response) {
+    try {
+      const text = (await response.clone().text()).trim();
+      if (text) {
+        try {
+          const parsed = JSON.parse(text) as { error?: unknown };
+          if (typeof parsed.error === 'string' && parsed.error.trim()) {
+            return parsed.error.trim();
+          }
+        } catch {
+          return text.length > 500 ? `${text.slice(0, 500)}…` : text;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return 'Edge function request failed.';
+}
+
 async function invokeWorkspaceMemberAdmin(
   body: Record<string, unknown>
 ): Promise<WorkspaceMemberAdminResponse> {
@@ -26,22 +78,7 @@ async function invokeWorkspaceMemberAdmin(
   }
   const { data, error } = await client.functions.invoke('workspace-member-admin', { body });
   if (error) {
-    const errorLike = error as { context?: Response; message?: string };
-    if (errorLike.context instanceof Response) {
-      try {
-        const responseBody = await errorLike.context.json();
-        const message =
-          typeof responseBody?.error === 'string'
-            ? responseBody.error
-            : typeof errorLike.message === 'string'
-              ? errorLike.message
-              : 'Edge function request failed.';
-        throw new Error(message);
-      } catch {
-        throw new Error(errorLike.message || 'Edge function request failed.');
-      }
-    }
-    throw error;
+    throw new Error(await readEdgeFunctionFailureMessage(error, data));
   }
   return (data || {}) as WorkspaceMemberAdminResponse;
 }

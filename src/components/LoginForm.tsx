@@ -75,7 +75,7 @@ export function LoginForm() {
     [authBackend]
   );
 
-  const { register, handleSubmit, formState: { errors }, getValues, watch: watchLogin } = useForm<LoginFormValues>({
+  const { register, handleSubmit, formState: { errors }, getValues, watch: watchLogin, setValue } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: '',
@@ -97,6 +97,14 @@ export function LoginForm() {
   const [magicBusy, setMagicBusy] = useState(false);
   const resetUsername = watchReset('username');
   const loginEmail = watchLogin('username');
+
+  useEffect(() => {
+    const search = new URLSearchParams(location.search);
+    const switchEmail = search.get('switchEmail');
+    if (switchEmail && authBackend === 'supabase') {
+      setValue('username', switchEmail);
+    }
+  }, [authBackend, location.search, setValue]);
 
   const getPostLoginDestination = (): string => {
     const state = location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null;

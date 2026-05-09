@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import type { OrganizationSummary } from '@/lib/supabase/organizationData';
 import {
   fetchOrganizationRow,
@@ -46,6 +47,7 @@ export function OrganizationMasterPanel({
   selectOrganization,
   refreshOrganizations,
 }: OrganizationMasterPanelProps) {
+  const { currentUser } = useAuth();
   const [nameDraft, setNameDraft] = useState('');
   const [addressDraft, setAddressDraft] = useState('');
   const [adminDraft, setAdminDraft] = useState('');
@@ -57,6 +59,10 @@ export function OrganizationMasterPanel({
     () => [...organizations].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
     [organizations],
   );
+  const activeOrgRow = activeOrganizationId
+    ? sortedOrgs.find((o) => o.organizationId === activeOrganizationId)
+    : undefined;
+  const activeOrgIsOwner = !!currentUser?.id && activeOrgRow?.ownerUserId === currentUser.id;
 
   const loadRow = useCallback(async () => {
     if (!activeOrganizationId || authBackend !== 'supabase') {
@@ -156,8 +162,27 @@ export function OrganizationMasterPanel({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Master organization</p>
-              <CardTitle className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                {activeOrganizationName ?? 'Select an organization'}
+              <CardTitle className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                <span className="min-w-0 truncate">{activeOrganizationName ?? 'Select an organization'}</span>
+                {activeOrganizationId ? (
+                  activeOrgIsOwner ? (
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 border-emerald-500/50 bg-emerald-500/10 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
+                      title="You created this organization (owner in organizations.owner_user_id)."
+                    >
+                      Owner
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="secondary"
+                      className="shrink-0 text-xs font-semibold uppercase tracking-wide"
+                      title="Another account owns this organization; you were added as a member."
+                    >
+                      Shared
+                    </Badge>
+                  )
+                ) : null}
               </CardTitle>
               {activeOrganizationId ? (
                 <p className="font-mono text-[11px] text-muted-foreground/90" title="Organization id">
@@ -176,23 +201,29 @@ export function OrganizationMasterPanel({
             <div className="space-y-2 border-t border-border/50 pt-3">
               <p className="text-xs font-medium text-muted-foreground">Switch master org</p>
               <div className="flex flex-wrap gap-2">
-                {sortedOrgs.map((org) => (
-                  <Button
-                    key={org.organizationId}
-                    type="button"
-                    size="sm"
-                    variant={org.organizationId === activeOrganizationId ? 'default' : 'outline'}
-                    className="max-w-[18rem] justify-start truncate"
-                    title={org.organizationId}
-                    onClick={() => {
-                      if (org.organizationId !== activeOrganizationId) {
-                        selectOrganization(org.organizationId);
-                      }
-                    }}
-                  >
-                    <span className="truncate">{org.name}</span>
-                  </Button>
-                ))}
+                {sortedOrgs.map((org) => {
+                  const rowOwner = !!currentUser?.id && org.ownerUserId === currentUser.id;
+                  return (
+                    <Button
+                      key={org.organizationId}
+                      type="button"
+                      size="sm"
+                      variant={org.organizationId === activeOrganizationId ? 'default' : 'outline'}
+                      className="max-w-[20rem] justify-start gap-1.5 truncate"
+                      title={org.organizationId}
+                      onClick={() => {
+                        if (org.organizationId !== activeOrganizationId) {
+                          selectOrganization(org.organizationId);
+                        }
+                      }}
+                    >
+                      <span className="truncate">{org.name}</span>
+                      <span className="shrink-0 text-[10px] font-semibold uppercase opacity-90">
+                        {rowOwner ? '· Owner' : '· Shared'}
+                      </span>
+                    </Button>
+                  );
+                })}
               </div>
               <p className="text-xs text-muted-foreground">
                 The header shows whichever org is selected. Workspace context may also align the active org when you

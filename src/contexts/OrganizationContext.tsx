@@ -14,6 +14,8 @@ interface OrganizationContextValue {
   activeOrganizationId: string | null;
   activeOrganizationRole: OrganizationSummary['role'] | null;
   activeOrganizationName: string | null;
+  /** `organizations.owner_user_id` for the active org; null when none selected. */
+  activeOrganizationOwnerUserId: string | null;
   loading: boolean;
   refreshOrganizations: () => Promise<void>;
   selectOrganization: (organizationId: string | null) => void;
@@ -125,11 +127,21 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       activeOrganizationId,
       activeOrganizationRole: activeOrganization?.role ?? null,
       activeOrganizationName: activeOrganization?.name ?? null,
+      activeOrganizationOwnerUserId: activeOrganization?.ownerUserId ?? null,
       loading,
       refreshOrganizations,
       selectOrganization,
     }),
-    [activeOrganization?.name, activeOrganization?.role, activeOrganizationId, loading, organizations, refreshOrganizations, selectOrganization],
+    [
+      activeOrganization?.name,
+      activeOrganization?.ownerUserId,
+      activeOrganization?.role,
+      activeOrganizationId,
+      loading,
+      organizations,
+      refreshOrganizations,
+      selectOrganization,
+    ],
   );
 
   return <OrganizationContext.Provider value={value}>{children}</OrganizationContext.Provider>;

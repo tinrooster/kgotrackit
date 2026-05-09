@@ -22,6 +22,7 @@ interface AddUserDialogProps {
 
 const roles = [
   { value: 'admin', label: 'Admin' },
+  { value: 'editor', label: 'Editor' },
   { value: 'user', label: 'User' },
   { value: 'viewer', label: 'Viewer' },
 ];
@@ -46,7 +47,7 @@ export default function AddUserDialog({ open, onOpenChange, onAdd }: AddUserDial
       username: username.trim(),
       displayName: displayName.trim(),
       password: password.trim(),
-      role: role as 'admin' | 'user' | 'viewer',
+      role: role as 'admin' | 'editor' | 'user' | 'viewer',
       securityQuestion: securityQuestion.trim(),
       securityAnswer: securityAnswer.trim(),
       phoneExtension: phoneExtension.trim(),

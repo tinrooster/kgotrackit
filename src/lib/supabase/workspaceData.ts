@@ -33,6 +33,8 @@ export type WorkspaceMemberRole = 'admin' | 'editor' | 'viewer';
 export interface WorkspaceSummary {
   workspaceId: string;
   organizationId?: string | null;
+  /** Display name from `organizations.name` when linked; null if unlinked or not readable. */
+  organizationName?: string | null;
   name: string;
   ownerUserId: string;
   role: WorkspaceMemberRole;
@@ -40,6 +42,12 @@ export interface WorkspaceSummary {
   updatedAt?: string;
   recordCount?: number;
   productionCount?: number;
+  memberCounts?: {
+    admin: number;
+    editor: number;
+    viewer: number;
+    total: number;
+  };
 }
 
 function countEntries(value: unknown): number {
@@ -217,9 +225,39 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
   const byId = new Map(
     sortedWorkspaces.map((workspace) => [
       (workspace as { id: string }).id,
-      workspace as { id: string; name: string; owner_user_id: string; created_at?: string },
-    ])
+      workspace as {
+        id: string;
+        name: string;
+        owner_user_id: string;
+        created_at?: string;
+        organization_id?: string | null;
+      },
+    ]),
   );
+
+  const organizationIdsForNames = [
+    ...new Set(
+      sortedWorkspaces
+        .map((row) => (row as { organization_id?: string | null }).organization_id)
+        .filter((id): id is string => typeof id === 'string' && id.trim().length > 0),
+    ),
+  ];
+  const organizationNameById = new Map<string, string>();
+  if (organizationIdsForNames.length > 0) {
+    const { data: orgRows, error: orgNameError } = await client
+      .from('organizations')
+      .select('id, name')
+      .in('id', organizationIdsForNames);
+    if (orgNameError) {
+      console.warn('[workspaceData] organization names for workspace list', orgNameError.message);
+    } else if (Array.isArray(orgRows)) {
+      for (const row of orgRows as { id: string; name: string }[]) {
+        if (row.id && typeof row.name === 'string') {
+          organizationNameById.set(row.id, row.name);
+        }
+      }
+    }
+  }
 
   const appRowsWithProductions = await client
     .from('workspace_app_data')
@@ -247,6 +285,24 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
         ])
       : [],
   );
+  const { data: memberCountRows } = await client
+    .from('workspace_members')
+    .select('workspace_id, role')
+    .in('workspace_id', ids);
+  const memberCountsByWorkspaceId = new Map<string, { admin: number; editor: number; viewer: number; total: number }>();
+  for (const id of ids) {
+    memberCountsByWorkspaceId.set(id, { admin: 0, editor: 0, viewer: 0, total: 0 });
+  }
+  if (Array.isArray(memberCountRows)) {
+    for (const row of memberCountRows as Array<{ workspace_id: string; role: string }>) {
+      const target = memberCountsByWorkspaceId.get(String(row.workspace_id));
+      if (!target) continue;
+      target.total += 1;
+      if (row.role === 'admin') target.admin += 1;
+      else if (row.role === 'editor') target.editor += 1;
+      else target.viewer += 1;
+    }
+  }
   const out: WorkspaceSummary[] = [];
   const roleByWorkspaceId = new Map<string, WorkspaceMemberRole>();
   for (const m of memberRows) {
@@ -254,17 +310,22 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
     roleByWorkspaceId.set(m.workspace_id, role);
   }
   for (const ownerWorkspace of ownerWorkspaceRows) {
-    if (!roleByWorkspaceId.has(ownerWorkspace.id)) {
-      roleByWorkspaceId.set(ownerWorkspace.id, 'admin');
-    }
+    // Owners always have full workspace control (matches fetchWorkspaceMemberRole); a stale
+    // workspace_members row must not show them as editor/viewer in the UI.
+    roleByWorkspaceId.set(ownerWorkspace.id, 'admin');
   }
   for (const id of ids) {
     const w = byId.get(id);
     if (!w) continue;
     const role = roleByWorkspaceId.get(id) ?? 'viewer';
+    const orgIdRaw = w.organization_id;
+    const organizationId =
+      typeof orgIdRaw === 'string' && orgIdRaw.trim().length > 0 ? orgIdRaw.trim() : null;
+    const organizationName = organizationId ? organizationNameById.get(organizationId) ?? null : null;
     out.push({
       workspaceId: w.id,
-      organizationId: (w as { organization_id?: string | null }).organization_id ?? null,
+      organizationId,
+      organizationName,
       name: w.name,
       ownerUserId: w.owner_user_id,
       role,
@@ -272,6 +333,7 @@ export async function listWorkspaceSummariesForUser(userId: string): Promise<Wor
       updatedAt: appById.get(w.id)?.updatedAt,
       recordCount: appById.get(w.id)?.recordCount,
       productionCount: appById.get(w.id)?.productionCount,
+      memberCounts: memberCountsByWorkspaceId.get(w.id),
     });
   }
   return out;

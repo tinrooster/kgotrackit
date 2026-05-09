@@ -139,7 +139,7 @@ export interface MappedAppUser {
   username: string;
   displayName: string;
   password: string;
-  role: 'admin' | 'user' | 'viewer';
+  role: 'admin' | 'editor' | 'user' | 'viewer';
   securityQuestion: string;
   securityAnswer: string;
   phoneExtension?: string;
@@ -148,10 +148,13 @@ export interface MappedAppUser {
 export function mapSupabaseUserToAppUser(user: SupabaseAuthUser): MappedAppUser {
   const meta = (user.user_metadata || {}) as Record<string, unknown>;
   const appMeta = (user.app_metadata || {}) as Record<string, unknown>;
-  const roleRaw = (meta.role ?? appMeta.role ?? appMeta.user_role ?? meta.user_role);
+  // Trust app_metadata role first (server-controlled), then fall back to user_metadata.
+  const roleRaw = (appMeta.role ?? appMeta.user_role ?? meta.role ?? meta.user_role);
   const normalizedRole = typeof roleRaw === 'string' ? roleRaw.trim().toLowerCase() : '';
   const role =
-    normalizedRole === 'admin' || normalizedRole === 'user' || normalizedRole === 'viewer' ? normalizedRole : 'user';
+    normalizedRole === 'admin' || normalizedRole === 'editor' || normalizedRole === 'user' || normalizedRole === 'viewer'
+      ? normalizedRole
+      : 'user';
   const email = user.email ?? user.id;
   return {
     id: user.id,

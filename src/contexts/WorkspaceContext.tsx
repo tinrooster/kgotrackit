@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import {
@@ -58,18 +58,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [refreshWorkspaces]);
 
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(() => getActiveWorkspaceId());
+  const missingActiveWorkspaceChecksRef = useRef(0);
   // Re-sync from localStorage only when the signed-in user identity changes (e.g. user switch).
   // Do NOT include `workspaces` here — that causes a race: if bootstrapCloudData or any other
   // caller mutates localStorage before `workspaces` finishes loading, this effect picks up the
   // stale/cleared value and overwrites the correctly-initialised state.
   useEffect(() => {
     setActiveWorkspaceIdState(getActiveWorkspaceId());
+    missingActiveWorkspaceChecksRef.current = 0;
   }, [currentUser?.id]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== ACTIVE_WORKSPACE_STORAGE_KEY) return;
       setActiveWorkspaceIdState(getActiveWorkspaceId());
+      missingActiveWorkspaceChecksRef.current = 0;
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
@@ -89,7 +92,19 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       ? workspaces.some((workspace) => workspace.workspaceId === activeWorkspaceId)
       : false;
     if (hasActiveWorkspace) {
+      missingActiveWorkspaceChecksRef.current = 0;
       return;
+    }
+
+    if (activeWorkspaceId) {
+      // Avoid overwriting a just-selected/just-created workspace when the list is briefly stale.
+      // Require a repeated miss before falling back to the first available workspace.
+      missingActiveWorkspaceChecksRef.current += 1;
+      if (missingActiveWorkspaceChecksRef.current < 2) {
+        return;
+      }
+    } else {
+      missingActiveWorkspaceChecksRef.current = 0;
     }
 
     const defaultWorkspaceId = workspaces[0]?.workspaceId ?? null;
