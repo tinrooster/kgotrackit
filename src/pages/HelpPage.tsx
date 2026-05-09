@@ -25,6 +25,9 @@ export default function HelpPage() {
       { id: 'team-workspace', label: 'Team workspace data' },
       { id: 'financial-codes', label: 'Financial codes' },
       { id: 'reconciliation', label: 'Reconciliation' },
+      { id: 'planner-workspace', label: 'Planner workspace' },
+      { id: 'call-sheets', label: 'Call sheets & exports' },
+      { id: 'organization-branding', label: 'Organization branding' },
       { id: 'overview', label: 'Overview' },
       { id: 'inventory', label: 'Inventory' },
       { id: 'quick-add', label: 'Quick add' },
@@ -153,6 +156,46 @@ export default function HelpPage() {
           <strong>Fix unreconciled</strong> next to Sync on the Settings page while viewing the relevant list. That clears
           or repairs those references according to the list type. Group-level reconciliation is available under Data
           Management where applicable.
+        </p>
+      </section>
+
+      <section id="planner-workspace" className={cn(sectionClass('planner-workspace'), 'space-y-3')}>
+        <h2 className="text-lg font-semibold text-foreground">Planner workspace</h2>
+        <p className="text-sm text-muted-foreground">
+          Open Productions → Planner Workspace to manage Checklist, Vehicle Packlists, Schedule, Crew, and Overview in one
+          place. The planner restores your last route context (production, tab, and schedule day).
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Schedule supports Day Board editing, day locking with override confirmation, conflict detection (including
+          availability checks), and quick day copy.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Use the Simple/Detailed switch in Schedule tabs to reduce UI density for day-of operations.
+        </p>
+      </section>
+
+      <section id="call-sheets" className={cn(sectionClass('call-sheets'), 'space-y-3')}>
+        <h2 className="text-lg font-semibold text-foreground">Call sheets &amp; exports</h2>
+        <p className="text-sm text-muted-foreground">
+          In Planner Workspace → Schedule, use Export actions for CSV, text call sheet, and printable HTML.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Open Preview to access Call Sheet Options: include/exclude notes/resources/warnings, choose Simple/Detailed/Branded
+          template, limit to filtered rows, and customize headers (title/show/venue/producer).
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Printable HTML preview is rendered in-app and matches download output, including branded header and logo when set.
+        </p>
+      </section>
+
+      <section id="organization-branding" className={cn(sectionClass('organization-branding'), 'space-y-3')}>
+        <h2 className="text-lg font-semibold text-foreground">Organization branding</h2>
+        <p className="text-sm text-muted-foreground">
+          Branding upload is organization-scoped: Settings → Organization → Overview → Organization Branding.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Configure app name plus separate light and dark logos. Theme auto-switch applies the correct logo variant
+          across navigation, login, and branded call sheet exports.
         </p>
       </section>
 

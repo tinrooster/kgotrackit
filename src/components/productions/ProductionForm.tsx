@@ -48,10 +48,11 @@ interface ProductionFormProps {
   open: boolean;
   production?: Production;
   onSave: (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew' | 'crewSchedule'>) => void;
+  onDelete?: () => void;
   onClose: () => void;
 }
 
-export function ProductionForm({ open, production, onSave, onClose }: ProductionFormProps) {
+export function ProductionForm({ open, production, onSave, onDelete, onClose }: ProductionFormProps) {
   const [draft, setDraft] = useState<ProductionDraft>(() => toDraft(production));
   const isEditing = Boolean(production);
 
@@ -144,6 +145,19 @@ export function ProductionForm({ open, production, onSave, onClose }: Production
           </div>
         </div>
         <DialogFooter>
+          {isEditing && onDelete ? (
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const shouldDelete = window.confirm(`Delete production "${production?.name ?? 'this production'}"?`);
+                if (!shouldDelete) return;
+                onDelete();
+              }}
+              className="mr-auto"
+            >
+              Delete Production
+            </Button>
+          ) : null}
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

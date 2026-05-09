@@ -13,6 +13,7 @@ trackIT is a broadcast/AV inventory management system delivered as a **web app**
 | [project-structure.md](./project-structure.md) | Directory layout, routes, components, services, data model, Supabase schema, storage architecture |
 | [roadmap.md](./roadmap.md) | Shipped work, active priorities, upcoming items, and deferred features |
 | [supabase-auth-send-email-hook.md](./supabase-auth-send-email-hook.md) | Setup guide for Supabase Auth Send Email HTTP hook using Resend API |
+| [planner-workspace-and-branding.md](./planner-workspace-and-branding.md) | Planner scheduling, call sheet options, exports, and organization branding workflow |
 
 Archived legacy docs are stored in `docs_old/`.
 

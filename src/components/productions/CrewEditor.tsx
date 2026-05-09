@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, User, Database, ChevronDown, ChevronRight, GripVertical, MoreHorizontal } from 'lucide-react';
+import { Plus, Trash2, User, Database, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Flag } from 'lucide-react';
 import { PositionTemplate, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getCrewContacts, CREW_CONTACTS_UPDATED_EVENT } from '@/lib/crewContactsService';
 import { CrewContact } from '@/types/crewContacts';
@@ -40,6 +41,7 @@ interface CrewEditorProps {
 }
 
 type CrewSortMode = 'manual' | 'name_asc' | 'name_desc' | 'role_asc' | 'role_desc';
+type CrewCardDensityMode = 'detailed' | 'compact';
 
 const DEFAULT_DEPARTMENT = 'General';
 
@@ -90,6 +92,17 @@ function normalizeDepartment(value?: string): string {
   return value?.trim() || DEFAULT_DEPARTMENT;
 }
 
+function getDepartmentAccentHex(departmentName: string): string {
+  const key = departmentName.trim().toLowerCase() || DEFAULT_DEPARTMENT;
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 75% 58%)`;
+}
+
 export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConfirm = false }: CrewEditorProps) {
   const [draft, setDraft] = useState<Omit<ProductionCrewMember, 'id'>>(EMPTY_MEMBER);
   const [masterDialogOpen, setMasterDialogOpen] = useState(false);
@@ -113,9 +126,16 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
   });
   /** Departments start collapsed; user expands one or more to view crew. */
   const [expandedDepartmentNames, setExpandedDepartmentNames] = useState<string[]>([]);
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
   const [memberSortMode, setMemberSortMode] = useState<CrewSortMode>('manual');
+  const [cardDensityMode, setCardDensityMode] = useState<CrewCardDensityMode>('detailed');
+  const [expandedMemberIds, setExpandedMemberIds] = useState<string[]>([]);
   const [draggingDepartmentName, setDraggingDepartmentName] = useState<string | null>(null);
   const [draggingMemberId, setDraggingMemberId] = useState<string | null>(null);
+  const [draggingMemberSourceDepartment, setDraggingMemberSourceDepartment] = useState<string | null>(null);
+  const [quickAddDraftByDepartment, setQuickAddDraftByDepartment] = useState<
+    Record<string, { name: string; role: string }>
+  >({});
   const [shiftDraftsByMemberId, setShiftDraftsByMemberId] = useState<
     Record<
       string,
@@ -195,6 +215,36 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     });
   }, [masterContacts, masterSearch]);
 
+  const masterContactByLowerName = useMemo(() => {
+    const nextMap = new Map<string, CrewContact>();
+    for (const contact of masterContacts) {
+      const key = contact.fullName.trim().toLowerCase();
+      if (!key) continue;
+      if (!nextMap.has(key)) nextMap.set(key, contact);
+    }
+    return nextMap;
+  }, [masterContacts]);
+
+  const allMasterNameSuggestions = useMemo(() => {
+    return Array.from(new Set(masterContacts.map((contact) => contact.fullName.trim()).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [masterContacts]);
+
+  const applyMasterContactToMainDraft = (typedName: string) => {
+    const matchedContact = masterContactByLowerName.get(typedName.trim().toLowerCase());
+    if (!matchedContact) return;
+    setDraft((current) => ({
+      ...current,
+      name: matchedContact.fullName,
+      role: current.role || matchedContact.roleTags[0] || '',
+      department: normalizeDepartment(current.department || matchedContact.functionalArea),
+      phone: current.phone || formatPhoneNumber(matchedContact.phone ?? '') || undefined,
+      email: current.email || matchedContact.email || undefined,
+      notes: current.notes || matchedContact.notes || undefined,
+    }));
+  };
+
   const getShiftDraft = (memberId: string) => shiftDraftsByMemberId[memberId] ?? EMPTY_SHIFT_DRAFT;
 
   const updateShiftDraft = (
@@ -217,6 +267,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
 
   const addMember = () => {
     if (!draft.name?.trim()) return;
+    const nextDepartment = normalizeDepartment(draft.department);
     onChange([
       ...crew,
       {
@@ -226,22 +277,26 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
         role: draft.role?.trim() || '',
         phone: formatPhoneNumber(draft.phone ?? ''),
         email: draft.email?.trim() || undefined,
-        department: normalizeDepartment(draft.department),
+        department: nextDepartment,
       },
     ]);
+    setExpandedDepartmentNames((previous) =>
+      previous.includes(nextDepartment) ? previous : [...previous, nextDepartment]
+    );
     setDraft(EMPTY_MEMBER);
   };
 
   const addMemberFromMaster = (contact: CrewContact) => {
     const alreadyAssigned = crew.some((member) => member.name.trim().toLowerCase() === contact.fullName.trim().toLowerCase());
     if (alreadyAssigned) return;
+    const nextDepartment = normalizeDepartment(contact.functionalArea);
     onChange([
       ...crew,
       {
         id: crypto.randomUUID(),
         name: contact.fullName,
         role: contact.roleTags[0] ?? '',
-        department: normalizeDepartment(contact.functionalArea),
+        department: nextDepartment,
         contactId: contact.id,
         positionLabel: '',
         phone: formatPhoneNumber(contact.phone ?? ''),
@@ -249,6 +304,9 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
         notes: contact.notes,
       },
     ]);
+    setExpandedDepartmentNames((previous) =>
+      previous.includes(nextDepartment) ? previous : [...previous, nextDepartment]
+    );
   };
 
   const addShiftForMember = (memberId: string) => {
@@ -410,6 +468,70 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     );
   };
 
+  const moveMemberToDepartment = (memberId: string, nextDepartmentName: string) => {
+    onChange(
+      crew.map((member) =>
+        member.id === memberId ? { ...member, department: normalizeDepartment(nextDepartmentName) } : member
+      )
+    );
+    setExpandedDepartmentNames((previous) =>
+      previous.includes(nextDepartmentName) ? previous : [...previous, nextDepartmentName]
+    );
+  };
+
+  const toggleMemberExpanded = (memberId: string) => {
+    setExpandedMemberIds((previous) =>
+      previous.includes(memberId) ? previous.filter((id) => id !== memberId) : [...previous, memberId]
+    );
+  };
+
+  const clearDraggingMemberState = () => {
+    setDraggingMemberId(null);
+    setDraggingMemberSourceDepartment(null);
+  };
+
+  const getQuickAddDraft = (departmentName: string) => {
+    return quickAddDraftByDepartment[departmentName] ?? { name: '', role: '' };
+  };
+
+  const updateQuickAddDraft = (
+    departmentName: string,
+    updates: Partial<{ name: string; role: string }>
+  ) => {
+    const nextDraft = { ...getQuickAddDraft(departmentName), ...updates };
+    if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+      const matchedContact = masterContactByLowerName.get((updates.name ?? '').trim().toLowerCase());
+      if (matchedContact) {
+        nextDraft.name = matchedContact.fullName;
+        if (!nextDraft.role.trim()) nextDraft.role = matchedContact.roleTags[0] ?? '';
+      }
+    }
+    setQuickAddDraftByDepartment((previous) => ({
+      ...previous,
+      [departmentName]: nextDraft,
+    }));
+  };
+
+  const addQuickMemberToDepartment = (departmentName: string) => {
+    const draftForDepartment = getQuickAddDraft(departmentName);
+    const nextName = draftForDepartment.name.trim();
+    if (!nextName) return;
+    onChange([
+      ...crew,
+      {
+        ...EMPTY_MEMBER,
+        id: crypto.randomUUID(),
+        name: nextName,
+        role: draftForDepartment.role.trim(),
+        department: departmentName,
+      },
+    ]);
+    updateQuickAddDraft(departmentName, { name: '', role: '' });
+    setExpandedDepartmentNames((previous) =>
+      previous.includes(departmentName) ? previous : [...previous, departmentName]
+    );
+  };
+
   const membersByDepartment = useMemo(() => {
     const grouped = new Map<string, ProductionCrewMember[]>();
     for (const departmentName of orderedDepartments) grouped.set(departmentName, []);
@@ -432,6 +554,35 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     }
     return grouped;
   }, [crew, orderedDepartments, memberSortMode]);
+
+  const normalizedMemberSearchTerm = memberSearchTerm.trim().toLowerCase();
+
+  const visibleMembersByDepartment = useMemo(() => {
+    if (!normalizedMemberSearchTerm) return membersByDepartment;
+    const filtered = new Map<string, ProductionCrewMember[]>();
+    for (const [departmentName, departmentMembers] of membersByDepartment.entries()) {
+      const visibleMembers = departmentMembers.filter((member) =>
+        [
+          member.name,
+          member.role ?? '',
+          member.phone ?? '',
+          member.email ?? '',
+          member.notes ?? '',
+          member.positionLabel ?? '',
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedMemberSearchTerm)
+      );
+      if (visibleMembers.length > 0) filtered.set(departmentName, visibleMembers);
+    }
+    return filtered;
+  }, [membersByDepartment, normalizedMemberSearchTerm]);
+
+  const visibleDepartmentNames = useMemo(() => {
+    if (!normalizedMemberSearchTerm) return orderedDepartments;
+    return orderedDepartments.filter((departmentName) => (visibleMembersByDepartment.get(departmentName)?.length ?? 0) > 0);
+  }, [orderedDepartments, normalizedMemberSearchTerm, visibleMembersByDepartment]);
 
   if (crew.length === 0 && readOnly) return <p className="text-sm text-muted-foreground">No crew members assigned.</p>;
 
@@ -461,86 +612,237 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
               </SelectContent>
             </Select>
           </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input
+              placeholder="Search assigned crew by name, role, phone, email..."
+              className="h-8 text-sm"
+              value={memberSearchTerm}
+              onChange={(event) => setMemberSearchTerm(event.target.value)}
+            />
+            <div className="flex items-center gap-2">
+              <Select
+                value={cardDensityMode}
+                onValueChange={(value) => setCardDensityMode(value as CrewCardDensityMode)}
+              >
+                <SelectTrigger className="h-8 w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="detailed">Detailed cards</SelectItem>
+                  <SelectItem value="compact">Compact cards</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setExpandedDepartmentNames(visibleDepartmentNames)}
+                disabled={visibleDepartmentNames.length === 0}
+              >
+                Expand all
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setExpandedDepartmentNames([])}
+                disabled={expandedDepartmentNames.length === 0}
+              >
+                Collapse all
+              </Button>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/80 bg-background/70 px-2 py-1.5">
+            <span className="text-xs font-medium text-foreground/90">Legend:</span>
+            <Badge className="border border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-600/20 dark:text-emerald-200">
+              Active
+            </Badge>
+            <Badge className="border border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-500/40 dark:bg-slate-600/20 dark:text-slate-200">
+              Inactive
+            </Badge>
+            <Badge className="border border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-500/40 dark:bg-blue-600/20 dark:text-blue-200">
+              Crew
+            </Badge>
+            <Badge className="border border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-600/20 dark:text-amber-200">
+              Vendor
+            </Badge>
+            <Badge variant="outline" className="border-border/80 bg-background text-foreground">
+              Local only
+            </Badge>
+          </div>
         </div>
       )}
 
-      {orderedDepartments.map((departmentName) => {
-        const departmentMembers = membersByDepartment.get(departmentName) ?? [];
-        const isExpanded = expandedDepartmentNames.includes(departmentName);
-        return (
-          <div
-            key={departmentName}
-            className="rounded-md border bg-muted/20 p-2"
-            draggable={!readOnly}
-            onDragStart={() => setDraggingDepartmentName(departmentName)}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={() => {
-              if (!draggingDepartmentName || draggingDepartmentName === departmentName) return;
-              const nextOrder = [...orderedDepartments];
-              const sourceIndex = nextOrder.indexOf(draggingDepartmentName);
-              const targetIndex = nextOrder.indexOf(departmentName);
-              if (sourceIndex < 0 || targetIndex < 0) return;
-              const [moved] = nextOrder.splice(sourceIndex, 1);
-              nextOrder.splice(targetIndex, 0, moved);
-              setDepartmentOrder(nextOrder);
-              setDraggingDepartmentName(null);
-            }}
-          >
-            <div className="mb-2 flex items-center gap-2">
-              {!readOnly && <GripVertical className="h-4 w-4 text-muted-foreground" />}
-              <button type="button" className="inline-flex items-center gap-1 text-sm font-medium" onClick={() => toggleDepartmentExpanded(departmentName)}>
-                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                {departmentName}
-              </button>
-              <span className="text-xs text-muted-foreground">{departmentMembers.length} crew</span>
-              {!readOnly && (
-                <div className="ml-auto">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Department actions">
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          openRenameDepartmentDialog(departmentName);
-                        }}
-                      >
-                        Rename department
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          deleteDepartment(departmentName);
-                        }}
-                      >
-                        Delete department
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
-            </div>
-            {isExpanded && (
-              <div className="space-y-2">
-                {departmentMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-start gap-2 rounded-md border bg-background px-3 py-2"
+      <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+        {visibleDepartmentNames.map((departmentName) => {
+          const departmentMembers = visibleMembersByDepartment.get(departmentName) ?? [];
+          const totalDepartmentMembers = membersByDepartment.get(departmentName) ?? [];
+          const isExpanded = expandedDepartmentNames.includes(departmentName);
+          return (
+            <div
+              key={departmentName}
+              className="rounded-lg border border-border/90 bg-card/95 p-2.5 shadow-md"
+              style={{ borderLeftColor: getDepartmentAccentHex(departmentName), borderLeftWidth: '4px' }}
+              draggable={!readOnly}
+              onDragStart={() => setDraggingDepartmentName(departmentName)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => {
+                if (!draggingDepartmentName || draggingDepartmentName === departmentName) return;
+                const nextOrder = [...orderedDepartments];
+                const sourceIndex = nextOrder.indexOf(draggingDepartmentName);
+                const targetIndex = nextOrder.indexOf(departmentName);
+                if (sourceIndex < 0 || targetIndex < 0) return;
+                const [moved] = nextOrder.splice(sourceIndex, 1);
+                nextOrder.splice(targetIndex, 0, moved);
+                setDepartmentOrder(nextOrder);
+                setDraggingDepartmentName(null);
+              }}
+            >
+              <div className="mb-2 flex items-center gap-2 rounded-md border border-border/80 bg-muted/50 px-2 py-1.5">
+                {!readOnly && <GripVertical className="h-4 w-4 text-muted-foreground" />}
+                <Flag className="h-3.5 w-3.5" style={{ color: getDepartmentAccentHex(departmentName) }} />
+                <button type="button" className="inline-flex items-center gap-1 text-sm font-semibold" onClick={() => toggleDepartmentExpanded(departmentName)}>
+                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {departmentName}
+                </button>
+                <span className="rounded bg-background/80 px-1.5 py-0.5 text-xs text-muted-foreground">
+                  {normalizedMemberSearchTerm
+                    ? `${departmentMembers.length} of ${totalDepartmentMembers.length} crew`
+                    : `${departmentMembers.length} crew`}
+                </span>
+                {!readOnly && (
+                  <div className="ml-auto">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Department actions">
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            openRenameDepartmentDialog(departmentName);
+                          }}
+                        >
+                          Rename department
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            deleteDepartment(departmentName);
+                          }}
+                        >
+                          Delete department
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+              </div>
+              {isExpanded && (
+                <div
+                  className="space-y-2"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => {
+                    if (!draggingMemberId) return;
+                    if (draggingMemberSourceDepartment === departmentName) {
+                      clearDraggingMemberState();
+                      return;
+                    }
+                    moveMemberToDepartment(draggingMemberId, departmentName);
+                    clearDraggingMemberState();
+                  }}
+                >
+                  {!readOnly ? (
+                    <div className="grid grid-cols-[1fr_1fr_auto] gap-1.5 rounded-md border border-dashed border-border/90 bg-muted/30 px-2 py-1.5">
+                    <Input
+                      placeholder={`Quick add name in ${departmentName}`}
+                      className="h-7 text-sm"
+                      list="crew-editor-master-name-suggestions"
+                      value={getQuickAddDraft(departmentName).name}
+                      onChange={(event) => updateQuickAddDraft(departmentName, { name: event.target.value })}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter') return;
+                        event.preventDefault();
+                        addQuickMemberToDepartment(departmentName);
+                      }}
+                    />
+                    <Input
+                      placeholder="Role"
+                      className="h-7 text-sm"
+                      value={getQuickAddDraft(departmentName).role}
+                      onChange={(event) => updateQuickAddDraft(departmentName, { role: event.target.value })}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter') return;
+                        event.preventDefault();
+                        addQuickMemberToDepartment(departmentName);
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7"
+                      onClick={() => addQuickMemberToDepartment(departmentName)}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  ) : null}
+                  {departmentMembers.map((member) => {
+                    const matchedMasterContact = member.contactId
+                      ? masterContacts.find((contact) => contact.id === member.contactId)
+                      : masterContactByLowerName.get(member.name.trim().toLowerCase());
+                    return (
+                    <div
+                      key={member.id}
+                      className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-1.5 shadow-sm"
                     draggable={!readOnly && memberSortMode === 'manual'}
-                    onDragStart={() => setDraggingMemberId(member.id)}
+                    onDragStart={() => {
+                      setDraggingMemberId(member.id);
+                      setDraggingMemberSourceDepartment(departmentName);
+                    }}
+                    onDragEnd={clearDraggingMemberState}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => {
                       if (!draggingMemberId || draggingMemberId === member.id || memberSortMode !== 'manual') return;
+                      if (draggingMemberSourceDepartment && draggingMemberSourceDepartment !== departmentName) {
+                        moveMemberToDepartment(draggingMemberId, departmentName);
+                        clearDraggingMemberState();
+                        return;
+                      }
                       moveMemberWithinDepartment(draggingMemberId, member.id, departmentName);
-                      setDraggingMemberId(null);
+                      clearDraggingMemberState();
                     }}
                   >
                     <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1 space-y-2">
+                      {matchedMasterContact ? (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge
+                            className={matchedMasterContact.isActive
+                              ? 'border border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-600/20 dark:text-emerald-200'
+                              : 'border border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-500/40 dark:bg-slate-600/20 dark:text-slate-200'}
+                          >
+                            {matchedMasterContact.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <Badge
+                            className={matchedMasterContact.contactType === 'vendor'
+                              ? 'border border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-600/20 dark:text-amber-200'
+                              : 'border border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-500/40 dark:bg-blue-600/20 dark:text-blue-200'}
+                          >
+                            {matchedMasterContact.contactType === 'vendor' ? 'Vendor' : 'Crew'}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Local only
+                        </Badge>
+                      )}
                       {readOnly ? (
                         <>
                           <p className="text-sm font-medium">{member.name}</p>
@@ -552,103 +854,242 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                         </>
                       ) : (
                         <>
-                          <div className="grid grid-cols-2 gap-2">
-                            <Input placeholder="Name *" className="h-7 text-sm" value={member.name} onChange={(event) => updateMember(member.id, { name: event.target.value })} />
-                            <Input placeholder="Role" className="h-7 text-sm" value={member.role} onChange={(event) => updateMember(member.id, { role: event.target.value })} />
-                            <Input
-                              placeholder="Phone"
-                              className="h-7 text-sm"
-                              value={member.phone ?? ''}
-                              onChange={(event) => updateMember(member.id, { phone: event.target.value })}
-                              onBlur={(event) => updateMember(member.id, { phone: formatPhoneNumber(event.target.value) || undefined })}
-                            />
-                            <Input
-                              placeholder="Email"
-                              className="h-7 text-sm"
-                              type="email"
-                              value={member.email ?? ''}
-                              onChange={(event) => updateMember(member.id, { email: event.target.value.trim() || undefined })}
-                            />
-                            <Select value={normalizeDepartment(member.department)} onValueChange={(value) => updateMember(member.id, { department: value })}>
-                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {orderedDepartments.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <Input placeholder="Position label" className="h-7 text-sm" value={member.positionLabel ?? ''} onChange={(event) => updateMember(member.id, { positionLabel: event.target.value })} />
-                            <Select
-                              value={member.positionTemplateId ?? 'none'}
-                              onValueChange={(value) => {
-                                if (value === 'none') return updateMember(member.id, { positionTemplateId: undefined });
-                                applyPositionTemplateToMember(member.id, value);
-                              }}
-                            >
-                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No template</SelectItem>
-                                {positionTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.label}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <Input placeholder="Notes" className="h-7 text-sm" value={member.notes ?? ''} onChange={(event) => updateMember(member.id, { notes: event.target.value })} />
-                          </div>
-                          <OptionalFormCollapsible title="Assignment shifts">
-                            <div className="space-y-2">
-                              {(member.shifts ?? []).map((shift) => (
-                                <div key={shift.id} className="grid grid-cols-6 gap-1 rounded border p-1.5">
-                                  <Input className="h-7 text-xs" type="date" value={shift.date} onChange={(event) => updateShiftForMember(member.id, shift.id, { date: normalizeDateInputValue(event.target.value) })} />
-                                  <TimeInput
-                                    className="h-7 text-xs"
-                                    value={shift.callTime ?? ''}
-                                    onChange={(event) => updateShiftForMember(member.id, shift.id, { callTime: event.target.value || undefined })}
-                                    onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { callTime: value })}
-                                  />
-                                  <TimeInput
-                                    className="h-7 text-xs"
-                                    value={shift.startTime ?? ''}
-                                    onChange={(event) => updateShiftForMember(member.id, shift.id, { startTime: event.target.value || undefined })}
-                                    onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { startTime: value })}
-                                  />
-                                  <TimeInput
-                                    className="h-7 text-xs"
-                                    value={shift.endTime ?? ''}
-                                    onChange={(event) => updateShiftForMember(member.id, shift.id, { endTime: event.target.value || undefined })}
-                                    onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { endTime: value })}
-                                  />
-                                  <Input className="h-7 text-xs" placeholder="Location" value={shift.location ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { location: event.target.value || undefined })} />
-                                  <div className="flex items-center justify-end">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShiftForMember(member.id, shift.id)}>
-                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                    </Button>
-                                  </div>
-                                  <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
-                                </div>
-                              ))}
-                              <div className="grid grid-cols-6 gap-1 rounded border border-dashed p-1.5">
-                                <Input className="h-7 text-xs" type="date" value={getShiftDraft(member.id).date} onChange={(event) => updateShiftDraft(member.id, { date: normalizeDateInputValue(event.target.value) })} />
-                                <TimeInput
-                                  className="h-7 text-xs"
-                                  value={getShiftDraft(member.id).callTime}
-                                  onChange={(event) => updateShiftDraft(member.id, { callTime: event.target.value })}
-                                  onBlurCommit={(value) => updateShiftDraft(member.id, { callTime: value ?? '' })}
+                          {cardDensityMode === 'compact' ? (
+                            <>
+                              <div className="grid grid-cols-[1fr_1fr_auto] gap-1.5">
+                                <Input
+                                  placeholder="Name *"
+                                  className="h-7 text-sm"
+                                  value={member.name}
+                                  onChange={(event) => updateMember(member.id, { name: event.target.value })}
                                 />
-                                <TimeInput
-                                  className="h-7 text-xs"
-                                  value={getShiftDraft(member.id).startTime}
-                                  onChange={(event) => updateShiftDraft(member.id, { startTime: event.target.value })}
-                                  onBlurCommit={(value) => updateShiftDraft(member.id, { startTime: value ?? '' })}
+                                <Input
+                                  placeholder="Role"
+                                  className="h-7 text-sm"
+                                  value={member.role}
+                                  onChange={(event) => updateMember(member.id, { role: event.target.value })}
                                 />
-                                <TimeInput
-                                  className="h-7 text-xs"
-                                  value={getShiftDraft(member.id).endTime}
-                                  onChange={(event) => updateShiftDraft(member.id, { endTime: event.target.value })}
-                                  onBlurCommit={(value) => updateShiftDraft(member.id, { endTime: value ?? '' })}
-                                />
-                                <Input className="h-7 text-xs" placeholder="Location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
-                                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift</Button>
-                                <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7"
+                                  onClick={() => toggleMemberExpanded(member.id)}
+                                >
+                                  {expandedMemberIds.includes(member.id) ? 'Less' : 'Details'}
+                                </Button>
                               </div>
-                            </div>
-                          </OptionalFormCollapsible>
+                              {expandedMemberIds.includes(member.id) ? (
+                                <>
+                                  <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-3">
+                                    <Input
+                                      placeholder="Phone"
+                                      className="h-7 text-sm"
+                                      value={member.phone ?? ''}
+                                      onChange={(event) => updateMember(member.id, { phone: event.target.value })}
+                                      onBlur={(event) => updateMember(member.id, { phone: formatPhoneNumber(event.target.value) || undefined })}
+                                    />
+                                    <Input
+                                      placeholder="Email"
+                                      className="h-7 text-sm"
+                                      type="email"
+                                      value={member.email ?? ''}
+                                      onChange={(event) => updateMember(member.id, { email: event.target.value.trim() || undefined })}
+                                    />
+                                    <Select value={normalizeDepartment(member.department)} onValueChange={(value) => updateMember(member.id, { department: value })}>
+                                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        {orderedDepartments.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input placeholder="Position label" className="h-7 text-sm" value={member.positionLabel ?? ''} onChange={(event) => updateMember(member.id, { positionLabel: event.target.value })} />
+                                    <Select
+                                      value={member.positionTemplateId ?? 'none'}
+                                      onValueChange={(value) => {
+                                        if (value === 'none') return updateMember(member.id, { positionTemplateId: undefined });
+                                        applyPositionTemplateToMember(member.id, value);
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">No template</SelectItem>
+                                        {positionTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.label}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      placeholder="Notes"
+                                      className="h-7 text-sm lg:col-span-3"
+                                      value={member.notes ?? ''}
+                                      onChange={(event) => updateMember(member.id, { notes: event.target.value })}
+                                    />
+                                  </div>
+                                  <OptionalFormCollapsible title="Assignment shifts">
+                                    <div className="space-y-2">
+                                      {(member.shifts ?? []).map((shift) => (
+                                        <div key={shift.id} className="grid grid-cols-6 gap-1 rounded border p-1.5">
+                                          <Input className="h-7 text-xs" type="date" value={shift.date} onChange={(event) => updateShiftForMember(member.id, shift.id, { date: normalizeDateInputValue(event.target.value) })} />
+                                          <TimeInput
+                                            className="h-7 text-xs"
+                                            value={shift.callTime ?? ''}
+                                            onChange={(event) => updateShiftForMember(member.id, shift.id, { callTime: event.target.value || undefined })}
+                                            onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { callTime: value })}
+                                          />
+                                          <TimeInput
+                                            className="h-7 text-xs"
+                                            value={shift.startTime ?? ''}
+                                            onChange={(event) => updateShiftForMember(member.id, shift.id, { startTime: event.target.value || undefined })}
+                                            onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { startTime: value })}
+                                          />
+                                          <TimeInput
+                                            className="h-7 text-xs"
+                                            value={shift.endTime ?? ''}
+                                            onChange={(event) => updateShiftForMember(member.id, shift.id, { endTime: event.target.value || undefined })}
+                                            onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { endTime: value })}
+                                          />
+                                          <Input className="h-7 text-xs" placeholder="Location" value={shift.location ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { location: event.target.value || undefined })} />
+                                          <div className="flex items-center justify-end">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShiftForMember(member.id, shift.id)}>
+                                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                            </Button>
+                                          </div>
+                                          <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
+                                        </div>
+                                      ))}
+                                      <div className="grid grid-cols-6 gap-1 rounded border border-dashed p-1.5">
+                                        <Input className="h-7 text-xs" type="date" value={getShiftDraft(member.id).date} onChange={(event) => updateShiftDraft(member.id, { date: normalizeDateInputValue(event.target.value) })} />
+                                        <TimeInput
+                                          className="h-7 text-xs"
+                                          value={getShiftDraft(member.id).callTime}
+                                          onChange={(event) => updateShiftDraft(member.id, { callTime: event.target.value })}
+                                          onBlurCommit={(value) => updateShiftDraft(member.id, { callTime: value ?? '' })}
+                                        />
+                                        <TimeInput
+                                          className="h-7 text-xs"
+                                          value={getShiftDraft(member.id).startTime}
+                                          onChange={(event) => updateShiftDraft(member.id, { startTime: event.target.value })}
+                                          onBlurCommit={(value) => updateShiftDraft(member.id, { startTime: value ?? '' })}
+                                        />
+                                        <TimeInput
+                                          className="h-7 text-xs"
+                                          value={getShiftDraft(member.id).endTime}
+                                          onChange={(event) => updateShiftDraft(member.id, { endTime: event.target.value })}
+                                          onBlurCommit={(value) => updateShiftDraft(member.id, { endTime: value ?? '' })}
+                                        />
+                                        <Input className="h-7 text-xs" placeholder="Location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
+                                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift</Button>
+                                        <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
+                                      </div>
+                                    </div>
+                                  </OptionalFormCollapsible>
+                                </>
+                              ) : null}
+                            </>
+                          ) : (
+                            <>
+                              <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-3">
+                                <Input placeholder="Name *" className="h-7 text-sm" value={member.name} onChange={(event) => updateMember(member.id, { name: event.target.value })} />
+                                <Input placeholder="Role" className="h-7 text-sm" value={member.role} onChange={(event) => updateMember(member.id, { role: event.target.value })} />
+                                <Input
+                                  placeholder="Phone"
+                                  className="h-7 text-sm"
+                                  value={member.phone ?? ''}
+                                  onChange={(event) => updateMember(member.id, { phone: event.target.value })}
+                                  onBlur={(event) => updateMember(member.id, { phone: formatPhoneNumber(event.target.value) || undefined })}
+                                />
+                                <Input
+                                  placeholder="Email"
+                                  className="h-7 text-sm"
+                                  type="email"
+                                  value={member.email ?? ''}
+                                  onChange={(event) => updateMember(member.id, { email: event.target.value.trim() || undefined })}
+                                />
+                                <Select value={normalizeDepartment(member.department)} onValueChange={(value) => updateMember(member.id, { department: value })}>
+                                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {orderedDepartments.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                <Input placeholder="Position label" className="h-7 text-sm" value={member.positionLabel ?? ''} onChange={(event) => updateMember(member.id, { positionLabel: event.target.value })} />
+                                <Select
+                                  value={member.positionTemplateId ?? 'none'}
+                                  onValueChange={(value) => {
+                                    if (value === 'none') return updateMember(member.id, { positionTemplateId: undefined });
+                                    applyPositionTemplateToMember(member.id, value);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No template</SelectItem>
+                                    {positionTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.label}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  placeholder="Notes"
+                                  className="h-7 text-sm lg:col-span-3"
+                                  value={member.notes ?? ''}
+                                  onChange={(event) => updateMember(member.id, { notes: event.target.value })}
+                                />
+                              </div>
+                              <OptionalFormCollapsible title="Assignment shifts">
+                                <div className="space-y-2">
+                                  {(member.shifts ?? []).map((shift) => (
+                                    <div key={shift.id} className="grid grid-cols-6 gap-1 rounded border p-1.5">
+                                      <Input className="h-7 text-xs" type="date" value={shift.date} onChange={(event) => updateShiftForMember(member.id, shift.id, { date: normalizeDateInputValue(event.target.value) })} />
+                                      <TimeInput
+                                        className="h-7 text-xs"
+                                        value={shift.callTime ?? ''}
+                                        onChange={(event) => updateShiftForMember(member.id, shift.id, { callTime: event.target.value || undefined })}
+                                        onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { callTime: value })}
+                                      />
+                                      <TimeInput
+                                        className="h-7 text-xs"
+                                        value={shift.startTime ?? ''}
+                                        onChange={(event) => updateShiftForMember(member.id, shift.id, { startTime: event.target.value || undefined })}
+                                        onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { startTime: value })}
+                                      />
+                                      <TimeInput
+                                        className="h-7 text-xs"
+                                        value={shift.endTime ?? ''}
+                                        onChange={(event) => updateShiftForMember(member.id, shift.id, { endTime: event.target.value || undefined })}
+                                        onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { endTime: value })}
+                                      />
+                                      <Input className="h-7 text-xs" placeholder="Location" value={shift.location ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { location: event.target.value || undefined })} />
+                                      <div className="flex items-center justify-end">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShiftForMember(member.id, shift.id)}>
+                                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                        </Button>
+                                      </div>
+                                      <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
+                                    </div>
+                                  ))}
+                                  <div className="grid grid-cols-6 gap-1 rounded border border-dashed p-1.5">
+                                    <Input className="h-7 text-xs" type="date" value={getShiftDraft(member.id).date} onChange={(event) => updateShiftDraft(member.id, { date: normalizeDateInputValue(event.target.value) })} />
+                                    <TimeInput
+                                      className="h-7 text-xs"
+                                      value={getShiftDraft(member.id).callTime}
+                                      onChange={(event) => updateShiftDraft(member.id, { callTime: event.target.value })}
+                                      onBlurCommit={(value) => updateShiftDraft(member.id, { callTime: value ?? '' })}
+                                    />
+                                    <TimeInput
+                                      className="h-7 text-xs"
+                                      value={getShiftDraft(member.id).startTime}
+                                      onChange={(event) => updateShiftDraft(member.id, { startTime: event.target.value })}
+                                      onBlurCommit={(value) => updateShiftDraft(member.id, { startTime: value ?? '' })}
+                                    />
+                                    <TimeInput
+                                      className="h-7 text-xs"
+                                      value={getShiftDraft(member.id).endTime}
+                                      onChange={(event) => updateShiftDraft(member.id, { endTime: event.target.value })}
+                                      onBlurCommit={(value) => updateShiftDraft(member.id, { endTime: value ?? '' })}
+                                    />
+                                    <Input className="h-7 text-xs" placeholder="Location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
+                                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift</Button>
+                                    <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
+                                  </div>
+                                </div>
+                              </OptionalFormCollapsible>
+                            </>
+                          )}
                         </>
                       )}
                     </div>
@@ -672,14 +1113,21 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
-                  </div>
-                ))}
-                {departmentMembers.length === 0 && <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">No crew in this department.</p>}
-              </div>
-            )}
-          </div>
-        );
-      })}
+                    </div>
+                    );
+                  })}
+                  {departmentMembers.length === 0 && <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">No crew in this department.</p>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {!readOnly && normalizedMemberSearchTerm && visibleDepartmentNames.length === 0 ? (
+        <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          No assigned crew members match your search.
+        </p>
+      ) : null}
 
       {!readOnly && (
         <OptionalFormCollapsible title="Add crew member">
@@ -695,7 +1143,24 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
             <Button variant="outline" size="sm" className="h-7" onClick={handleCreateTemplate}>Save template</Button>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Name *" className="h-7 text-sm" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} onKeyDown={(event) => event.key === 'Enter' && addMember()} />
+            <datalist id="crew-editor-master-name-suggestions">
+              {allMasterNameSuggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+            <Input
+              placeholder="Name *"
+              className="h-7 text-sm"
+              list="crew-editor-master-name-suggestions"
+              value={draft.name}
+              onChange={(event) => {
+                const nextName = event.target.value;
+                setDraft((current) => ({ ...current, name: nextName }));
+                applyMasterContactToMainDraft(nextName);
+              }}
+              onBlur={(event) => applyMasterContactToMainDraft(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && addMember()}
+            />
             <Input placeholder="Role" className="h-7 text-sm" value={draft.role} onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value }))} onKeyDown={(event) => event.key === 'Enter' && addMember()} />
             <Input placeholder="Phone" className="h-7 text-sm" value={draft.phone ?? ''} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} onBlur={(event) => setDraft((current) => ({ ...current, phone: formatPhoneNumber(event.target.value) || undefined }))} />
             <Input placeholder="Email" type="email" className="h-7 text-sm" value={draft.email ?? ''} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />

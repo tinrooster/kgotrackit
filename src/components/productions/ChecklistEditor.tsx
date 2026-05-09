@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, GripVertical, Link2, Unlink, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { ChecklistGroup, ChecklistItem } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { InventoryItemPicker } from './InventoryItemPicker';
 import { BulkInventorySelectionDialog, BulkSelectionResult } from './BulkInventorySelectionDialog';
@@ -43,6 +44,17 @@ function newGroup(title: string): ChecklistGroup {
   return { id: crypto.randomUUID(), title, items: [] };
 }
 
+function getGroupAccentHex(groupTitle: string): string {
+  const key = groupTitle.trim().toLowerCase() || 'group';
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 70% 58%)`;
+}
+
 export function ChecklistEditor({
   groups,
   onChange,
@@ -65,6 +77,9 @@ export function ChecklistEditor({
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [completionFilter, setCompletionFilter] = useState<'all' | 'open' | 'done'>('all');
   const [sortMode, setSortMode] = useState<'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'>('manual');
+
+  const allGroupIds = useMemo(() => groups.map((group) => group.id), [groups]);
+
   const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
     if (!requireDeleteConfirm) {
       deleteAction();
@@ -212,46 +227,88 @@ export function ChecklistEditor({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-2 rounded-md border p-2 sm:grid-cols-3">
-        <Input
-          placeholder="Search checklist items..."
-          value={listSearchQuery}
-          onChange={(event) => setListSearchQuery(event.target.value)}
-          className="h-8"
-        />
-        <Select value={completionFilter} onValueChange={(value) => setCompletionFilter(value as 'all' | 'open' | 'done')}>
-          <SelectTrigger className="h-8">
-            <SelectValue placeholder="Filter status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All status</SelectItem>
-            <SelectItem value="open">Open only</SelectItem>
-            <SelectItem value="done">Completed only</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={sortMode}
-          onValueChange={(value) => setSortMode(value as 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc')}
-        >
-          <SelectTrigger className="h-8">
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="manual">Manual order</SelectItem>
-            <SelectItem value="name_asc">Name (A-Z)</SelectItem>
-            <SelectItem value="name_desc">Name (Z-A)</SelectItem>
-            <SelectItem value="qty_asc">Qty (low-high)</SelectItem>
-            <SelectItem value="qty_desc">Qty (high-low)</SelectItem>
-          </SelectContent>
-        </Select>
+    <div className="space-y-3">
+      <div className="rounded-md border bg-muted/20 p-2">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <Input
+            placeholder="Search checklist items..."
+            value={listSearchQuery}
+            onChange={(event) => setListSearchQuery(event.target.value)}
+            className="h-8 text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <Select value={completionFilter} onValueChange={(value) => setCompletionFilter(value as 'all' | 'open' | 'done')}>
+              <SelectTrigger className="h-8 w-full sm:w-[180px]">
+                <SelectValue placeholder="Filter status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="open">Open only</SelectItem>
+                <SelectItem value="done">Completed only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={sortMode}
+              onValueChange={(value) => setSortMode(value as 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc')}
+            >
+              <SelectTrigger className="h-8 w-full sm:w-[180px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Manual order</SelectItem>
+                <SelectItem value="name_asc">Name (A-Z)</SelectItem>
+                <SelectItem value="name_desc">Name (Z-A)</SelectItem>
+                <SelectItem value="qty_asc">Qty (low-high)</SelectItem>
+                <SelectItem value="qty_desc">Qty (high-low)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="mt-2 flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setExpandedGroupIds(allGroupIds)}
+            disabled={allGroupIds.length === 0}
+          >
+            Expand all
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setExpandedGroupIds([])}
+            disabled={expandedGroupIds.length === 0}
+          >
+            Collapse all
+          </Button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/80 bg-background/70 px-2 py-1.5">
+          <span className="text-xs font-medium text-foreground/90">Legend:</span>
+          <Badge className="border border-green-300 bg-green-100 text-green-800 dark:border-green-500/40 dark:bg-green-600/20 dark:text-green-200">
+            Completed
+          </Badge>
+          <Badge className="border border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-500/40 dark:bg-slate-600/20 dark:text-slate-200">
+            Open
+          </Badge>
+          <Badge className="border border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-500/40 dark:bg-blue-600/20 dark:text-blue-200">
+            Linked
+          </Badge>
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">
         Item checkbox marks completion status only (not multi-select for list actions).
       </p>
       {groups.map((group) => (
-        <div key={group.id} className="rounded-md border">
-          <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2">
+        <div
+          key={group.id}
+          className="rounded-lg border border-border/90 bg-card/95 p-2.5 shadow-sm"
+          style={{ borderLeftColor: getGroupAccentHex(group.title), borderLeftWidth: '4px' }}
+        >
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-border/80 bg-muted/50 px-2 py-1.5">
             <Button
               variant="ghost"
               size="icon"
@@ -275,6 +332,9 @@ export function ChecklistEditor({
                 onChange={(e) => updateGroup(group.id, { title: e.target.value })}
               />
             )}
+            <span className="rounded bg-background/80 px-1.5 py-0.5 text-xs text-muted-foreground">
+              {group.items.length} items
+            </span>
             {!readOnly && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -296,7 +356,7 @@ export function ChecklistEditor({
               </DropdownMenu>
             )}
           </div>
-          {expandedGroupIds.includes(group.id) && <div className="divide-y">
+          {expandedGroupIds.includes(group.id) && <div className="divide-y rounded-md border border-border/70 bg-background">
             {getVisibleItems(group.items).map((item) => {
               const invName = resolveInventoryName(item.inventoryItemId);
               const isEditingItemLabel =
@@ -448,7 +508,7 @@ export function ChecklistEditor({
             })}
           </div>}
           {!readOnly && (
-            <div className="flex gap-2 border-t px-3 py-2">
+            <div className="mt-2 flex gap-2 rounded-md border border-dashed border-border/80 px-3 py-2">
               <Input
                 placeholder="Add item..."
                 className="h-7 text-sm"

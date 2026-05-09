@@ -24,6 +24,7 @@ import ProductionsPage from './pages/ProductionsPage';
 import TimePickerLabPage from './pages/TimePickerLabPage';
 import UiDiagnosticsPage from './pages/UiDiagnosticsPage';
 import DevMenuPage from './pages/DevMenuPage';
+import PlannerWorkspacePage from './pages/PlannerWorkspacePage';
 
 const LAST_ROUTE_STORAGE_KEY = 'trackit:last-route';
 
@@ -218,6 +219,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <ProductionsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/productions/planner"
+                element={
+                  <ProtectedRoute>
+                    <PlannerWorkspacePage />
                   </ProtectedRoute>
                 }
               />

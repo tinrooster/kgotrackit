@@ -5,9 +5,11 @@ import { isSupabaseConfigured } from '@/lib/supabase/client';
 import {
   getActiveOrganizationId,
   listOrganizationSummariesForUser,
+  pullOrganizationAppData,
   setActiveOrganizationId as persistActiveOrganizationId,
   type OrganizationSummary,
 } from '@/lib/supabase/organizationData';
+import { saveAppBranding } from '@/lib/appBranding';
 
 interface OrganizationContextValue {
   organizations: OrganizationSummary[];
@@ -110,6 +112,37 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     persistActiveOrganizationId(fallbackOrganizationId);
     setActiveOrganizationIdState(fallbackOrganizationId);
   }, [activeOrganizationId, activeWorkspaceId, authBackend, currentUser?.id, loading, organizations, workspaces]);
+
+  useEffect(() => {
+    const syncOrganizationBranding = async () => {
+      if (!activeOrganizationId || authBackend !== 'supabase') return;
+      try {
+        const row = await pullOrganizationAppData(activeOrganizationId);
+        const branding =
+          row?.branding && typeof row.branding === 'object' && !Array.isArray(row.branding)
+            ? (row.branding as Record<string, unknown>)
+            : {};
+        const appBranding =
+          branding.appBranding && typeof branding.appBranding === 'object' && !Array.isArray(branding.appBranding)
+            ? (branding.appBranding as Record<string, unknown>)
+            : null;
+        if (!appBranding) return;
+        saveAppBranding({
+          appName:
+            typeof appBranding.appName === 'string' && appBranding.appName.trim()
+              ? appBranding.appName
+              : 'TEd_trackIT',
+          logoLightDataUrl:
+            typeof appBranding.logoLightDataUrl === 'string' ? appBranding.logoLightDataUrl : '',
+          logoDarkDataUrl:
+            typeof appBranding.logoDarkDataUrl === 'string' ? appBranding.logoDarkDataUrl : '',
+        });
+      } catch {
+        // best-effort sync; keep existing local branding if unavailable
+      }
+    };
+    void syncOrganizationBranding();
+  }, [activeOrganizationId, authBackend]);
 
   const activeOrganization = useMemo(
     () => organizations.find((organization) => organization.organizationId === activeOrganizationId),

@@ -82,6 +82,8 @@ export interface CrewScheduleEntry {
   role?: string;
   location?: string;
   notes?: string;
+  /** Linked day resources used by this schedule block. */
+  resourceIds?: string[];
 }
 
 export interface Production {

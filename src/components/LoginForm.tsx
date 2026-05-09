@@ -15,6 +15,7 @@ import type { UserWithPassword, LoginResult } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { logger } from '@/utils/logger';
 import { useLocation } from 'react-router-dom';
+import { APP_BRANDING_UPDATED_EVENT, loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding';
 
 const LAST_ROUTE_STORAGE_KEY = 'trackit:last-route';
 
@@ -69,6 +70,8 @@ export function LoginForm() {
   const [resetError, setResetError] = useState<string | null>(null);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isResetPasswordVisible, setIsResetPasswordVisible] = useState(false);
+  const [branding, setBranding] = useState(() => loadAppBranding());
+  const [brandLogo, setBrandLogo] = useState(() => resolveBrandLogoForTheme(loadAppBranding()));
 
   const resetSchema = useMemo(
     () => buildResetPasswordSchema(authBackend === 'supabase'),
@@ -105,6 +108,21 @@ export function LoginForm() {
       setValue('username', switchEmail);
     }
   }, [authBackend, location.search, setValue]);
+
+  useEffect(() => {
+    const syncBranding = () => {
+      const nextBranding = loadAppBranding();
+      setBranding(nextBranding);
+      setBrandLogo(resolveBrandLogoForTheme(nextBranding));
+    };
+    syncBranding();
+    window.addEventListener(APP_BRANDING_UPDATED_EVENT, syncBranding);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncBranding);
+    return () => {
+      window.removeEventListener(APP_BRANDING_UPDATED_EVENT, syncBranding);
+      window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', syncBranding);
+    };
+  }, []);
 
   const getPostLoginDestination = (): string => {
     const state = location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null;
@@ -288,6 +306,10 @@ export function LoginForm() {
         }}
         className="space-y-6"
       >
+        <div className="flex items-center justify-center gap-3">
+          {brandLogo ? <img src={brandLogo} alt="App logo" className="h-10 w-auto" /> : null}
+          <h2 className="text-lg font-semibold">{branding.appName || 'TEd_trackIT'}</h2>
+        </div>
         {loginError && (
           <div className="p-4 mb-4 text-sm border rounded-md bg-destructive/10 text-destructive border-destructive flex items-center space-x-2">
             <div>

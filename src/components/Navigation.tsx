@@ -9,6 +9,21 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useOrganization } from '@/contexts/OrganizationContext'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
 import { DEV_MENU_UPDATED_EVENT, getDevMenuPreference, isDevMenuEnabled, setDevMenuEnabled as persistDevMenuEnabled } from '@/lib/devMenu'
+import { APP_BRANDING_UPDATED_EVENT, loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding'
+
+const LAST_PLANNER_ROUTE_STORAGE_KEY = 'trackit:last-planner-route'
+
+function getProductionsNavPath(): string {
+  try {
+    const savedPlannerPath = sessionStorage.getItem(LAST_PLANNER_ROUTE_STORAGE_KEY)
+    if (savedPlannerPath && savedPlannerPath.startsWith('/productions/planner')) {
+      return savedPlannerPath
+    }
+  } catch {
+    /* ignore */
+  }
+  return '/productions'
+}
 
 export function Navigation() {
   const location = useLocation()
@@ -21,6 +36,8 @@ export function Navigation() {
     () => SettingsService.loadDefaultSettings().mobileTabletUi
   )
   const [devMenuEnabled, setDevMenuEnabledState] = useState(() => isDevMenuEnabled())
+  const [branding, setBranding] = useState(() => loadAppBranding())
+  const [brandLogo, setBrandLogo] = useState(() => resolveBrandLogoForTheme(loadAppBranding()))
 
   useEffect(() => {
     const syncMobileTablet = () => {
@@ -34,6 +51,21 @@ export function Navigation() {
     const syncDevMenu = () => setDevMenuEnabledState(isDevMenuEnabled())
     window.addEventListener(DEV_MENU_UPDATED_EVENT, syncDevMenu)
     return () => window.removeEventListener(DEV_MENU_UPDATED_EVENT, syncDevMenu)
+  }, [])
+
+  useEffect(() => {
+    const syncBranding = () => {
+      const nextBranding = loadAppBranding()
+      setBranding(nextBranding)
+      setBrandLogo(resolveBrandLogoForTheme(nextBranding))
+    }
+    syncBranding()
+    window.addEventListener(APP_BRANDING_UPDATED_EVENT, syncBranding)
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncBranding)
+    return () => {
+      window.removeEventListener(APP_BRANDING_UPDATED_EVENT, syncBranding)
+      window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', syncBranding)
+    }
   }, [])
 
   useEffect(() => {
@@ -84,14 +116,15 @@ export function Navigation() {
   const navItems = [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
     { path: "/inventory", label: "Inventory", icon: List },
-    { path: "/productions", label: "Productions", icon: Clapperboard },
+    { path: getProductionsNavPath(), label: "Productions", icon: Clapperboard, activeBasePath: '/productions' },
     { path: "/checkout", label: "Check-In/Out", icon: ShoppingCart },
     { path: "/reports", label: "Reports", icon: FileText },
     { path: "/settings", label: "Settings", icon: Settings }
   ]
-  const isNavItemActive = (path: string): boolean => {
-    if (path === '/') return location.pathname === '/';
-    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const isNavItemActive = (path: string, activeBasePath?: string): boolean => {
+    const matchPath = activeBasePath ?? path
+    if (matchPath === '/') return location.pathname === '/';
+    return location.pathname === matchPath || location.pathname.startsWith(`${matchPath}/`);
   };
   const isAdmin = (activeWorkspaceId ? activeWorkspaceRole : currentUser?.role) === 'admin'
   const devNavItems = (isAdmin && devMenuEnabled)
@@ -105,12 +138,21 @@ export function Navigation() {
           <div className="flex min-w-0 max-w-[min(100%,220px)] flex-col gap-0.5 sm:max-w-none sm:flex-row sm:items-center sm:gap-2">
             <Link
               to="/"
-              className={cn(
-                'shrink-0 min-w-0 font-bold hover:text-primary transition-colors',
-                mobileTabletUi ? 'text-base sm:text-lg' : 'text-lg'
-              )}
+              className="shrink-0 min-w-0 hover:text-primary transition-colors"
             >
-              TEd_trackIT
+              <span className="flex items-center gap-2">
+                {brandLogo ? (
+                  <img src={brandLogo} alt="App logo" className="h-7 w-auto shrink-0" />
+                ) : null}
+                <span
+                  className={cn(
+                    'min-w-0 truncate font-bold',
+                    mobileTabletUi ? 'text-base sm:text-lg' : 'text-lg'
+                  )}
+                >
+                  {branding.appName || 'TEd_trackIT'}
+                </span>
+              </span>
             </Link>
             {showDataContextChip ? (
               <span
@@ -137,7 +179,7 @@ export function Navigation() {
                 className={cn(
                   'flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md text-sm font-medium transition-colors md:min-h-0 md:min-w-0',
                   mobileTabletUi ? 'px-2 py-1.5 md:max-lg:px-2 md:max-lg:justify-center lg:px-3 lg:py-2' : 'px-3 py-2',
-                  isNavItemActive(item.path)
+                  isNavItemActive(item.path, item.activeBasePath)
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
@@ -206,7 +248,7 @@ export function Navigation() {
                 to={item.path}
                 className={cn(
                   'flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
-                  isNavItemActive(item.path)
+                  isNavItemActive(item.path, item.activeBasePath)
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger, createTabsScope } from '@/components/ui/tabs';
 import { OrgMaintenanceBroadcastTemplateSection } from '@/components/settings/OrgMaintenanceBroadcastTemplateSection';
 import { OrganizationDirectoryContactsSection } from '@/components/settings/OrganizationDirectoryContactsSection';
+import { OrganizationBrandingSection } from '@/components/settings/OrganizationBrandingSection';
 import { OrganizationMasterPanel } from '@/components/settings/OrganizationMasterPanel';
 import type { OrganizationSummary } from '@/lib/supabase/organizationData';
 import type { MaintenanceOnAirSchedule } from '@/lib/settingsService';
@@ -87,6 +88,11 @@ export function OrganizationSettingsSection({
             loading={organizationsLoading}
             selectOrganization={selectOrganization}
             refreshOrganizations={refreshOrganizations}
+          />
+          <OrganizationBrandingSection
+            organizationId={activeOrganizationId}
+            authBackend={authBackend}
+            canEdit={activeOrganizationRole === 'admin' || activeOrganizationRole === 'editor'}
           />
 
           <Card>

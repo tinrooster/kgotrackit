@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Trash2, Truck, Unlink, AlertTriangle, MoreHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Truck, Unlink, AlertTriangle, MoreHorizontal, ChevronDown, ChevronRight } from 'lucide-react';
 import { VehiclePacklist, VehiclePacklistSection, ChecklistItem, ChecklistGroup } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
@@ -91,6 +91,14 @@ export function VehiclePacklistEditor({
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [packedFilter, setPackedFilter] = useState<'all' | 'open' | 'done'>('all');
   const [sortMode, setSortMode] = useState<'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'>('manual');
+  const [expandedPacklistIds, setExpandedPacklistIds] = useState<string[]>([]);
+
+  const allPacklistIds = useMemo(() => packlists.map((packlist) => packlist.id), [packlists]);
+
+  useEffect(() => {
+    const validIds = new Set(packlists.map((packlist) => packlist.id));
+    setExpandedPacklistIds((previous) => previous.filter((id) => validIds.has(id)));
+  }, [packlists]);
 
   const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
     if (!requireDeleteConfirm) {
@@ -127,7 +135,9 @@ export function VehiclePacklistEditor({
   const addPacklist = () => {
     const name = newVehicleName.trim();
     if (!name) return;
-    onChange([...packlists, { id: crypto.randomUUID(), vehicleName: name, items: [], sections: [] }]);
+    const nextId = crypto.randomUUID();
+    onChange([...packlists, { id: nextId, vehicleName: name, items: [], sections: [] }]);
+    setExpandedPacklistIds((previous) => (previous.includes(nextId) ? previous : [...previous, nextId]));
     setNewVehicleName('');
   };
 
@@ -357,39 +367,65 @@ export function VehiclePacklistEditor({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-2 rounded-md border p-2 sm:grid-cols-3">
-        <Input
-          placeholder="Search packlist items..."
-          value={listSearchQuery}
-          onChange={(event) => setListSearchQuery(event.target.value)}
-          className="h-8"
-        />
-        <Select value={packedFilter} onValueChange={(value) => setPackedFilter(value as 'all' | 'open' | 'done')}>
-          <SelectTrigger className="h-8">
-            <SelectValue placeholder="Filter packed state" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All status</SelectItem>
-            <SelectItem value="open">Not packed</SelectItem>
-            <SelectItem value="done">Packed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={sortMode}
-          onValueChange={(value) => setSortMode(value as 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc')}
-        >
-          <SelectTrigger className="h-8">
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="manual">Manual order</SelectItem>
-            <SelectItem value="name_asc">Name (A-Z)</SelectItem>
-            <SelectItem value="name_desc">Name (Z-A)</SelectItem>
-            <SelectItem value="qty_asc">Qty (low-high)</SelectItem>
-            <SelectItem value="qty_desc">Qty (high-low)</SelectItem>
-          </SelectContent>
-        </Select>
+    <div className="space-y-3">
+      <div className="rounded-md border bg-muted/20 p-2">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <Input
+            placeholder="Search packlist items..."
+            value={listSearchQuery}
+            onChange={(event) => setListSearchQuery(event.target.value)}
+            className="h-8 text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <Select value={packedFilter} onValueChange={(value) => setPackedFilter(value as 'all' | 'open' | 'done')}>
+              <SelectTrigger className="h-8 w-full sm:w-[170px]">
+                <SelectValue placeholder="Filter packed state" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="open">Not packed</SelectItem>
+                <SelectItem value="done">Packed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={sortMode}
+              onValueChange={(value) => setSortMode(value as 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc')}
+            >
+              <SelectTrigger className="h-8 w-full sm:w-[170px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Manual order</SelectItem>
+                <SelectItem value="name_asc">Name (A-Z)</SelectItem>
+                <SelectItem value="name_desc">Name (Z-A)</SelectItem>
+                <SelectItem value="qty_asc">Qty (low-high)</SelectItem>
+                <SelectItem value="qty_desc">Qty (high-low)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="mt-2 flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setExpandedPacklistIds(allPacklistIds)}
+            disabled={allPacklistIds.length === 0}
+          >
+            Expand all
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setExpandedPacklistIds([])}
+            disabled={expandedPacklistIds.length === 0}
+          >
+            Collapse all
+          </Button>
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">
         Checklist packs stay grouped below. Checkbox marks packed on the truck. A badge appears when the matching
@@ -400,8 +436,27 @@ export function VehiclePacklistEditor({
         const allFlat = flattenVehiclePacklistItems(packlist);
         const doneCount = allFlat.filter((i) => i.completed).length;
         return (
-          <div key={packlist.id} className="rounded-md border">
-            <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2">
+          <div key={packlist.id} className="rounded-lg border border-border/90 bg-card/95 p-2.5 shadow-sm">
+            <div className="mb-2 flex items-center gap-2 rounded-md border border-border/80 bg-muted/50 px-2 py-1.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                onClick={() =>
+                  setExpandedPacklistIds((previous) =>
+                    previous.includes(packlist.id)
+                      ? previous.filter((id) => id !== packlist.id)
+                      : [...previous, packlist.id]
+                  )
+                }
+                title={expandedPacklistIds.includes(packlist.id) ? 'Collapse packlist' : 'Expand packlist'}
+              >
+                {expandedPacklistIds.includes(packlist.id) ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+              </Button>
               <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
               {readOnly ? (
                 <span className="flex-1 text-sm font-medium">{packlist.vehicleName}</span>
@@ -412,7 +467,7 @@ export function VehiclePacklistEditor({
                   onChange={(e) => updatePacklist(packlist.id, { vehicleName: e.target.value })}
                 />
               )}
-              <span className="ml-auto text-xs text-muted-foreground">
+              <span className="rounded bg-background/80 px-1.5 py-0.5 text-xs text-muted-foreground">
                 {doneCount}/{allFlat.length} packed
               </span>
               {!readOnly && (
@@ -437,7 +492,7 @@ export function VehiclePacklistEditor({
               )}
             </div>
 
-            <div className="space-y-2 p-2">
+            {expandedPacklistIds.includes(packlist.id) && <div className="space-y-2">
               {(packlist.sections ?? []).map((section) => {
                 if (section.items.length === 0) return null;
                 const visible = getVisibleItems(section.items);
@@ -477,22 +532,22 @@ export function VehiclePacklistEditor({
                   </OptionalFormCollapsible>
                 );
               })}
-            </div>
+            </div>}
 
-            {(packlist.sections ?? []).length > 0 && getVisibleItems(packlist.items).length > 0 ? (
+            {expandedPacklistIds.includes(packlist.id) && (packlist.sections ?? []).length > 0 && getVisibleItems(packlist.items).length > 0 ? (
               <div className="px-3 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Loose items on this truck
               </div>
             ) : null}
-            <div className="divide-y">
+            {expandedPacklistIds.includes(packlist.id) && <div className="divide-y rounded-md border border-border/70 bg-background">
               {getVisibleItems(packlist.items).map((item) => renderPacklistLine(packlist.id, item))}
               {packlist.items.length === 0 && (packlist.sections ?? []).length === 0 && (
                 <p className="px-3 py-2 text-xs text-muted-foreground">No items yet.</p>
               )}
-            </div>
+            </div>}
 
-            {!readOnly && (
-              <div className="flex flex-wrap gap-2 border-t px-3 py-2">
+            {!readOnly && expandedPacklistIds.includes(packlist.id) && (
+              <div className="mt-2 flex flex-wrap gap-2 rounded-md border border-dashed border-border/80 px-3 py-2">
                 <Input
                   placeholder="Add item..."
                   className="h-7 min-w-[120px] flex-1 text-sm"

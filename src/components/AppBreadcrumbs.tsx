@@ -8,6 +8,7 @@ import {
   ORGANIZATION_SETTINGS_SUB_TAB_IDS,
   type OrganizationSettingsSubTabId,
 } from '@/components/settings/organizationSettingsSubTabs';
+import { getProductions } from '@/lib/productionService';
 
 const PATH_LABELS: Record<string, string> = {
   '/': 'Dashboard',
@@ -16,6 +17,7 @@ const PATH_LABELS: Record<string, string> = {
   '/reports': 'Reports',
   '/settings': 'Settings',
   '/productions': 'Productions',
+  '/productions/planner': 'Planner Workspace',
   '/help': 'Help',
   '/about': 'About',
   '/dev': 'Dev',
@@ -71,6 +73,13 @@ const ORGANIZATION_SUBTAB_LABELS: Record<OrganizationSettingsSubTabId, string> =
 };
 const URL_SYNC_EVENT = 'trackit:url-sync';
 const ADMIN_ONLY_SETTINGS_TABS = new Set(['userDefined', 'libraries', 'organization', 'users', 'workspaces', 'logs']);
+const PLANNER_TAB_LABELS: Record<string, string> = {
+  checklist: 'Checklist',
+  vehicles: 'Vehicle Packlists',
+  schedule: 'Schedule',
+  crew: 'Crew',
+  overview: 'Overview',
+};
 
 function titleize(segment: string): string {
   return segment
@@ -180,6 +189,29 @@ export function AppBreadcrumbs() {
             label: defaultSubLabel,
           });
         }
+      }
+    }
+    if (location.pathname === '/productions/planner') {
+      const search = new URLSearchParams(urlSearch);
+      const productionId = search.get('productionId');
+      if (productionId) {
+        const productionName =
+          getProductions().find((production) => production.id === productionId)?.name ?? null;
+        if (productionName) {
+          baseCrumbs.push({
+            href: `/productions/planner?productionId=${productionId}`,
+            label: productionName,
+          });
+        }
+      }
+      const plannerTab = search.get('pt') ?? 'checklist';
+      const plannerTabLabel = PLANNER_TAB_LABELS[plannerTab];
+      if (plannerTabLabel) {
+        const productionSearchPrefix = productionId ? `productionId=${productionId}&` : '';
+        baseCrumbs.push({
+          href: `/productions/planner?${productionSearchPrefix}pt=${plannerTab}`,
+          label: plannerTabLabel,
+        });
       }
     }
     return baseCrumbs;

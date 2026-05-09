@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Trash2, CalendarDays, MapPin, FileText } from 'lucide-react';
+import { Pencil, CalendarDays, MapPin, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   Production,
   ProductionStatus,
@@ -24,8 +25,6 @@ import { CrewScheduleCalendar } from './CrewScheduleCalendar';
 import { applyProductionInventoryAction, exportProductionPacklistsToPdf } from '@/lib/productionService';
 import { flattenVehiclePacklistItems } from '@/lib/vehiclePacklistUtils';
 import { toast } from 'sonner';
-import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
@@ -65,10 +64,9 @@ export function ProductionDetail({
   onClose,
 }: ProductionDetailProps) {
   const [editOpen, setEditOpen] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmListDeletes, setConfirmListDeletes] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'vehicles' | 'crew' | 'schedule'>('overview');
-  const [plannerWindowOpen, setPlannerWindowOpen] = useState(false);
+  const navigate = useNavigate();
   const scheduleResources = useMemo(() => {
     if (!production) return [];
     const resourceMap = new Map<string, number>();
@@ -122,10 +120,6 @@ export function ProductionDetail({
   };
 
   const handleDelete = () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
     onDelete(production.id);
     onClose();
   };
@@ -221,30 +215,10 @@ export function ProductionDetail({
                 variant="outline"
                 size="sm"
                 className="h-7"
-                onClick={() => setPlannerWindowOpen(true)}
+                onClick={() => navigate(`/productions/planner?productionId=${production.id}`)}
               >
                 Open Planner Workspace
               </Button>
-              {confirmDelete ? (
-                <>
-                  <Button variant="destructive" size="sm" className="h-7" onClick={handleDelete}>
-                    Confirm delete
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7" onClick={() => setConfirmDelete(false)}>
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-1 border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:text-red-200"
-                  onClick={handleDelete}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </Button>
-              )}
             </div>
           </SheetHeader>
 
@@ -385,6 +359,9 @@ export function ProductionDetail({
 
                 <TabsContent value="schedule" className="mt-0">
                   <CrewScheduleCalendar
+                    productionName={production.name}
+                    productionClient={production.client}
+                    productionLocation={production.location}
                     projectStartDate={production.startDate}
                     projectEndDate={production.endDate}
                     projectedWindowStartTime={production.scheduleDefaultStartTime}
@@ -393,6 +370,7 @@ export function ProductionDetail({
                     resources={scheduleResources}
                     crewMembers={production.crew}
                     schedule={production.crewSchedule ?? []}
+                    scheduleScopeKey={production.id}
                     requireDeleteConfirm={confirmListDeletes}
                     onChange={handleScheduleChange}
                   />
@@ -408,79 +386,9 @@ export function ProductionDetail({
         open={editOpen}
         production={production}
         onSave={handleEditSave}
+        onDelete={handleDelete}
         onClose={() => setEditOpen(false)}
       />
-
-      <Dialog open={plannerWindowOpen} onOpenChange={setPlannerWindowOpen}>
-        <DraggableDialogContent
-          dismissOnOutsidePointer={false}
-          className="flex h-[min(92vh,980px)] w-[min(96vw,1800px)] flex-col overflow-hidden p-0"
-        >
-          <DialogHeader className="shrink-0 border-b px-4 py-3">
-            <DialogTitle>{production.name} — Planning Workspace</DialogTitle>
-          </DialogHeader>
-          <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
-            <Tabs
-              value={activeTab}
-              onValueChange={(value) => setActiveTab(value as typeof activeTab)}
-              className="flex min-h-0 flex-1 flex-col gap-3"
-            >
-              <TabsList className="mb-3 shrink-0">
-                <TabsTrigger value="checklist">Checklist</TabsTrigger>
-                <TabsTrigger value="vehicles">Vehicle Packlists</TabsTrigger>
-                <TabsTrigger value="schedule">Schedule</TabsTrigger>
-                <TabsTrigger value="crew">Crew</TabsTrigger>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="checklist" className="space-y-3">
-                <ChecklistEditor
-                  groups={production.checklistGroups}
-                  onChange={handleChecklistChange}
-                  inventoryItems={inventoryItems}
-                  requireDeleteConfirm={confirmListDeletes}
-                />
-              </TabsContent>
-              <TabsContent value="vehicles" className="space-y-3">
-                <VehiclePacklistEditor
-                  packlists={production.vehiclePacklists}
-                  onChange={handleVehicleChange}
-                  checklistGroups={production.checklistGroups}
-                  inventoryItems={inventoryItems}
-                  requireDeleteConfirm={confirmListDeletes}
-                />
-              </TabsContent>
-              <TabsContent value="schedule" className="space-y-3">
-                <CrewScheduleCalendar
-                  projectStartDate={production.startDate}
-                  projectEndDate={production.endDate}
-                  projectedWindowStartTime={production.scheduleDefaultStartTime}
-                  projectedWindowEndTime={production.scheduleDefaultEndTime}
-                  onProjectedWindowChange={handleProjectedWindowChange}
-                  resources={scheduleResources}
-                  crewMembers={production.crew}
-                  schedule={production.crewSchedule ?? []}
-                  requireDeleteConfirm={confirmListDeletes}
-                  onChange={handleScheduleChange}
-                />
-              </TabsContent>
-              <TabsContent value="crew">
-                <CrewEditor
-                  crew={production.crew}
-                  onChange={handleCrewChange}
-                  requireDeleteConfirm={confirmListDeletes}
-                />
-              </TabsContent>
-              <TabsContent value="overview" className="space-y-2 text-sm">
-                <p><span className="text-muted-foreground">Client:</span> {production.client || '—'}</p>
-                <p><span className="text-muted-foreground">Location:</span> {production.location || '—'}</p>
-                <p><span className="text-muted-foreground">Dates:</span> {production.startDate || '—'} {production.endDate ? `to ${production.endDate}` : ''}</p>
-                <p><span className="text-muted-foreground">Status:</span> {PRODUCTION_STATUS_LABELS[production.status]}</p>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </DraggableDialogContent>
-      </Dialog>
     </>
   );
 }
