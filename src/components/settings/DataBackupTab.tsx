@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger, createTabsScope } from '@/components/ui/tabs';
 import { Download, Save, RefreshCw, FileJson, Database, GitMerge, Upload, Loader2, History } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import type { GroupReconcileResult } from '@/lib/groupInventoryReconciliation';
@@ -124,6 +124,8 @@ export function DataBackupTab({
   organizationDataLabel,
 }: DataBackupTabProps) {
   const { toast } = useToast();
+  const useDataTabsScope = useMemo(() => createTabsScope(), []);
+  const dataTabsScope = useDataTabsScope(undefined);
   const [activeTab, setActiveTab] = useState<'import-export' | 'backup-restore'>(() => readDataPanelFromSearch());
   const [isImporting, setIsImporting] = useState(false);
   const [isImportingExcel, setIsImportingExcel] = useState(false);
@@ -612,13 +614,21 @@ export function DataBackupTab({
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="import-export">Import & Export</TabsTrigger>
-          <TabsTrigger value="backup-restore">Backup & Restore</TabsTrigger>
+      <Tabs
+        __scopeTabs={dataTabsScope}
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as 'import-export' | 'backup-restore')}
+      >
+        <TabsList __scopeTabs={dataTabsScope} className="grid w-full grid-cols-2">
+          <TabsTrigger __scopeTabs={dataTabsScope} value="import-export">
+            Import & Export
+          </TabsTrigger>
+          <TabsTrigger __scopeTabs={dataTabsScope} value="backup-restore">
+            Backup & Restore
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="import-export" className="space-y-4 pt-4">
+        <TabsContent __scopeTabs={dataTabsScope} value="import-export" className="space-y-4 pt-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -764,7 +774,7 @@ export function DataBackupTab({
           </Card>
         </TabsContent>
 
-        <TabsContent value="backup-restore" className="space-y-4 pt-4">
+        <TabsContent __scopeTabs={dataTabsScope} value="backup-restore" className="space-y-4 pt-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

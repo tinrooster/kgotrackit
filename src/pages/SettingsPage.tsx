@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Library, Building2, Contact, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Save, GripVertical, Upload, Trash2, Pencil, UserPlus, Shield, Key, Camera, SlidersHorizontal, Boxes, Users, HardDrive, ScrollText, Undo2, Redo2, Wrench, Library, Building2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -40,8 +40,12 @@ import { DataBackupTab } from "@/components/settings/DataBackupTab"
 import { WorkspaceTeamTab } from '@/components/settings/WorkspaceTeamTab'
 import { SupabaseWorkspaceUsersCard } from '@/components/settings/SupabaseWorkspaceUsersCard'
 import { GeneralSettingsTab } from '@/components/settings/GeneralSettingsTab'
-import { OrgMaintenanceBroadcastTemplateSection } from '@/components/settings/OrgMaintenanceBroadcastTemplateSection'
-import { OrganizationMasterPanel } from '@/components/settings/OrganizationMasterPanel'
+import { OrganizationSettingsSection } from '@/components/settings/OrganizationSettingsSection'
+import {
+  ORGANIZATION_SETTINGS_SUB_TAB_IDS,
+  readOrganizationSubTabFromSearch,
+} from '@/components/settings/organizationSettingsSubTabs'
+import type { OrganizationSettingsSubTabId } from '@/components/settings/organizationSettingsSubTabs'
 import {
   UserDefinedListsSection,
   type UserDefinedPanel,
@@ -54,7 +58,6 @@ import * as XLSX from 'xlsx'
 import { SystemLogs } from '@/components/settings/SystemLogs'
 import AddUserDialog from '@/components/AddUserDialog'
 import { logger } from '@/lib/logging'
-import CrewPage from '@/pages/CrewPage'
 import { reconcileInventoryGroup, type GroupReconcileResult } from '@/lib/groupInventoryReconciliation'
 import { parseDeviceLibraryFromBackup, saveDeviceLibrary } from '@/lib/deviceLibraryStorage'
 import { sendAdminSettingsNotification } from '@/lib/supabase/adminNotifications'
@@ -309,6 +312,7 @@ const ADMIN_ONLY_SETTINGS_TABS: SettingsPrimaryTabId[] = [
   'logs',
 ];
 const URL_SYNC_EVENT = 'trackit:url-sync';
+
 function isAdminOnlySettingsTab(tab: SettingsPrimaryTabId): boolean {
   return ADMIN_ONLY_SETTINGS_TABS.includes(tab);
 }
@@ -446,6 +450,11 @@ export default function SettingsPage() {
   )
   const [userDefinedPanel, setUserDefinedPanel] = useState<UserDefinedPanel>(() => readUserDefinedPanelFromSearch());
   const [librariesPanel, setLibrariesPanel] = useState<LibrariesPanel>(() => readLibrariesPanelFromSearch());
+  const [organizationSubTab, setOrganizationSubTab] = useState<OrganizationSettingsSubTabId>(() =>
+    readOrganizationSubTabFromSearch(),
+  );
+  const organizationSubTabRef = useRef(organizationSubTab);
+  organizationSubTabRef.current = organizationSubTab;
   const canManageSharedConfig = activeWorkspaceId
     ? activeWorkspaceRole === 'admin'
     : currentUser?.role === 'admin';
@@ -518,7 +527,24 @@ export default function SettingsPage() {
         setLibrariesPanel(nextLibraryPanel);
       }
     }
-  }, [location.search, canManageSharedConfig]);
+
+    if (nextSettingsTab === 'organization') {
+      const stRawForOrg = search.get('st');
+      if (stRawForOrg === 'masterCrew') {
+        setOrganizationSubTab((prev) => (prev !== 'crew' ? 'crew' : prev));
+      } else {
+        const ospRaw = search.get('osp');
+        // When `osp` is missing, keep the in-memory tab (ref); do not depend on `organizationSubTab`
+        // in this effect's deps — that re-ran after every click while `location.search` was still stale
+        // and forced `osp` from the URL (e.g. overview) to overwrite the new selection.
+        const nextOsp =
+          ospRaw && (ORGANIZATION_SETTINGS_SUB_TAB_IDS as readonly string[]).includes(ospRaw)
+            ? (ospRaw as OrganizationSettingsSubTabId)
+            : organizationSubTabRef.current;
+        setOrganizationSubTab((prev) => (nextOsp !== prev ? nextOsp : prev));
+      }
+    }
+  }, [location.search, canManageSharedConfig, librariesPanel, userDefinedPanel]);
 
   useEffect(() => {
     if (!canManageSharedConfig && isAdminOnlySettingsTab(settingsTab)) {
@@ -532,19 +558,26 @@ export default function SettingsPage() {
     if (settingsTab === 'userDefined') {
       url.searchParams.set('usp', userDefinedPanel);
       url.searchParams.delete('lp');
+      url.searchParams.delete('osp');
     } else if (settingsTab === 'libraries') {
       url.searchParams.set('lp', librariesPanel);
       url.searchParams.delete('usp');
+      url.searchParams.delete('osp');
+    } else if (settingsTab === 'organization') {
+      url.searchParams.set('osp', organizationSubTab);
+      url.searchParams.delete('usp');
+      url.searchParams.delete('lp');
     } else {
       url.searchParams.delete('usp');
       url.searchParams.delete('lp');
+      url.searchParams.delete('osp');
       if (settingsTab !== 'data') {
         url.searchParams.delete('dp');
       }
     }
     window.history.replaceState({}, '', url.toString());
     window.dispatchEvent(new CustomEvent(URL_SYNC_EVENT));
-  }, [settingsTab, userDefinedPanel, librariesPanel]);
+  }, [settingsTab, userDefinedPanel, librariesPanel, organizationSubTab]);
 
   useEffect(() => {
     if (importDuplicateReport.length === 0) {
@@ -2144,94 +2177,25 @@ export default function SettingsPage() {
 
         {canManageSharedConfig && (
           <TabsContent value="organization" className="space-y-4">
-            <OrganizationMasterPanel
+            <OrganizationSettingsSection
+              organizationSubTab={organizationSubTab}
+              onOrganizationSubTabChange={setOrganizationSubTab}
               authBackend={authBackend}
               organizations={organizations}
               activeOrganizationId={activeOrganizationId}
               activeOrganizationName={activeOrganizationName}
               activeOrganizationRole={activeOrganizationRole}
-              loading={organizationsLoading}
+              organizationsLoading={organizationsLoading}
               selectOrganization={selectOrganization}
               refreshOrganizations={refreshOrganizations}
-            />
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Organization library</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm text-muted-foreground">
-                <p>
-                  Shared organization bundles (libraries, lookups, portable metadata tied to your org in Supabase) are
-                  exported and imported from Data Management—not from this shortcut card alone.
-                </p>
-                {authBackend === 'supabase' && !activeOrganizationId ? (
-                  <p>Select an organization above (or join a workspace linked to one) for library portability.</p>
-                ) : null}
-                {authBackend !== 'supabase' ? (
-                  <p>Organization-level cloud sync applies when you sign in with Supabase and use team workspaces.</p>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" onClick={() => setSettingsTab('data')}>
-                    Open Data Management
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setSettingsTab('workspaces')}>
-                    Workspaces and invites
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Define the master organization</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  The large title at the top of this tab is your current master organization. Use the org buttons there
-                  to switch between organizations you belong to (for example after creating <span className="font-medium text-foreground">ABC Corp</span>).
-                  To stand up a <span className="font-medium text-foreground">new</span> organization, create a workspace so Supabase ties org data,
-                  exports, and org-scoped libraries to that tenant.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={() => setSettingsTab('workspaces')}>
-                    Set up workspace (new org)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setSettingsTab('libraries');
-                      setLibrariesPanel('positionTemplates');
-                    }}
-                  >
-                    Crew position templates (org library)
-                  </Button>
-                </div>
-                {authBackend !== 'supabase' ? (
-                  <p className="text-xs">
-                    Organization features apply after you sign in with Supabase and use a team workspace.
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-foreground">
-                <Contact className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                <h2 className="text-base font-semibold">Master crew</h2>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Master crew contacts are shared across productions. Each production&apos;s Crew tab assigns people to that
-                shoot; attach names from this roster when building a crew list.
-              </p>
-              <CrewPage />
-            </div>
-            <OrgMaintenanceBroadcastTemplateSection
-              organizationId={activeOrganizationId}
-              authBackend={authBackend}
-              storedTemplate={orgMaintenanceTemplateStored}
-              canEdit={activeOrganizationRole === 'admin' || activeOrganizationRole === 'editor'}
-              onAfterSave={() => void refreshOrgMaintenanceTemplate()}
+              orgMaintenanceTemplateStored={orgMaintenanceTemplateStored}
+              onAfterOrgMaintenanceSave={() => void refreshOrgMaintenanceTemplate()}
+              onNavigateToDataTab={() => setSettingsTab('data')}
+              onNavigateToWorkspacesTab={() => setSettingsTab('workspaces')}
+              onNavigateToLibrariesPositionTemplates={() => {
+                setSettingsTab('libraries');
+                setLibrariesPanel('positionTemplates');
+              }}
             />
           </TabsContent>
         )}

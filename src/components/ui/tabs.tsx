@@ -5,11 +5,20 @@ import * as TabsPrimitive from "@radix-ui/react-tabs"
 
 import { cn } from "@/lib/utils"
 
-const Tabs = TabsPrimitive.Root
+/** Object returned by `createTabsScope()(undefined)` for nested tab groups. */
+type TabsScopeValue = ReturnType<ReturnType<typeof TabsPrimitive.createTabsScope>>
+
+type WithTabsScope<P> = P & { __scopeTabs?: TabsScopeValue }
+
+const Tabs = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Root>,
+  WithTabsScope<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root>>
+>((props, ref) => <TabsPrimitive.Root ref={ref} {...props} />)
+Tabs.displayName = TabsPrimitive.Root.displayName
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+  WithTabsScope<React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>>
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
@@ -24,7 +33,7 @@ TabsList.displayName = TabsPrimitive.List.displayName
 
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+  WithTabsScope<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>>
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Trigger
     ref={ref}
@@ -39,7 +48,7 @@ TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+  WithTabsScope<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>>
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}
@@ -52,4 +61,11 @@ const TabsContent = React.forwardRef<
 ))
 TabsContent.displayName = TabsPrimitive.Content.displayName
 
-export { Tabs, TabsList, TabsTrigger, TabsContent }
+/**
+ * Nested tab groups: `const useScope = useMemo(() => createTabsScope(), []); const scope = useScope(undefined);`
+ * then pass `__scopeTabs={scope}` on the nested `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent` tree.
+ * Passing `createTabsScope` or `useMemo(() => createTabsScope(), [])` without invoking the hook is invalid.
+ */
+const createTabsScope = TabsPrimitive.createTabsScope
+
+export { Tabs, TabsList, TabsTrigger, TabsContent, createTabsScope }

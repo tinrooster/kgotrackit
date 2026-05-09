@@ -4,6 +4,10 @@ import { ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import {
+  ORGANIZATION_SETTINGS_SUB_TAB_IDS,
+  type OrganizationSettingsSubTabId,
+} from '@/components/settings/organizationSettingsSubTabs';
 
 const PATH_LABELS: Record<string, string> = {
   '/': 'Dashboard',
@@ -33,7 +37,6 @@ const SETTINGS_TAB_LABELS: Record<string, string> = {
 };
 
 const SETTINGS_TAB_DEFAULT_SUBLABELS: Record<string, string> = {
-  organization: 'Organization Library',
   data: 'Backup & Restore',
   workspaces: 'Workspaces and Invites',
   logs: 'System Logs',
@@ -59,6 +62,12 @@ const LIBRARIES_PANEL_LABELS: Record<string, string> = {
 const DATA_PANEL_LABELS: Record<string, string> = {
   'import-export': 'Import & Export',
   'backup-restore': 'Backup & Restore',
+};
+
+const ORGANIZATION_SUBTAB_LABELS: Record<OrganizationSettingsSubTabId, string> = {
+  overview: 'Overview',
+  crew: 'Master crew',
+  maintenance: 'Maintenance cautions',
 };
 const URL_SYNC_EVENT = 'trackit:url-sync';
 const ADMIN_ONLY_SETTINGS_TABS = new Set(['userDefined', 'libraries', 'organization', 'users', 'workspaces', 'logs']);
@@ -130,6 +139,23 @@ export function AppBreadcrumbs() {
           });
         }
       }
+      if (settingsTab === 'organization') {
+        const rawSt = search.get('st');
+        let orgSub: OrganizationSettingsSubTabId = 'overview';
+        if (rawSt === 'masterCrew') {
+          orgSub = 'crew';
+        } else {
+          const osp = search.get('osp');
+          if (osp && (ORGANIZATION_SETTINGS_SUB_TAB_IDS as readonly string[]).includes(osp)) {
+            orgSub = osp as OrganizationSettingsSubTabId;
+          }
+        }
+        hasExplicitSublevel = true;
+        baseCrumbs.push({
+          href: `/settings?st=organization&osp=${orgSub}`,
+          label: ORGANIZATION_SUBTAB_LABELS[orgSub],
+        });
+      }
       if (settingsTab === 'data') {
         const dataPanel = search.get('dp');
         if (dataPanel && DATA_PANEL_LABELS[dataPanel]) {
@@ -144,6 +170,7 @@ export function AppBreadcrumbs() {
         settingsTab &&
         settingsTab !== 'libraries' &&
         settingsTab !== 'userDefined' &&
+        settingsTab !== 'organization' &&
         !hasExplicitSublevel
       ) {
         const defaultSubLabel = SETTINGS_TAB_DEFAULT_SUBLABELS[settingsTab];
