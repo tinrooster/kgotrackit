@@ -2,6 +2,18 @@ import { getItems, getSettings, getTemplates } from '@/lib/storageService';
 import { getFinancialSettings } from '@/lib/financialSettingsService';
 import { SettingsService } from '@/lib/settingsService';
 import { getDeviceLibrary } from '@/lib/deviceLibraryStorage';
+import { getProductions } from '@/lib/productionService';
+import { getCrewContacts } from '@/lib/crewContactsService';
+
+function readStoredArray(storageKey: string): unknown[] {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 /** Full app payload for explicit backup/export (lists + inventory + financial + UI defaults + cabinets + templates). */
 export async function buildFullOfflineBackupPayload(): Promise<{
@@ -16,9 +28,14 @@ export async function buildFullOfflineBackupPayload(): Promise<{
   const cabinets = await SettingsService.getCabinets();
   const templates = getTemplates();
   const deviceLibrary = getDeviceLibrary();
+  const productions = getProductions();
+  const crewContacts = getCrewContacts();
+  const customReportDefinitions = readStoredArray('inventory-custom-report-definitions');
+  const inventoryHistory = readStoredArray('inventoryHistory');
+  const checkoutRecentActivities = readStoredArray('checkout-recent-activities');
 
   return {
-    version: '1.1',
+    version: '1.2',
     timestamp: new Date().toISOString(),
     data: {
       locations: lists.locations,
@@ -33,6 +50,11 @@ export async function buildFullOfflineBackupPayload(): Promise<{
       cabinets,
       templates,
       deviceLibrary,
+      productions,
+      crewContacts,
+      customReportDefinitions,
+      inventoryHistory,
+      checkoutRecentActivities,
     },
   };
 }

@@ -91,6 +91,7 @@ import {
 } from '@/lib/crewDirectoryMigration'
 import { parseContactWorkbookFile, type ParsedContactCandidate } from '@/lib/contactWorkbookImport'
 import { canonicalNameKey, parseContactDisplayName } from '@/lib/contactName'
+import { saveProductions } from '@/lib/productionService'
 
 type ParsedContactDestination = 'production' | 'org_directory';
 
@@ -1146,7 +1147,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `trackIT-settings-snapshot_${new Date().toISOString().split('T')[0]}.json`;
+      link.download = buildExportFilename('settings-snapshot', 'json');
       link.click();
       URL.revokeObjectURL(url);
       toast.success('Settings snapshot downloaded', {
@@ -1224,7 +1225,7 @@ export default function SettingsPage() {
     const link = document.createElement('a');
     link.href = url;
     const slug = (activeOrganizationName || 'organization').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
-    link.download = `trackIT-org-export-${slug || 'organization'}-${new Date().toISOString().split('T')[0]}.json`;
+    link.download = buildExportFilename(`org-export-${slug || 'organization'}`, 'json');
     link.click();
     URL.revokeObjectURL(url);
     toast.success('Organization library export complete');
@@ -1694,7 +1695,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `trackIT-org-contacts-from-excel-${nowIso.split('T')[0]}.json`;
+    link.download = buildExportFilename('org-contacts-from-excel', 'json');
     link.click();
     URL.revokeObjectURL(url);
     toast.success('Parsed contacts exported as organization JSON.', {
@@ -1730,6 +1731,32 @@ export default function SettingsPage() {
     }
   }
 
+  const resolveSettingsKeyFromType = (rawType: string): SettingsKey => {
+    const typeKey = rawType.trim().toLowerCase();
+    switch (typeKey) {
+      case 'categories':
+        return 'categories';
+      case 'units':
+        return 'units';
+      case 'locations':
+        return 'locations';
+      case 'projects':
+        return 'projects';
+      case 'suppliers':
+      case 'vendors':
+        return 'suppliers';
+      case 'expensecodes':
+      case 'expense codes':
+        return 'expenseCodes';
+      default:
+        return (typeKey.endsWith('y')
+          ? `${typeKey.slice(0, -1)}ies`
+          : typeKey.endsWith('s')
+            ? typeKey
+            : `${typeKey}s`) as SettingsKey;
+    }
+  };
+
   const handleReconcileConfirm = () => {
     if (!itemToDelete) return;
 
@@ -1737,31 +1764,7 @@ export default function SettingsPage() {
     const typeKey = type.toLowerCase();
 
     // Find the correct settings key for this item type
-    let settingsKey: SettingsKey;
-    switch (typeKey) {
-      case 'categories':
-        settingsKey = 'categories';
-        break;
-      case 'units':
-        settingsKey = 'units';
-        break;
-      case 'locations':
-        settingsKey = 'locations';
-        break;
-      case 'suppliers':
-        settingsKey = 'suppliers';
-        break;
-      case 'projects':
-        settingsKey = 'projects';
-        break;
-      default:
-        // Handle singular form of the types
-        settingsKey = (typeKey.endsWith('y') ? 
-          typeKey.slice(0, -1) + 'ies' : 
-          typeKey.endsWith('s') ? 
-            typeKey : 
-            typeKey + 's') as SettingsKey;
-    }
+    const settingsKey = resolveSettingsKeyFromType(type);
 
     // 1. Update the settings list
     const newList = settings[settingsKey].filter(item => item.name !== value);
@@ -1935,7 +1938,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `trackIT_config_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = buildExportFilename('config', 'json');
     link.click();
     URL.revokeObjectURL(url);
 
@@ -2476,6 +2479,32 @@ export default function SettingsPage() {
   };
 
   // Add these functions to handle data import, export, backup and restore
+  const getExportDbLabel = (): string => {
+    if (authBackend === 'supabase' && activeWorkspaceId) {
+      const workspaceSlug = (activeWorkspaceName ?? activeWorkspaceId).replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+      return workspaceSlug ? `supabase-${workspaceSlug}` : 'supabase-workspace';
+    }
+    return 'local-browser';
+  };
+
+  const getFilenameTimestamp = (): string => {
+    const now = new Date();
+    const yyyy = String(now.getFullYear());
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}-${hh}${min}${ss}`;
+  };
+
+  const buildExportFilename = (label: string, extension: string): string => {
+    const dbLabel = getExportDbLabel();
+    const safeLabel = label.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '');
+    const safeExt = extension.replace(/^\./, '');
+    return `trackIT-${safeLabel}-db-${dbLabel}-${getFilenameTimestamp()}.${safeExt}`;
+  };
+
   const handleExportData = () => {
     try {
       const data = {
@@ -2492,7 +2521,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'trackIT-data-export.json';
+      a.download = buildExportFilename('data-export', 'json');
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -2510,14 +2539,14 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `trackIT-backup-${new Date().toISOString().split('T')[0]}.backup`;
+      a.download = buildExportFilename('full-backup', 'backup');
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       const items = getItems();
       toast.success('Backup created successfully', {
-        description: `Format v${backupData.version} · ${items.length} inventory rows · lists, financials, templates, cabinets included.`,
+        description: `Format v${backupData.version} · ${items.length} inventory rows · includes Production Planner data and crew directory data.`,
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
@@ -2585,6 +2614,36 @@ export default function SettingsPage() {
       saveDeviceLibrary(parseDeviceLibraryFromBackup(data.deviceLibrary));
     }
 
+    if (Array.isArray(data.productions)) {
+      saveProductions(data.productions as any[]);
+    } else {
+      saveProductions([]);
+    }
+
+    if (Array.isArray(data.crewContacts)) {
+      saveCrewContacts(data.crewContacts as any[]);
+    } else {
+      saveCrewContacts([]);
+    }
+
+    if (Array.isArray(data.customReportDefinitions)) {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_REPORT_DEFINITIONS, JSON.stringify(data.customReportDefinitions));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CUSTOM_REPORT_DEFINITIONS);
+    }
+
+    if (Array.isArray(data.inventoryHistory)) {
+      localStorage.setItem('inventoryHistory', JSON.stringify(data.inventoryHistory));
+    } else {
+      localStorage.removeItem('inventoryHistory');
+    }
+
+    if (Array.isArray(data.checkoutRecentActivities)) {
+      localStorage.setItem('checkout-recent-activities', JSON.stringify(data.checkoutRecentActivities));
+    } else {
+      localStorage.removeItem('checkout-recent-activities');
+    }
+
     window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT, { detail: getSettings() }));
   };
 
@@ -2628,7 +2687,7 @@ export default function SettingsPage() {
       XLSX.utils.book_append_sheet(workbook, expenseCodesWorksheet, "ExpenseCodes");
       
       // Generate the Excel file
-      XLSX.writeFile(workbook, `trackIT-data-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.writeFile(workbook, buildExportFilename('data-export', 'xlsx'));
       
       toast.success("Data exported to Excel successfully");
     } catch (error) {
@@ -3490,7 +3549,7 @@ export default function SettingsPage() {
                     onChange={(e) => setReplacementValue(e.target.value)}
                   >
                     <option value="">Select replacement...</option>
-                    {settings[itemToDelete.type.toLowerCase() as SettingsKey]
+                    {settings[resolveSettingsKeyFromType(itemToDelete.type)]
                       .filter(item => item.name !== itemToDelete.value)
                       .map(item => (
                         <option key={item.id} value={item.name}>{item.name}</option>

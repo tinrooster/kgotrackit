@@ -79,6 +79,18 @@ export function validateFullBackupJsonText(text: string): FullBackupValidation {
     summaryLines.push('Device library: none in file (existing entries kept)');
   }
 
+  if (Array.isArray(data.productions) && data.productions.length > 0) {
+    summaryLines.push(`Productions: ${data.productions.length}`);
+  } else {
+    summaryLines.push('Productions: none in file');
+  }
+
+  if (Array.isArray(data.crewContacts) && data.crewContacts.length > 0) {
+    summaryLines.push(`Crew contacts: ${data.crewContacts.length}`);
+  } else {
+    summaryLines.push('Crew contacts: none in file');
+  }
+
   if (data.financial && typeof data.financial === 'object') {
     summaryLines.push('Financial code tables: present');
   } else {
