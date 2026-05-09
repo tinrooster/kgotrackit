@@ -455,6 +455,10 @@ export default function SettingsPage() {
   );
   const organizationSubTabRef = useRef(organizationSubTab);
   organizationSubTabRef.current = organizationSubTab;
+  const userDefinedPanelRef = useRef(userDefinedPanel);
+  userDefinedPanelRef.current = userDefinedPanel;
+  const librariesPanelRef = useRef(librariesPanel);
+  librariesPanelRef.current = librariesPanel;
   const canManageSharedConfig = activeWorkspaceId
     ? activeWorkspaceRole === 'admin'
     : currentUser?.role === 'admin';
@@ -509,23 +513,24 @@ export default function SettingsPage() {
     if (nextSettingsTab === 'userDefined') {
       const uspRaw = search.get('usp');
       const allowedUserPanels: UserDefinedPanel[] = ['overview', 'categories', 'units', 'locations', 'projects', 'financial'];
-      const nextUserPanel = uspRaw && allowedUserPanels.includes(uspRaw as UserDefinedPanel)
-        ? (uspRaw as UserDefinedPanel)
-        : 'categories';
-      if (nextUserPanel !== userDefinedPanel) {
-        setUserDefinedPanel(nextUserPanel);
-      }
+      // When `usp` is missing or invalid, keep the in-memory panel (ref). Do not list `userDefinedPanel`
+      // in this effect's deps — that re-ran after every sub-tab click while `location.search` could still
+      // show `st=general` (or a stale `usp`) and forced the primary tab back to General.
+      const nextUserPanel =
+        uspRaw && allowedUserPanels.includes(uspRaw as UserDefinedPanel)
+          ? (uspRaw as UserDefinedPanel)
+          : userDefinedPanelRef.current;
+      setUserDefinedPanel((prev) => (nextUserPanel !== prev ? nextUserPanel : prev));
     }
 
     if (nextSettingsTab === 'libraries') {
       const lpRaw = search.get('lp');
       const allowedLibraryPanels: LibrariesPanel[] = ['suppliers', 'positionTemplates', 'templates', 'deviceLibrary', 'cabinets'];
-      const nextLibraryPanel = lpRaw && allowedLibraryPanels.includes(lpRaw as LibrariesPanel)
-        ? (lpRaw as LibrariesPanel)
-        : 'suppliers';
-      if (nextLibraryPanel !== librariesPanel) {
-        setLibrariesPanel(nextLibraryPanel);
-      }
+      const nextLibraryPanel =
+        lpRaw && allowedLibraryPanels.includes(lpRaw as LibrariesPanel)
+          ? (lpRaw as LibrariesPanel)
+          : librariesPanelRef.current;
+      setLibrariesPanel((prev) => (nextLibraryPanel !== prev ? nextLibraryPanel : prev));
     }
 
     if (nextSettingsTab === 'organization') {
@@ -544,7 +549,9 @@ export default function SettingsPage() {
         setOrganizationSubTab((prev) => (nextOsp !== prev ? nextOsp : prev));
       }
     }
-  }, [location.search, canManageSharedConfig, librariesPanel, userDefinedPanel]);
+    // Intentionally omit `settingsTab` and sub-panel state from deps: including them re-ran this effect
+    // after in-app tab changes while `location.search` could still be stale and forced `st` back to `general`.
+  }, [location.search, canManageSharedConfig]);
 
   useEffect(() => {
     if (!canManageSharedConfig && isAdminOnlySettingsTab(settingsTab)) {
