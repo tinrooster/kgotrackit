@@ -5,7 +5,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { canViewMaintenanceWindowCautions } from '@/lib/maintenanceCutoverCaution';
-import { InventoryItem, CategoryNode, ItemWithSubcategories } from '@/types/inventory';
+import { InventoryItem, CategoryNode, ItemWithSubcategories, OrderStatus } from '@/types/inventory';
 import BatchOperations from '@/components/BatchOperations';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
@@ -35,6 +35,7 @@ import {
   Trash,
   ArrowUpDown,
   FileText,
+  FileSpreadsheet,
   LayoutList,
   LayoutGrid,
   Printer,
@@ -44,6 +45,7 @@ import {
   Ruler,
   ChevronLeft,
   ChevronRight,
+  Menu,
   MoreHorizontal,
 } from 'lucide-react';
 import { AddItemDialog } from '@/components/AddItemDialog';
@@ -51,6 +53,7 @@ import { MobileQuickAddDialog } from '@/components/MobileQuickAddDialog';
 import { EditItemDialog } from '@/components/EditItemDialog';
 import { DuplicateItemDialog } from '@/components/DuplicateItemDialog';
 import { ExportDialog } from '@/components/ExportDialog';
+import { ImportDialog } from '@/components/ImportDialog';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,6 +65,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useHorizontalScrollHints } from '@/components/ui/useHorizontalScrollHints';
@@ -190,6 +194,33 @@ function normalizeColumnOrder(input: string[] | undefined, defaults: string[]): 
   return normalized;
 }
 
+function normalizeImportedOrderStatus(value: unknown): OrderStatus {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return OrderStatus.COMPLETED;
+  }
+  const upper = String(value).trim().toUpperCase().replace(/[\s-]+/g, '_');
+  if ((Object.values(OrderStatus) as string[]).includes(upper)) {
+    return upper as OrderStatus;
+  }
+  const aliases: Record<string, OrderStatus> = {
+    DELIVERED: OrderStatus.COMPLETED,
+    COMPLETE: OrderStatus.COMPLETED,
+    SHIPPED: OrderStatus.COMPLETED,
+  };
+  return aliases[upper] ?? OrderStatus.COMPLETED;
+}
+
+function parseExpectedDeliveryDateImported(value: unknown): string | Date | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value;
+  }
+  const s = String(value).trim();
+  if (!s) return undefined;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
 // Helper function to convert ItemWithSubcategories to CategoryNode
 const convertToCategories = (items: ItemWithSubcategories[]): CategoryNode[] => {
   return items.map(item => ({
@@ -255,6 +286,7 @@ export default function InventoryPage() {
   const [originalEditItem, setOriginalEditItem] = useState<InventoryItem | null>(null);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [printItem, setPrintItem] = useState<InventoryItem | null>(null);
   const [printLayout, setPrintLayout] = useState<'compact' | 'detailed'>('detailed');
   const [printCodeType, setPrintCodeType] = useState<'qr' | 'barcode' | 'both'>(() => {
@@ -666,6 +698,113 @@ export default function InventoryPage() {
       'InventoryPage'
     );
   };
+
+  const bulkAddFromPartialRows = React.useCallback(
+    async (
+      rows: Partial<InventoryItem>[]
+    ): Promise<{ importedCount: number; skippedCount: number }> => {
+      const modBy = currentUser?.username || currentUser?.displayName || 'Unknown';
+      const prepared = rows
+        .map((row) => {
+          const name = row.name != null ? String(row.name).trim() : '';
+          const unit = row.unit != null ? String(row.unit).trim() : '';
+          return { row, name, unit };
+        })
+        .filter((x) => x.name.length > 0 && x.unit.length > 0);
+
+      const skippedCount = rows.length - prepared.length;
+      if (prepared.length === 0) {
+        return { importedCount: 0, skippedCount: rows.length };
+      }
+
+      recordInventorySnapshotBeforeChange(items);
+      const defaults = SettingsService.loadDefaultSettings();
+      const newItems: InventoryItem[] = [];
+
+      for (const { row, name, unit } of prepared) {
+        const qtyRaw = row.quantity;
+        const quantity =
+          qtyRaw !== undefined && qtyRaw !== null && String(qtyRaw).trim() !== '' && !Number.isNaN(Number(qtyRaw))
+            ? Math.max(0, Number(qtyRaw))
+            : 1;
+        const trackingMode = (row.assetTrackingMode || 'line_item') as 'line_item' | 'per_unit';
+        const recordId = allocateRecordId();
+        let assetId: string | undefined;
+        let assetTagEnd: string | undefined;
+        if (defaults.autoAssignAssetId) {
+          const gen = allocateAssetTags(coerceDateInServiceForTag(row.dateInService), quantity, trackingMode);
+          assetId = gen.startId;
+          assetTagEnd = gen.endId;
+        }
+        const normalizedLocation = normalizeLocationValue(row.location, locations);
+        const normalizedProject = normalizeProjectValue(row.project, projects);
+        const selectedExpenseType = expenseTypes.find((e) => e.code === row.expenseTypeCode);
+        const selectedCostCenter = costCenters.find((c) => c.code === row.costCenterCode);
+
+        const newItem: InventoryItem = {
+          name,
+          unit,
+          quantity,
+          description: row.description != null ? String(row.description) : undefined,
+          costPerUnit:
+            row.costPerUnit !== undefined && row.costPerUnit !== null && String(row.costPerUnit).trim() !== ''
+              ? Number(row.costPerUnit)
+              : undefined,
+          category: row.category != null ? String(row.category) : undefined,
+          location: normalizedLocation || undefined,
+          project: normalizedProject || undefined,
+          reorderLevel:
+            row.reorderLevel !== undefined && row.reorderLevel !== null && String(row.reorderLevel).trim() !== ''
+              ? Number(row.reorderLevel)
+              : undefined,
+          barcode: row.barcode != null ? String(row.barcode) : undefined,
+          notes: row.notes != null ? String(row.notes) : undefined,
+          supplier: row.supplier != null ? String(row.supplier) : undefined,
+          supplierWebsite: row.supplierWebsite != null ? String(row.supplierWebsite) : undefined,
+          deliveryPercentage:
+            row.deliveryPercentage !== undefined &&
+            row.deliveryPercentage !== null &&
+            String(row.deliveryPercentage).trim() !== ''
+              ? Number(row.deliveryPercentage)
+              : 100,
+          expectedDeliveryDate: parseExpectedDeliveryDateImported(row.expectedDeliveryDate),
+          orderStatus: normalizeImportedOrderStatus(row.orderStatus),
+          expenseTypeCode: row.expenseTypeCode != null ? String(row.expenseTypeCode) : undefined,
+          costCenterCode: row.costCenterCode != null ? String(row.costCenterCode) : undefined,
+          expenseTypeDescription: row.expenseTypeDescription || selectedExpenseType?.description,
+          costCenterDescription: row.costCenterDescription || selectedCostCenter?.description,
+          recordId,
+          assetId,
+          assetTagEnd: row.assetTagEnd || assetTagEnd,
+          assetTrackingMode: trackingMode,
+          id: uuidv4(),
+          lastUpdated: new Date(),
+          lastModifiedBy: modBy,
+        };
+        newItems.push(newItem);
+      }
+
+      const prevItems = getItems();
+      const next = [...prevItems, ...newItems];
+      const saveOk = saveItems(next);
+
+      if (!saveOk) {
+        toast.error('Could not save imported items.', {
+          description: 'Browser storage may be full. Export a backup or free space, then try again.',
+        });
+        return { importedCount: 0, skippedCount: rows.length };
+      }
+
+      setItems(next);
+      setInvUndoAvail(canUndoInventory());
+      setInvRedoAvail(canRedoInventory());
+      newItems.forEach((item) => appendAuditLog('CREATE', item));
+      setHighlightedItemId(newItems[newItems.length - 1]?.id ?? null);
+
+      return { importedCount: newItems.length, skippedCount };
+    },
+    [items, expenseTypes, costCenters, locations, projects, currentUser, setItems]
+  );
 
   const stringifyFieldValue = (fieldValue: unknown): string => {
     if (fieldValue === null || fieldValue === undefined || fieldValue === '') return '(empty)';
@@ -1620,6 +1759,16 @@ export default function InventoryPage() {
               >
                 <Zap className="h-4 w-4" />
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className={cn("h-11 w-11", mobileTabletUi ? "touch-manipulation" : "")}
+                onClick={() => setIsBulkImportOpen(true)}
+                title="Bulk add from spreadsheet"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+              </Button>
               {inventoryUndoEnabled ? (
                 <Button
                   type="button"
@@ -1663,6 +1812,10 @@ export default function InventoryPage() {
                   <DropdownMenuItem onClick={() => setIsExportDialogOpen(true)}>
                     <Download className="mr-2 h-4 w-4" />
                     Export current view
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsBulkImportOpen(true)}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Bulk add from spreadsheet
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1708,6 +1861,15 @@ export default function InventoryPage() {
                 >
                   <Zap className="mr-2 h-4 w-4" />
                   Quick add
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn("w-full sm:w-auto", mobileTabletUi ? "h-11 touch-manipulation" : "h-10")}
+                  onClick={() => setIsBulkImportOpen(true)}
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Bulk add
                 </Button>
               </div>
             </>
@@ -1885,45 +2047,47 @@ export default function InventoryPage() {
                     </div>
                   </TableCell>
                 ))}
-                <TableCell>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(mobileTabletUi && "h-10 w-10 touch-manipulation")}
-                      onClick={() => handleEditItem(item)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(mobileTabletUi && "h-10 w-10 touch-manipulation")}
-                      onClick={() => handleDelete(item)}
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(mobileTabletUi && "h-10 w-10 touch-manipulation")}
-                      onClick={() => {
-                        setSelectedItem(item);
-                        setIsDuplicateDialogOpen(true);
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(mobileTabletUi && "h-10 w-10 touch-manipulation")}
-                      onClick={() => openPrintDialog(item)}
-                      title="Print asset sticker"
-                    >
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                  </div>
+                <TableCell onClick={(event) => event.stopPropagation()}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(mobileTabletUi && 'h-10 w-10 touch-manipulation')}
+                        aria-label={`Actions for ${item.name}`}
+                        title="Row actions"
+                      >
+                        <Menu className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEditItem(item)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setIsDuplicateDialogOpen(true);
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Duplicate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openPrintDialog(item)}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print asset sticker
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:bg-destructive/15 focus:text-destructive"
+                        onClick={() => handleDelete(item)}
+                      >
+                        <Trash className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -2066,6 +2230,26 @@ export default function InventoryPage() {
         onClose={() => setIsExportDialogOpen(false)}
         items={filteredItems}
         defaultFilename={`inventory_export_${new Date().toISOString().split('T')[0]}_${filteredItems.length}_items`}
+      />
+
+      <ImportDialog
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        onImport={bulkAddFromPartialRows}
+        onComplete={(importedCount, skippedCount) => {
+          setIsBulkImportOpen(false);
+          if (importedCount > 0) {
+            const skipPart =
+              skippedCount > 0
+                ? ` Skipped ${skippedCount} row${skippedCount === 1 ? '' : 's'} without name and unit.`
+                : '';
+            toast.success(`Imported ${importedCount} item${importedCount === 1 ? '' : 's'}.${skipPart}`);
+          } else if (skippedCount > 0) {
+            toast.info('No items were imported.', {
+              description: `${skippedCount} row(s) skipped — each row needs a name and unit.`,
+            });
+          }
+        }}
       />
 
       <Dialog open={!!printItem} onOpenChange={(open) => !open && setPrintItem(null)}>
