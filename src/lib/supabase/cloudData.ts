@@ -6,6 +6,7 @@ import type { DefaultSettings } from '@/lib/settingsService';
 import type { FinancialSettings } from '@/lib/financialSettingsService';
 import type { Settings } from '@/lib/storageService';
 import { getSupabase } from '@/lib/supabase/client';
+import { formatSupabaseOrUnknownError } from '@/lib/supabase/formatSupabaseError';
 import { parseMaintenanceOnAirScheduleFromUnknown, SettingsService } from '@/lib/settingsService';
 import {
   getItems,
@@ -34,7 +35,11 @@ import {
   type OrganizationSnapshotPayload,
 } from '@/lib/supabase/organizationData';
 import { getProductions, PRODUCTIONS_UPDATED_EVENT } from '@/lib/productionService';
-import { dispatchCloudHydrated } from '@/lib/cloudSyncEvents';
+import {
+  clearPendingCloudPush,
+  dispatchCloudHydrated,
+  hasPendingCloudPush,
+} from '@/lib/cloudSyncEvents';
 import { toast } from 'sonner';
 import { getCrewContacts } from '@/lib/crewContactsService';
 import { getPositionTemplates, savePositionTemplates } from '@/lib/positionTemplatesService';
@@ -364,6 +369,7 @@ export async function applySnapshotToLocal(row: CloudSnapshotPayload): Promise<v
 export async function pushFullSnapshotToSupabase(userId: string): Promise<void> {
   const client = getSupabase();
   if (!client) {
+    clearPendingCloudPush();
     return;
   }
   const snapshot = await collectLocalSnapshot();
@@ -377,6 +383,7 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
         'workspace:',
         wsId,
       );
+      clearPendingCloudPush();
       return;
     }
     const organizationId = await fetchWorkspaceOrganizationId(wsId);
@@ -407,12 +414,11 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
           ),
         } satisfies OrganizationSnapshotPayload);
       } catch (orgError) {
-        console.error('[cloud sync] Workspace snapshot saved; organization snapshot failed:', orgError);
-        toast.warning('Inventory synced, but organization data (contacts, templates) did not save to the cloud.', {
-          description: orgError instanceof Error ? orgError.message : String(orgError),
-        });
+        const detail = formatSupabaseOrUnknownError(orgError);
+        console.error('[cloud sync] Workspace snapshot saved; organization snapshot failed:', detail, orgError);
       }
     }
+    clearPendingCloudPush();
     return;
   }
   const payloadWithContacts = {
@@ -435,11 +441,13 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
     if (retryError) {
       throw retryError;
     }
+    clearPendingCloudPush();
     return;
   }
   if (firstError) {
     throw firstError;
   }
+  clearPendingCloudPush();
 }
 
 export async function pullUserAppData(userId: string): Promise<UserAppDataRow | null> {
@@ -492,6 +500,18 @@ export async function bootstrapCloudData(userId: string): Promise<void> {
     const client = getSupabase();
     if (!client) {
       return;
+    }
+    if (hasPendingCloudPush()) {
+      try {
+        await pushFullSnapshotToSupabase(userId);
+      } catch (pushErr) {
+        const msg = formatSupabaseOrUnknownError(pushErr);
+        console.error('[cloud sync] Push before hydrate failed (keeping local data; skipping cloud pull):', msg, pushErr);
+        toast.error('Could not upload your latest edits before loading cloud data. Your changes stay on this device until upload succeeds.', {
+          description: msg,
+        });
+        return;
+      }
     }
     const wsId = getActiveWorkspaceId();
     if (wsId) {
@@ -564,4 +584,23 @@ export function scheduleDebouncedPushToSupabase(userId: string, delayMs = 1200):
     pushDebounceTimer = null;
     void runDebouncedPush(userId);
   }, delayMs);
+}
+
+/** Cancel debounce and upload now (e.g. tab hide / unload) so a quick refresh does not lose edits. */
+export async function flushCloudPushNow(userId: string): Promise<void> {
+  if (pushDebounceTimer) {
+    clearTimeout(pushDebounceTimer);
+    pushDebounceTimer = null;
+  }
+  if (pushInFlight) {
+    return;
+  }
+  pushInFlight = true;
+  try {
+    await pushFullSnapshotToSupabase(userId);
+  } catch (error) {
+    console.error('[cloud sync] Immediate push failed:', error);
+  } finally {
+    pushInFlight = false;
+  }
 }

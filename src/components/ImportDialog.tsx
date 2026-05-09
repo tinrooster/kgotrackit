@@ -1,4 +1,13 @@
-import { useState, ChangeEvent, useMemo, useRef, useEffect, type KeyboardEvent } from "react";
+import {
+  useState,
+  ChangeEvent,
+  useMemo,
+  useRef,
+  useEffect,
+  type KeyboardEvent,
+  type HTMLAttributes,
+  type Ref,
+} from "react";
 import * as XLSX from 'xlsx';
 import {
   Dialog,
@@ -12,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
-import { Upload, Loader2, AlertTriangle, CheckCircle, ArrowRight, ClipboardPaste, Grid3x3, Wand2, SlidersHorizontal, ScanLine } from 'lucide-react';
+import { Upload, Loader2, AlertTriangle, CheckCircle, ArrowRight, ClipboardPaste, Grid3x3, Wand2, SlidersHorizontal, ScanLine, ChevronDown, Eraser, Trash2 } from 'lucide-react';
 import { InventoryItem } from '@/types/inventory';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
@@ -38,10 +47,9 @@ interface ImportDialogProps {
   onImport: (itemsToImport: Partial<InventoryItem>[]) => Promise<{ importedCount: number; skippedCount: number }>;
   onComplete: (importedCount: number, skippedCount: number) => void;
   /**
-   * Optional library suggestions for the in-app grid columns. Each entry is rendered as a
-   * native <datalist> attached to the matching cell input, providing autocomplete from
-   * existing workspace lookups (categories, locations, suppliers, projects, units, …).
-   * Missing or empty arrays are ignored — those cells fall back to plain text input.
+   * Optional library suggestions for the in-app grid columns. Each non-empty list adds a
+   * chevron that opens a filterable picker (full list, not filtered by the current cell value).
+   * Cells remain free-text; numeric fields still validate on import.
    */
   gridFieldSuggestions?: Partial<Record<GridFieldKey, readonly string[]>>;
   /**
@@ -61,31 +69,85 @@ const EXPECTED_HEADERS = [
 ];
 const UNMAPPED_HEADER_VALUE = "__UNMAPPED_HEADER__";
 
+/**
+ * Loose substring matching was removed: e.g. "notes".includes("name") is true in JS, so a
+ * "Notes" column incorrectly mapped to the `name` field. Synonyms are explicit instead.
+ */
+const IMPORT_HEADER_SYNONYMS: Record<string, readonly string[]> = {
+  name: ["names", "item", "item name", "product", "product name", "title"],
+  description: ["desc", "detail", "details"],
+  quantity: ["qty", "amount", "count"],
+  unit: ["uom", "units", "measure"],
+  costPerUnit: ["cost", "unit cost", "price", "cost per unit", "unit price"],
+  category: ["cat", "type"],
+  location: ["loc", "warehouse", "bin", "storage"],
+  reorderLevel: ["reorder", "min stock", "minimum", "reorder point"],
+  barcode: ["bar code", "upc"],
+  notes: ["note", "comment", "comments", "remark", "remarks"],
+  supplier: ["vendor"],
+  supplierWebsite: ["supplier url", "vendor website", "vendor url"],
+  project: ["job", "production"],
+  orderStatus: ["status", "order status"],
+  deliveryPercentage: ["delivery %", "delivered %", "percent delivered"],
+  expectedDeliveryDate: ["delivery date", "expected delivery", "edd", "due date"],
+};
+
+function normalizeImportHeaderLabel(raw: string): string {
+  return raw.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function expectedFieldToSpacedLower(field: string): string {
+  return field.replace(/([A-Z])/g, " $1").trim().toLowerCase();
+}
+
+/** Maps spreadsheet columns to import fields without ambiguous substring matching. */
+function buildInitialFieldMapping(fileHeaders: string[]): Record<string, string> {
+  const mapping: Record<string, string> = {};
+  const used = new Set<string>();
+  const normalized = fileHeaders.map((raw) => ({ raw, norm: normalizeImportHeaderLabel(raw) }));
+
+  for (const expectedField of EXPECTED_HEADERS) {
+    const candidateNorms = new Set<string>();
+    candidateNorms.add(expectedField.toLowerCase());
+    candidateNorms.add(expectedFieldToSpacedLower(expectedField));
+    const syns = IMPORT_HEADER_SYNONYMS[expectedField];
+    if (syns) {
+      for (const s of syns) candidateNorms.add(normalizeImportHeaderLabel(s));
+    }
+    const hit = normalized.find(({ raw, norm }) => !used.has(raw) && candidateNorms.has(norm));
+    if (hit) {
+      mapping[expectedField] = hit.raw;
+      used.add(hit.raw);
+    }
+  }
+  return mapping;
+}
+
 /** Applied when unit is left blank in bulk import (grid, file, or paste). */
 export const DEFAULT_BULK_IMPORT_UNIT = "each";
 
 /** Fixed columns for the in-app bulk entry grid (keys match import field names). */
 export const INPUT_GRID_FIELDS = [
   "name",
-  "unit",
-  "quantity",
   "category",
   "location",
   "project",
+  "notes",
+  "description",
+  "quantity",
+  "unit",
   "supplier",
   "costPerUnit",
   "reorderLevel",
   "barcode",
-  "notes",
-  "description",
 ] as const;
 
 export type BulkInputGridRow = Record<(typeof INPUT_GRID_FIELDS)[number], string>;
 export type GridFieldKey = (typeof INPUT_GRID_FIELDS)[number];
 type GridFillMode = 'increment' | 'copy';
 
-const INITIAL_GRID_ROWS = 18;
-const GRID_ROWS_ADD_CHUNK = 10;
+const INITIAL_GRID_ROWS = 5;
+const GRID_ROWS_ADD_CHUNK = 5;
 const MAX_GRID_ROWS = 200;
 
 /** Required cells that must always remain reachable by keyboard. */
@@ -96,6 +158,21 @@ const NUMERIC_GRID_FIELDS: ReadonlySet<GridFieldKey> = new Set<GridFieldKey>([
   "quantity",
   "costPerUnit",
   "reorderLevel",
+]);
+
+/**
+ * Fields intentionally excluded from strict lookup validation, even when they have
+ * suggestion lists or are free text by design.
+ */
+const NON_STRICT_LOOKUP_FIELDS: ReadonlySet<GridFieldKey> = new Set<GridFieldKey>([
+  "name",
+  "notes",
+  "barcode",
+  "description",
+  "costPerUnit",
+  "supplier",
+  "reorderLevel",
+  "quantity",
 ]);
 
 /** True when `raw` parses to a finite, non-negative number (or is empty/whitespace). */
@@ -144,18 +221,30 @@ function createInitialGridRows(): BulkInputGridRow[] {
   return Array.from({ length: INITIAL_GRID_ROWS }, () => createEmptyGridRow());
 }
 
+function isDefaultBulkGridUnit(raw: string): boolean {
+  const t = String(raw ?? "").trim();
+  return t === "" || t.toLowerCase() === DEFAULT_BULK_IMPORT_UNIT.toLowerCase();
+}
+
+/** True when the row has no user-entered data (default unit alone does not count). */
 function isGridRowBlank(row: BulkInputGridRow): boolean {
-  return INPUT_GRID_FIELDS.every((field) => !String(row[field] ?? "").trim());
+  return INPUT_GRID_FIELDS.every((field) => {
+    const raw = String(row[field] ?? "").trim();
+    if (field === "unit") return isDefaultBulkGridUnit(raw);
+    return raw === "";
+  });
 }
 
 function buildParsedRowsFromGrid(gridRows: BulkInputGridRow[]): Record<string, unknown>[] {
-  return gridRows.filter((row) => !isGridRowBlank(row)).map((row) => {
-    const parsed: Record<string, unknown> = {};
-    INPUT_GRID_FIELDS.forEach((field) => {
-      parsed[field] = row[field] ?? "";
+  return gridRows
+    .filter((row) => String(row.name ?? "").trim() !== "")
+    .map((row) => {
+      const parsed: Record<string, unknown> = {};
+      INPUT_GRID_FIELDS.forEach((field) => {
+        parsed[field] = row[field] ?? "";
+      });
+      return parsed;
     });
-    return parsed;
-  });
 }
 
 function buildIdentityFieldMapping(fields: readonly string[]): Record<string, string> {
@@ -249,6 +338,50 @@ function computeImportValidation(
   });
 
   return { mappingError: null, results };
+}
+
+function shouldEnforceLookupForField(
+  field: GridFieldKey,
+  suggestionMap: Partial<Record<GridFieldKey, string[]>>
+): boolean {
+  if (NON_STRICT_LOOKUP_FIELDS.has(field)) return false;
+  const suggestions = suggestionMap[field];
+  return Array.isArray(suggestions) && suggestions.length > 0;
+}
+
+function computeGridLookupValidation(
+  data: Record<string, unknown>[],
+  rowNumberForDataIndex: (dataIndex: number) => number,
+  suggestionMap: Partial<Record<GridFieldKey, string[]>>
+): { row: number; errors: string[] }[] {
+  const allowedByField: Partial<Record<GridFieldKey, Set<string>>> = {};
+  (Object.keys(suggestionMap) as GridFieldKey[]).forEach((field) => {
+    if (!shouldEnforceLookupForField(field, suggestionMap)) return;
+    const values = suggestionMap[field];
+    if (!values || values.length === 0) return;
+    allowedByField[field] = new Set(values.map((v) => v.toLowerCase()));
+  });
+
+  const results: { row: number; errors: string[] }[] = [];
+  data.forEach((row, index) => {
+    const errors: string[] = [];
+    (Object.keys(allowedByField) as GridFieldKey[]).forEach((field) => {
+      const allowed = allowedByField[field];
+      if (!allowed || allowed.size === 0) return;
+      const raw = String(row[field] ?? "").trim();
+      if (!raw) return;
+      if (field === "unit" && raw.toLowerCase() === DEFAULT_BULK_IMPORT_UNIT.toLowerCase()) return;
+      if (!allowed.has(raw.toLowerCase())) {
+        errors.push(
+          `${humanizeFieldLabel(field)} must match a library value (use the cell's ▾ picker).`
+        );
+      }
+    });
+    if (errors.length > 0) {
+      results.push({ row: rowNumberForDataIndex(index), errors });
+    }
+  });
+  return results;
 }
 
 function mapParsedRowsToPartialItems(
@@ -361,6 +494,117 @@ export function parseDelimitedPaste(
   return { headers, rows };
 }
 
+interface ImportGridSuggestCellProps {
+  value: string;
+  onValueChange: (next: string) => void;
+  suggestions: string[];
+  disabled?: boolean;
+  placeholder?: string;
+  inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"];
+  inputRef: Ref<HTMLInputElement>;
+  onFocus?: () => void;
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+  "aria-label"?: string;
+}
+
+/** Free-text input plus library picker (avoids Chromium datalist filtering when a value is already set). */
+function ImportGridSuggestCell({
+  value,
+  onValueChange,
+  suggestions,
+  disabled,
+  placeholder,
+  inputMode,
+  inputRef,
+  onFocus,
+  onKeyDown,
+  "aria-label": ariaLabel,
+}: ImportGridSuggestCellProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [filterQuery, setFilterQuery] = useState("");
+
+  useEffect(() => {
+    if (!pickerOpen) setFilterQuery("");
+  }, [pickerOpen]);
+
+  const filteredSuggestions = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase();
+    if (!q) return suggestions;
+    return suggestions.filter((s) => s.toLowerCase().includes(q));
+  }, [suggestions, filterQuery]);
+
+  return (
+    <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+      <div className="flex min-w-0">
+        <Input
+          ref={inputRef}
+          className="h-8 min-w-0 flex-1 rounded-r-none border-r-0 text-xs"
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          onFocus={onFocus}
+          onKeyDown={onKeyDown}
+          disabled={disabled}
+          placeholder={placeholder}
+          inputMode={inputMode}
+          autoComplete="off"
+          aria-label={ariaLabel}
+        />
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0 rounded-l-none border-l-0 px-0 text-muted-foreground"
+            disabled={disabled}
+            title="Browse full workspace library for this column"
+            aria-label={ariaLabel ? `${ariaLabel} — library` : "Open library list"}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+      </div>
+      <PopoverContent
+        className="w-[min(18rem,calc(100vw-2rem))] p-0"
+        align="end"
+        sideOffset={4}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="border-b p-2">
+          <Input
+            className="h-8 text-xs"
+            placeholder="Filter…"
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+            aria-label="Filter library values"
+          />
+        </div>
+        <ScrollArea className="h-[min(240px,40vh)]">
+          <ul className="p-1">
+            {filteredSuggestions.length === 0 ? (
+              <li className="px-2 py-2 text-xs text-muted-foreground">No matches</li>
+            ) : (
+              filteredSuggestions.map((s) => (
+                <li key={s}>
+                  <button
+                    type="button"
+                    className="w-full rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
+                    onClick={() => {
+                      onValueChange(s);
+                      setPickerOpen(false);
+                    }}
+                  >
+                    {s}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldSuggestions, userKey }: ImportDialogProps) {
   // Initial prefs are computed lazily so localStorage is only touched once per mount.
   const initialPrefsRef = useRef<ImportDialogPrefs>(loadImportDialogPrefs(userKey));
@@ -424,8 +668,6 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
     });
     return result;
   }, [gridFieldSuggestions]);
-
-  const getDatalistId = (field: GridFieldKey): string => `import-grid-suggest-${field}`;
 
   // Fill-series controls
   const [fillPopoverOpen, setFillPopoverOpen] = useState(false);
@@ -568,16 +810,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
   const applyHeadersAndRows = (fileHeaders: string[], fileData: Record<string, unknown>[]) => {
     setHeaders(fileHeaders);
     setParsedData(fileData);
-    const initialMapping: Record<string, string> = {};
-    EXPECTED_HEADERS.forEach((expectedHeader) => {
-      let match = fileHeaders.find((h) => h.toLowerCase() === expectedHeader.toLowerCase());
-      if (!match) {
-        match = fileHeaders.find((h) => h.toLowerCase().includes(expectedHeader.toLowerCase()));
-      }
-      if (match) {
-        initialMapping[expectedHeader] = match;
-      }
-    });
+    const initialMapping = buildInitialFieldMapping(fileHeaders);
     setFieldMapping(initialMapping);
     validateData(fileHeaders, fileData, initialMapping);
   };
@@ -641,6 +874,35 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
       const add = Math.min(GRID_ROWS_ADD_CHUNK, MAX_GRID_ROWS - prev.length);
       return [...prev, ...Array.from({ length: add }, () => createEmptyGridRow())];
     });
+  };
+
+  const handleClearGridRow = (rowIndex: number) => {
+    const row = gridRows[rowIndex];
+    if (!row || isGridRowBlank(row)) return;
+    setGridRows((prev) => {
+      if (!prev[rowIndex]) return prev;
+      const next = [...prev];
+      next[rowIndex] = createEmptyGridRow();
+      return next;
+    });
+    if (sourceMode === "grid" && validationResults.length > 0) {
+      setValidationResults([]);
+    }
+  };
+
+  const handleClearFilledGridRows = () => {
+    const filledCount = gridRows.filter((row) => !isGridRowBlank(row)).length;
+    if (filledCount === 0) {
+      toast.info("No filled rows to clear.");
+      return;
+    }
+    setGridRows((prev) =>
+      prev.map((row) => (!isGridRowBlank(row) ? createEmptyGridRow() : row))
+    );
+    if (sourceMode === "grid" && validationResults.length > 0) {
+      setValidationResults([]);
+    }
+    toast.success(`Cleared ${filledCount} row${filledCount === 1 ? "" : "s"}.`);
   };
 
   const getGridCellKey = (rowIndex: number, field: GridFieldKey): string => `${rowIndex}:${field}`;
@@ -720,8 +982,8 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
   /**
    * Routes a scanned barcode into the grid. Targets the row of the last-focused cell
    * when the focused column is `barcode`, otherwise picks the first row that already
-   * has a name/unit but no barcode (so users can pre-fill rows then sweep barcodes
-   * in order). Falls back to the first blank row if there is no clear target. After
+   * has grid content (not only the default unit) but no barcode. Falls back to the
+   * first blank row if there is no clear target. After
    * writing, focus advances to the next row's barcode cell so a subsequent scan
    * (re-opening the scanner) lands somewhere sensible.
    */
@@ -736,12 +998,8 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
         focused && focused.field === "barcode" ? focused.rowIndex : null;
 
       if (targetIdx === null) {
-        // Prefer rows that already have content but no barcode yet
-        targetIdx = next.findIndex((row) => {
-          const hasContent =
-            row.name.trim() !== "" || row.unit.trim() !== "" || row.quantity.trim() !== "";
-          return hasContent && row.barcode.trim() === "";
-        });
+        // Prefer rows that already have content but no barcode yet (default unit alone is not content)
+        targetIdx = next.findIndex((row) => !isGridRowBlank(row) && row.barcode.trim() === "");
       }
       if (targetIdx === null || targetIdx === -1) {
         targetIdx = next.findIndex((row) => isGridRowBlank(row));
@@ -786,6 +1044,13 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
     return indices.map((i) => buildIncrementValue(prefix, start + i, pad));
   }, [fillCount, fillMode, fillValue]);
 
+  // Auto-increment is only valid for Name. Switching columns auto-falls back to Copy.
+  useEffect(() => {
+    if (fillColumn !== "name" && fillMode === "increment") {
+      setFillMode("copy");
+    }
+  }, [fillColumn, fillMode]);
+
   /**
    * Validates the Fill series controls before they hit the grid. Numeric columns
    * (quantity/costPerUnit/reorderLevel) reject any text — the produced values would
@@ -796,6 +1061,9 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
   const fillValidationError = useMemo<string | null>(() => {
     if (!fillValue.trim() && fillMode === "copy") {
       return null; // Copying an empty value is allowed (clears the column).
+    }
+    if (fillMode === "increment" && fillColumn !== "name") {
+      return "Auto-increment is only available for Name.";
     }
     if (NUMERIC_GRID_FIELDS.has(fillColumn)) {
       if (fillMode === "copy") {
@@ -816,8 +1084,23 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
         return `${humanizeFieldLabel(fillColumn)} must start from a non-negative number.`;
       }
     }
+    if (shouldEnforceLookupForField(fillColumn, gridSuggestionMap)) {
+      const allowed = gridSuggestionMap[fillColumn];
+      if (allowed && allowed.length > 0) {
+        if (fillMode === "increment") {
+          return `${humanizeFieldLabel(fillColumn)} uses library values — use Copy mode and select/paste a valid value.`;
+        }
+        const trimmed = fillValue.trim().toLowerCase();
+        if (fillColumn === "unit" && trimmed === DEFAULT_BULK_IMPORT_UNIT.toLowerCase()) {
+          return null;
+        }
+        if (trimmed !== "" && !allowed.some((v) => v.toLowerCase() === trimmed)) {
+          return `${humanizeFieldLabel(fillColumn)} must match an existing library value.`;
+        }
+      }
+    }
     return null;
-  }, [fillColumn, fillMode, fillValue]);
+  }, [fillColumn, fillMode, fillValue, gridSuggestionMap]);
 
   const applyFillSeries = () => {
     if (fillValidationError) {
@@ -896,8 +1179,10 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
         return;
       }
       setError(null);
-      setValidationResults(results);
-      if (results.length > 0) {
+      const lookupResults = computeGridLookupValidation(dataToImport, (i) => i + 1, gridSuggestionMap);
+      const combinedResults = [...results, ...lookupResults];
+      setValidationResults(combinedResults);
+      if (combinedResults.length > 0) {
         toast.error("Fix the highlighted issues in the grid.");
         return;
       }
@@ -934,7 +1219,10 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
   return (
     <>
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { resetState(); onClose(); } }}>
-      <DraggableDialogContent className="w-[min(calc(100vw-1rem),960px)]" minWidth={400}>
+      <DraggableDialogContent
+        className="w-[min(calc(100vw-1.5rem),min(96vw,1580px))]"
+        minWidth={720}
+      >
         <DialogHeader>
           <DialogTitle>Bulk add from spreadsheet</DialogTitle>
           <DialogDescription>
@@ -966,7 +1254,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
               }
             }}
           >
-            <TabsList className="grid w-full max-w-2xl grid-cols-3">
+            <TabsList className="grid w-full max-w-4xl grid-cols-3">
               <TabsTrigger value="grid" className="inline-flex items-center justify-center gap-1.5">
                 <Grid3x3 className="h-3.5 w-3.5 shrink-0" />
                 Input grid
@@ -1017,7 +1305,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
             </TabsContent>
             <TabsContent value="grid" className="mt-4 space-y-3">
               <p className="text-sm text-muted-foreground">
-                Blank rows are ignored. Quantity defaults to 1 when left empty. Use Tab or arrow keys to move between cells. Up to {MAX_GRID_ROWS} rows.
+                Blank rows are ignored. Quantity defaults to 1 when left empty. Lookup-backed columns must match a library value before import (except name/notes/barcode/description/cost/supplier/reorder/quantity). Use Tab or arrow keys between cells. Up to {MAX_GRID_ROWS} rows.
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Popover>
@@ -1072,12 +1360,12 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
                       onClick={openFillPopover}
                     >
                       <Wand2 className="h-3.5 w-3.5" />
-                      Fill series
+                      Auto-Fill
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-80 space-y-3">
                     <div>
-                      <p className="text-sm font-medium">Fill column with a series</p>
+                      <p className="text-sm font-medium">Auto-Fill column values</p>
                       <p className="text-xs text-muted-foreground">
                         Defaults pull from the cell you last focused.
                       </p>
@@ -1148,9 +1436,11 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="increment">
-                            Auto-increment (lights 1, lights 2…)
-                          </SelectItem>
+                          {fillColumn === "name" ? (
+                            <SelectItem value="increment">
+                              Auto-increment (lights 1, lights 2…)
+                            </SelectItem>
+                          ) : null}
                           <SelectItem value="copy">Copy (same value in every row)</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1239,20 +1529,8 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
                   Tab / Shift+Tab and ↑ ↓ Enter move between cells
                 </p>
               </div>
-              {/* Native datalists provide library autocomplete on cells whose field has suggestions. */}
-              {(Object.keys(gridSuggestionMap) as GridFieldKey[]).map((field) => {
-                const values = gridSuggestionMap[field];
-                if (!values || values.length === 0) return null;
-                return (
-                  <datalist key={field} id={getDatalistId(field)}>
-                    {values.map((value) => (
-                      <option key={value} value={value} />
-                    ))}
-                  </datalist>
-                );
-              })}
               <ScrollArea className="h-[min(55vh,440px)] w-full rounded-md border">
-                <Table className="relative min-w-[480px] text-xs">
+                <Table className="relative min-w-[960px] text-xs">
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="sticky top-0 z-[1] w-10 bg-background text-center text-muted-foreground">
@@ -1264,7 +1542,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
                         return (
                           <TableHead
                             key={field}
-                            className="sticky top-0 z-[1] min-w-[6.5rem] whitespace-nowrap bg-background px-1 py-2"
+                            className="sticky top-0 z-[1] min-w-[7.25rem] whitespace-nowrap bg-background px-1 py-2"
                           >
                             <span className={isRequired ? "text-destructive" : ""}>
                               {humanizeFieldLabel(field)}
@@ -1272,7 +1550,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
                               {hasLibrary ? (
                                 <span
                                   className="ml-1 text-[10px] font-normal text-muted-foreground"
-                                  title="Autocomplete from your workspace library"
+                                  title="Use the ▾ in each cell to open the full library list"
                                 >
                                   ▾
                                 </span>
@@ -1286,9 +1564,25 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
                   <TableBody>
                     {gridRows.map((row, rowIndex) => (
                       <TableRow key={rowIndex} className="hover:bg-muted/40">
-                        <TableCell className="bg-muted/30 py-1 text-center text-muted-foreground">{rowIndex + 1}</TableCell>
+                        <TableCell className="bg-muted/30 px-1 py-1 text-center text-muted-foreground">
+                          <div className="flex items-center justify-center gap-1">
+                            <span>{rowIndex + 1}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              disabled={isLoading || isGridRowBlank(row)}
+                              onClick={() => handleClearGridRow(rowIndex)}
+                              title={`Clear row ${rowIndex + 1}`}
+                              aria-label={`Clear row ${rowIndex + 1}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
                         {activeGridColumnList.map((field) => {
-                          const datalistId = gridSuggestionMap[field] ? getDatalistId(field) : undefined;
+                          const suggestList = gridSuggestionMap[field];
                           const placeholder =
                             field === "quantity"
                               ? "1"
@@ -1296,22 +1590,37 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
                                 ? DEFAULT_BULK_IMPORT_UNIT
                                 : undefined;
                           const inputMode = NUMERIC_GRID_FIELDS.has(field) ? "decimal" : undefined;
+                          const aria = `${humanizeFieldLabel(field)} row ${rowIndex + 1}`;
                           return (
                             <TableCell key={field} className="p-1">
-                              <Input
-                                ref={setGridInputRef(rowIndex, field)}
-                                className="h-8 min-w-[5.5rem] text-xs"
-                                value={row[field]}
-                                onChange={(e) => handleGridCellChange(rowIndex, field, e.target.value)}
-                                onKeyDown={(e) => handleGridCellKeyDown(e, rowIndex, field)}
-                                onFocus={() => handleGridCellFocus(rowIndex, field)}
-                                disabled={isLoading}
-                                list={datalistId}
-                                placeholder={placeholder}
-                                inputMode={inputMode}
-                                autoComplete="off"
-                                aria-label={`${humanizeFieldLabel(field)} row ${rowIndex + 1}`}
-                              />
+                              {suggestList && suggestList.length > 0 ? (
+                                <ImportGridSuggestCell
+                                  value={row[field]}
+                                  onValueChange={(v) => handleGridCellChange(rowIndex, field, v)}
+                                  suggestions={suggestList}
+                                  disabled={isLoading}
+                                  placeholder={placeholder}
+                                  inputMode={inputMode}
+                                  inputRef={setGridInputRef(rowIndex, field)}
+                                  onFocus={() => handleGridCellFocus(rowIndex, field)}
+                                  onKeyDown={(e) => handleGridCellKeyDown(e, rowIndex, field)}
+                                  aria-label={aria}
+                                />
+                              ) : (
+                                <Input
+                                  ref={setGridInputRef(rowIndex, field)}
+                                  className="h-8 min-w-[5.5rem] text-xs"
+                                  value={row[field]}
+                                  onChange={(e) => handleGridCellChange(rowIndex, field, e.target.value)}
+                                  onKeyDown={(e) => handleGridCellKeyDown(e, rowIndex, field)}
+                                  onFocus={() => handleGridCellFocus(rowIndex, field)}
+                                  disabled={isLoading}
+                                  placeholder={placeholder}
+                                  inputMode={inputMode}
+                                  autoComplete="off"
+                                  aria-label={aria}
+                                />
+                              )}
                             </TableCell>
                           );
                         })}
@@ -1322,17 +1631,29 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
               </ScrollArea>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                  {gridRows.length} row slots · {gridNonEmptyCount} non-empty
+                  {gridRows.length} row slots · {gridNonEmptyCount} to import
                 </p>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleAddGridRows}
-                  disabled={isLoading || gridRows.length >= MAX_GRID_ROWS}
-                >
-                  Add {GRID_ROWS_ADD_CHUNK} rows
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearFilledGridRows}
+                    disabled={isLoading || gridNonEmptyCount === 0}
+                  >
+                    <Eraser className="mr-1.5 h-3.5 w-3.5" />
+                    Clear filled
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleAddGridRows}
+                    disabled={isLoading || gridRows.length >= MAX_GRID_ROWS}
+                  >
+                    Add {GRID_ROWS_ADD_CHUNK} rows
+                  </Button>
+                </div>
               </div>
               {sourceMode === "grid" && validationResults.length > 0 && (
                 <div className="space-y-2 rounded-md border border-destructive bg-destructive/5 p-3">
@@ -1508,6 +1829,7 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
       open={scannerOpen}
       onOpenChange={setScannerOpen}
       onScan={handleBarcodeScanned}
+      quiet
     />
     </>
   );

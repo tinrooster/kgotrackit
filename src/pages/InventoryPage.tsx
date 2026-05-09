@@ -2190,7 +2190,6 @@ export default function InventoryPage() {
         suppliers={suppliers}
         projects={projects}
         onSubmit={handleQuickAddSubmit}
-        showMaintenanceCutoverCautions={showMaintenanceCutoverCautions}
       />
 
       {selectedItem && (
