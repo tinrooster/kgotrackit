@@ -202,6 +202,7 @@ export function ProductionDetail({
               onPointerDown={sheetEdgeDrag.handlePointerDown}
               onPointerMove={sheetEdgeDrag.handlePointerMove}
               onPointerUp={sheetEdgeDrag.handlePointerUp}
+              onLostPointerCapture={sheetEdgeDrag.handleLostPointerCapture}
               onPointerCancel={sheetEdgeDrag.handlePointerCancel}
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" style={sheetEdgeDrag.contentStyle}>
