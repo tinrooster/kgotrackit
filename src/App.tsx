@@ -28,6 +28,7 @@ import ExpandCollapseSegmentedLabPage from './pages/ExpandCollapseSegmentedLabPa
 import DevMenuPage from './pages/DevMenuPage';
 import PlannerWorkspacePage from './pages/PlannerWorkspacePage';
 import FieldChecklistPage from './pages/FieldChecklistPage';
+import PlantPage from './pages/PlantPage';
 import {
   LAST_ROUTE_STORAGE_KEY,
   shouldPersistLastVisitedRoute,
@@ -55,7 +56,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const inventoryFullBleed = location.pathname === '/inventory';
+  const inventoryFullBleed = location.pathname === '/inventory' || location.pathname === '/plant';
   const { loading: authLoading } = useAuth();
   const [showInitialDefaultsDialog, setShowInitialDefaultsDialog] = useState(false);
   const [restoreChecked, setRestoreChecked] = useState(false);
@@ -251,6 +252,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <FieldChecklistPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/plant"
+                element={
+                  <ProtectedRoute>
+                    <PlantPage />
                   </ProtectedRoute>
                 }
               />

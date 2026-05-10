@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, List, FileText, Settings, ShoppingCart, Clapperboard, FlaskConical } from 'lucide-react'
+import { Cable, ClipboardList, LayoutDashboard, List, FileText, Settings, ShoppingCart, Clapperboard, FlaskConical } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { UserMenu } from '@/components/UserMenu'
 import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService'
@@ -116,6 +116,7 @@ export function Navigation() {
       { path: '/productions', label: "Productions", icon: Clapperboard, activeBasePath: '/productions' },
       { path: '/field-checklist', label: 'Field checklist', icon: ClipboardList },
       { path: "/checkout", label: "Check-In/Out", icon: ShoppingCart },
+      { path: "/plant", label: "Plant", icon: Cable },
       { path: "/reports", label: "Reports", icon: FileText },
       { path: "/settings", label: "Settings", icon: Settings },
     ]
