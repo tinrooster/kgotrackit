@@ -94,6 +94,54 @@ export async function listCables(
   return { cables, total: count ?? 0, page, pageSize };
 }
 
+export async function exportCablesCSV(
+  filters: Omit<PlantCableFilters, 'organizationId' | 'page' | 'pageSize'> = {}
+): Promise<string> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return '';
+
+  const allRows: PlantCableSummary[] = [];
+  let page = 0;
+  const pageSize = 1000;
+
+  while (true) {
+    const result = await listCables({ ...filters, page, pageSize });
+    allRows.push(...result.cables);
+    if (allRows.length >= result.total || result.cables.length < pageSize) break;
+    page++;
+  }
+
+  const headers = ['Cable #', 'Origin', 'Origin Loc', 'Destination', 'Dest Loc', 'Signal', 'Cable Family', 'Length ft', 'Status', 'Verified', 'Notes'];
+  const escape = (v: string | number | undefined | null) => {
+    if (v == null) return '';
+    const s = String(v);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const lines = [
+    headers.join(','),
+    ...allRows.map((c) => [
+      escape(c.cableNumber),
+      escape([c.originDevice, c.originPort].filter(Boolean).join(':')),
+      escape(c.originLocationCode),
+      escape([c.destDevice, c.destPort].filter(Boolean).join(':')),
+      escape(c.destLocationCode),
+      escape(c.signalType ? SIGNAL_TYPE_LABELS[c.signalType] : ''),
+      escape(c.cableFamily),
+      escape(c.lengthFt),
+      escape(STATUS_LABELS[c.status]),
+      escape(c.verifiedAt ? new Date(c.verifiedAt).toLocaleDateString() : ''),
+      escape(c.notes),
+    ].join(',')),
+  ];
+
+  return lines.join('\r\n');
+}
+
 export async function getCable(id: string): Promise<PlantCable | null> {
   const client = getSupabase();
   if (!client) return null;

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2, Search, X } from 'lucide-react';
 import {
   listCables,
+  exportCablesCSV,
   SIGNAL_TYPE_LABELS,
   STATUS_LABELS,
   STATUS_COLOURS,
@@ -43,6 +44,7 @@ export function CableRegisterTab() {
   const [signalFilters, setSignalFilters] = useState<PlantSignalType[]>([]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const loadRef = useRef(0);
@@ -76,6 +78,25 @@ export function CableRegisterTab() {
     return () => window.removeEventListener(PLANT_CABLES_UPDATED_EVENT, handler);
   }, [load, page]);
 
+  const handleExport = async () => {
+    setExporting(true);
+    const csv = await exportCablesCSV({
+      search: debouncedSearch,
+      status: statusFilters,
+      signalType: signalFilters,
+    });
+    if (csv) {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cables_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setExporting(false);
+  };
+
   const toggleStatus = (s: PlantCableStatus) => {
     setStatusFilters((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
@@ -92,7 +113,8 @@ export function CableRegisterTab() {
     <div className="flex flex-col gap-4">
       {/* Search + filter bar */}
       <div className="flex flex-col gap-2">
-        <div className="relative max-w-sm">
+        <div className="flex items-center gap-2">
+        <div className="relative max-w-sm flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
@@ -108,6 +130,20 @@ export function CableRegisterTab() {
               <X className="h-4 w-4" />
             </button>
           )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-10 shrink-0"
+          onClick={handleExport}
+          disabled={exporting || total === 0}
+          title={`Export ${total.toLocaleString()} cables to CSV`}
+        >
+          {exporting
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Download className="h-4 w-4" />}
+          <span className="ml-1.5 hidden sm:inline">Export</span>
+        </Button>
         </div>
 
         <div className="flex flex-wrap gap-1.5">
