@@ -170,14 +170,14 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
           setUploadingJson(false);
           return;
         }
+        const updated = { ...drawing, schematicJson: json };
+        setDrawing(updated);
+        onUpdated(updated);
         const ok = await saveDrawingSchematicJson(drawing.id, json);
         if (ok) {
-          const updated = { ...drawing, schematicJson: json };
-          setDrawing(updated);
-          onUpdated(updated);
           toast.success(`Loaded ${json.edges.length} connections`);
         } else {
-          toast.error('Failed to save schematic JSON');
+          toast.success(`Loaded ${json.edges.length} connections (not persisted — run DB migration)`);
         }
       } catch {
         toast.error('Could not parse JSON file');
