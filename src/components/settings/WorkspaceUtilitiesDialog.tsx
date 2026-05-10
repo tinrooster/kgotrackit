@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -24,7 +25,19 @@ import {
 import { toast } from 'sonner';
 import { DUMMY_INVENTORY_DATA, INITIAL_SETTINGS } from '@/lib/dummyData';
 import { STORAGE_KEYS, type Settings } from '@/lib/storageService';
-import { pushWorkspaceSnapshot, type WorkspaceSnapshotPayload } from '@/lib/supabase/workspaceData';
+import {
+  createWorkspaceWithSnapshot,
+  fetchWorkspaceOrganizationId,
+  pullWorkspaceAppData,
+  pushWorkspaceSnapshot,
+  updateWorkspaceDisplayName,
+  type WorkspaceSnapshotPayload,
+} from '@/lib/supabase/workspaceData';
+import {
+  appDataRowToSnapshotPayload,
+  mergeWorkspaceSnapshotsPreferDestination,
+} from '@/lib/supabase/workspaceSnapshotMerge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   populateDemoData,
   stripDemoData,
@@ -41,6 +54,16 @@ interface WorkspaceUtilitiesDialogProps {
   workspaceName: string;
   onClose: () => void;
   onApplied?: () => void;
+  /** Other workspaces (exclude current) for merge-from picker. */
+  workspaceOptions?: Array<{ workspaceId: string; name: string }>;
+  /** All taken workspace names — used when validating “copy to new” name. */
+  existingWorkspaceNames?: string[];
+  /** Called after a successful copy; parent usually switches workspace and reloads. */
+  onNewWorkspaceCreated?: (workspaceId: string) => void;
+  /** Full workspace list for rename uniqueness checks (typically `workspaces` from context). */
+  allWorkspaces?: Array<{ workspaceId: string; name: string }>;
+  /** After renaming, refresh workspace summaries so headers and lists update. */
+  onWorkspaceRenamed?: () => void | Promise<void>;
 }
 
 const cloneJson = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -93,6 +116,11 @@ export function WorkspaceUtilitiesDialog({
   workspaceName,
   onClose,
   onApplied,
+  workspaceOptions = [],
+  existingWorkspaceNames = [],
+  onNewWorkspaceCreated,
+  allWorkspaces = [],
+  onWorkspaceRenamed,
 }: WorkspaceUtilitiesDialogProps) {
   const [choice, setChoice] = React.useState<WorkspaceDefaultsChoice>('blank');
   const [includeSampleInventory, setIncludeSampleInventory] = React.useState(false);
@@ -106,6 +134,13 @@ export function WorkspaceUtilitiesDialog({
   const [confirmApplyDefaultsOpen, setConfirmApplyDefaultsOpen] = React.useState(false);
   const [confirmPopulateDemoOpen, setConfirmPopulateDemoOpen] = React.useState(false);
   const [confirmStripUnmodifiedOpen, setConfirmStripUnmodifiedOpen] = React.useState(false);
+  const [copyNewName, setCopyNewName] = React.useState('');
+  const [copyBusy, setCopyBusy] = React.useState(false);
+  const [mergeSourceId, setMergeSourceId] = React.useState<string>('');
+  const [mergeBusy, setMergeBusy] = React.useState(false);
+  const [confirmMergeOpen, setConfirmMergeOpen] = React.useState(false);
+  const [renameDraft, setRenameDraft] = React.useState('');
+  const [renameBusy, setRenameBusy] = React.useState(false);
 
   const refreshDemoSummary = React.useCallback(() => {
     setDemoSummary(summarizeDemoPresence());
@@ -123,8 +158,120 @@ export function WorkspaceUtilitiesDialog({
     setConfirmApplyDefaultsOpen(false);
     setConfirmPopulateDemoOpen(false);
     setConfirmStripUnmodifiedOpen(false);
+    setCopyNewName('');
+    setMergeSourceId('');
+    setConfirmMergeOpen(false);
+    setRenameDraft(workspaceName);
     refreshDemoSummary();
-  }, [open, refreshDemoSummary]);
+  }, [open, refreshDemoSummary, workspaceName]);
+
+  const mergeSourceLabel =
+    workspaceOptions.find((w) => w.workspaceId === mergeSourceId)?.name ?? 'selected workspace';
+
+  const handleCopyToNewWorkspace = async (): Promise<void> => {
+    const trimmed = copyNewName.trim();
+    if (!trimmed) {
+      toast.error('Enter a name for the new workspace.');
+      return;
+    }
+    const taken = existingWorkspaceNames.some(
+      (existing) => existing.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (taken) {
+      toast.error('A workspace with that name already exists.');
+      return;
+    }
+    setCopyBusy(true);
+    try {
+      const row = await pullWorkspaceAppData(workspaceId);
+      if (!row) {
+        throw new Error('Could not read this workspace from the cloud.');
+      }
+      const snapshot = appDataRowToSnapshotPayload(row);
+      const orgId = await fetchWorkspaceOrganizationId(workspaceId);
+      const newId = await createWorkspaceWithSnapshot(
+        trimmed,
+        snapshot,
+        orgId ? { existingOrganizationId: orgId } : undefined,
+      );
+      toast.success('Workspace copied', {
+        description: `Created "${trimmed}".`,
+      });
+      onClose();
+      onNewWorkspaceCreated?.(newId);
+    } catch (error) {
+      toast.error('Could not copy workspace.', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setCopyBusy(false);
+    }
+  };
+
+  const handleRenameWorkspace = async (): Promise<void> => {
+    const trimmed = renameDraft.trim();
+    if (!trimmed) {
+      toast.error('Enter a workspace name.');
+      return;
+    }
+    if (trimmed === workspaceName.trim()) {
+      return;
+    }
+    const takenByOther = allWorkspaces.some(
+      (w) => w.workspaceId !== workspaceId && w.name.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (takenByOther) {
+      toast.error('Another workspace already uses that name.');
+      return;
+    }
+    setRenameBusy(true);
+    try {
+      await updateWorkspaceDisplayName(workspaceId, trimmed);
+      toast.success('Workspace renamed.');
+      await onWorkspaceRenamed?.();
+      onClose();
+    } catch (error) {
+      toast.error('Could not rename workspace.', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setRenameBusy(false);
+    }
+  };
+
+  const handleMergeWorkspaces = async (): Promise<void> => {
+    if (!mergeSourceId || mergeSourceId === workspaceId) {
+      toast.error('Choose another workspace to merge from.');
+      return;
+    }
+    setMergeBusy(true);
+    setConfirmMergeOpen(false);
+    try {
+      const [destRow, srcRow] = await Promise.all([
+        pullWorkspaceAppData(workspaceId),
+        pullWorkspaceAppData(mergeSourceId),
+      ]);
+      if (!destRow || !srcRow) {
+        throw new Error('Could not load both workspaces from the cloud.');
+      }
+      const destSnap = appDataRowToSnapshotPayload(destRow);
+      const srcSnap = appDataRowToSnapshotPayload(srcRow);
+      const merged = mergeWorkspaceSnapshotsPreferDestination(destSnap, srcSnap);
+      await pushWorkspaceSnapshot(workspaceId, merged);
+      toast.success('Workspaces merged', {
+        description: `Merged data from "${mergeSourceLabel}" into "${workspaceName}". Reloading…`,
+      });
+      onApplied?.();
+      onClose();
+      window.location.reload();
+    } catch (error) {
+      toast.error('Could not merge workspaces.', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setMergeBusy(false);
+    }
+  };
 
   const applyDefaults = async (): Promise<void> => {
     setBusy(true);
@@ -326,13 +473,141 @@ export function WorkspaceUtilitiesDialog({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={busy}>
+            <Button variant="outline" onClick={onClose} disabled={busy || copyBusy || mergeBusy || renameBusy}>
               Close
             </Button>
-            <Button onClick={() => setConfirmApplyDefaultsOpen(true)} disabled={busy}>
+            <Button onClick={() => setConfirmApplyDefaultsOpen(true)} disabled={busy || copyBusy || mergeBusy || renameBusy}>
               {busy ? 'Applying…' : 'Apply'}
             </Button>
           </DialogFooter>
+
+          <Separator className="my-2" />
+
+          <section aria-labelledby="ws-utils-clone-merge" className="space-y-3">
+            <h3 id="ws-utils-clone-merge" className="text-sm font-semibold">
+              Copy &amp; merge
+            </h3>
+            {allWorkspaces.length > 0 ? (
+              <div className="rounded-md border p-3 space-y-2">
+                <Label className="text-sm">Rename this workspace</Label>
+                <p className="text-xs text-muted-foreground">
+                  Updates the display name for this team workspace in Supabase (navigation chip and workspace lists).
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Label htmlFor="ws-utils-rename" className="text-xs text-muted-foreground">
+                      Workspace name
+                    </Label>
+                    <Input
+                      id="ws-utils-rename"
+                      value={renameDraft}
+                      onChange={(event) => setRenameDraft(event.target.value)}
+                      disabled={renameBusy || copyBusy || mergeBusy}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={
+                      renameBusy ||
+                      copyBusy ||
+                      mergeBusy ||
+                      renameDraft.trim().length === 0 ||
+                      renameDraft.trim() === workspaceName.trim()
+                    }
+                    onClick={() => void handleRenameWorkspace()}
+                  >
+                    {renameBusy ? 'Saving…' : 'Save name'}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="rounded-md border p-3 space-y-2">
+              <Label className="text-sm">Copy to new workspace</Label>
+              <p className="text-xs text-muted-foreground">
+                Creates a new team workspace with a full copy of <span className="font-medium text-foreground">{workspaceName}</span>
+                &apos;s cloud data. The new workspace uses the same organization (shared library) when this one is
+                linked to an org.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Label htmlFor="ws-utils-copy-name" className="text-xs text-muted-foreground">
+                    New workspace name
+                  </Label>
+                  <Input
+                    id="ws-utils-copy-name"
+                    value={copyNewName}
+                    onChange={(event) => setCopyNewName(event.target.value)}
+                    placeholder="e.g. Q4 inventory copy"
+                    disabled={copyBusy || mergeBusy || renameBusy}
+                    autoComplete="off"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={copyBusy || mergeBusy || renameBusy}
+                  onClick={() => void handleCopyToNewWorkspace()}
+                >
+                  {copyBusy ? 'Copying…' : 'Copy to new'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 space-y-2">
+              <Label className="text-sm">Merge from another workspace</Label>
+              <p className="text-xs text-muted-foreground">
+                Pulls data from the workspace you select and merges it <strong>into {workspaceName}</strong>. When both
+                sides have the same record ID, <strong>this workspace keeps its copy</strong>; only rows unique to the
+                source are added. Inventory, productions, templates, lookup lists, history, and reporting definitions
+                all follow that rule.
+              </p>
+              {workspaceOptions.length === 0 ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  You need at least one other workspace you belong to before merge is available.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Label htmlFor="ws-utils-merge-from" className="text-xs text-muted-foreground">
+                      Merge from
+                    </Label>
+                    <Select
+                      value={mergeSourceId || undefined}
+                      onValueChange={(value) => setMergeSourceId(value)}
+                      disabled={mergeBusy || copyBusy || renameBusy}
+                    >
+                      <SelectTrigger id="ws-utils-merge-from" className="w-full">
+                        <SelectValue placeholder="Choose workspace…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {workspaceOptions.map((option) => (
+                          <SelectItem key={option.workspaceId} value={option.workspaceId}>
+                            {option.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={mergeBusy || copyBusy || renameBusy || !mergeSourceId}
+                    onClick={() => setConfirmMergeOpen(true)}
+                  >
+                    Merge…
+                  </Button>
+                </div>
+              )}
+            </div>
+          </section>
 
           <Separator className="my-2" />
 
@@ -538,6 +813,28 @@ export function WorkspaceUtilitiesDialog({
             <AlertDialogCancel disabled={stripBusy}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => void handleStripAll()} disabled={stripBusy}>
               {stripBusy ? 'Working…' : 'Remove all demo data'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmMergeOpen} onOpenChange={setConfirmMergeOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Merge into this workspace?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Data from <span className="font-medium text-foreground">{mergeSourceLabel}</span> will be merged into{' '}
+                <span className="font-medium text-foreground">{workspaceName}</span>. Matching IDs keep this
+                workspace&apos;s rows; new IDs from the source are added. This updates cloud data for the active workspace
+                and reloads the app.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={mergeBusy || renameBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleMergeWorkspaces()} disabled={mergeBusy || renameBusy}>
+              {mergeBusy ? 'Merging…' : 'Merge'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -10,7 +10,7 @@ import {
 } from '@/lib/crewDirectoryMigration';
 
 export default function UiDiagnosticsPage() {
-  const { activeWorkspaceId, workspaces } = useWorkspace();
+  const { activeWorkspaceId, workspaces, selectWorkspace, refreshWorkspaces } = useWorkspace();
   const activeWorkspaceName = activeWorkspaceId
     ? workspaces.find((workspace) => workspace.workspaceId === activeWorkspaceId)?.name ?? null
     : null;
@@ -112,6 +112,11 @@ export default function UiDiagnosticsPage() {
           workspaceName={activeWorkspaceName ?? 'Active workspace'}
           onClose={() => setWorkspaceUtilitiesOpen(false)}
           onApplied={() => void 0}
+          workspaceOptions={workspaces.filter((w) => w.workspaceId !== activeWorkspaceId)}
+          existingWorkspaceNames={workspaces.map((w) => w.name)}
+          onNewWorkspaceCreated={(newWorkspaceId) => selectWorkspace(newWorkspaceId)}
+          allWorkspaces={workspaces.map((w) => ({ workspaceId: w.workspaceId, name: w.name }))}
+          onWorkspaceRenamed={() => void refreshWorkspaces()}
         />
       ) : null}
     </div>

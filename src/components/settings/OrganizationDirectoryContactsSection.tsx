@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MoreHorizontal, Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { ClipboardList, MoreHorizontal, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,9 +10,19 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DraggableDialogContent } from '@/components/ui/draggable-dialog';
 import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
@@ -65,6 +76,85 @@ const EMPTY_ENTRY: Omit<DirectoryContactEntry, 'id'> = {
   notes: '',
 };
 
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      result.push(cur);
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+function headerColumnIndex(headerCells: string[], label: string): number {
+  const normalized = label.trim().toLowerCase();
+  return headerCells.findIndex((cell) => cell.trim().toLowerCase() === normalized);
+}
+
+/** Parses CSV exported via "Export filtered CSV" (one row per line; cells with embedded newlines are not supported). */
+function directoryContactsFromImportedCsv(text: string): DirectoryContactEntry[] {
+  const stripped = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const rawRows = stripped.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (rawRows.length < 2) {
+    return [];
+  }
+  const headerCells = parseCsvLine(rawRows[0]).map((cell) => cell.trim());
+  const idxFullName = headerColumnIndex(headerCells, 'Full Name');
+  if (idxFullName < 0) {
+    throw new Error('CSV must include a "Full Name" column (use the app export format).');
+  }
+  const idxPhone = headerColumnIndex(headerCells, 'Phone');
+  const idxEmail = headerColumnIndex(headerCells, 'Email');
+  const idxExtension = headerColumnIndex(headerCells, 'Extension');
+  const idxDepartment = headerColumnIndex(headerCells, 'Department');
+  const idxJobTitle = headerColumnIndex(headerCells, 'Job Title');
+  const idxArea = headerColumnIndex(headerCells, 'Area');
+  const idxNotes = headerColumnIndex(headerCells, 'Notes');
+
+  const take = (cells: string[], idx: number): string => {
+    if (idx < 0 || idx >= cells.length) return '';
+    return cells[idx]?.trim() ?? '';
+  };
+
+  const nowIso = new Date().toISOString();
+  const result: DirectoryContactEntry[] = [];
+  for (let r = 1; r < rawRows.length; r++) {
+    const cells = parseCsvLine(rawRows[r]).map((cell) => cell.trim());
+    const fullName = parseContactDisplayName(take(cells, idxFullName));
+    if (!fullName.trim()) continue;
+    const phoneRaw = take(cells, idxPhone);
+    const normalizedPhone = phoneRaw ? normalizeUsPhoneForStorage(phoneRaw) : '';
+    const email = take(cells, idxEmail);
+    result.push({
+      id: crypto.randomUUID(),
+      fullName,
+      phone: normalizedPhone || undefined,
+      email: email || undefined,
+      extension: take(cells, idxExtension) || undefined,
+      department: take(cells, idxDepartment) || undefined,
+      jobTitle: take(cells, idxJobTitle) || undefined,
+      functionalArea: take(cells, idxArea) || undefined,
+      notes: take(cells, idxNotes) || undefined,
+      updatedAt: nowIso,
+    });
+  }
+  return result;
+}
+
 export function OrganizationDirectoryContactsSection({
   organizationId,
   authBackend,
@@ -83,6 +173,9 @@ export function OrganizationDirectoryContactsSection({
   const [sortMode, setSortMode] = useState<DirectorySortMode>('name_asc');
   const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
   const [reconcilingDuplicates, setReconcilingDuplicates] = useState(false);
+  const [clearDirectoryDialogOpen, setClearDirectoryDialogOpen] = useState(false);
+  const [clearingDirectory, setClearingDirectory] = useState(false);
+  const importCsvInputRef = useRef<HTMLInputElement>(null);
 
   const refreshMasterNameKeys = useCallback((): void => {
     const keys = getCrewContacts()
@@ -207,6 +300,18 @@ export function OrganizationDirectoryContactsSection({
     });
   }, [filteredContacts, sortMode]);
 
+  const listParentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: sortedFilteredContacts.length,
+    getScrollElement: () => listParentRef.current,
+    estimateSize: () => 112,
+    overscan: 12,
+  });
+
+  useEffect(() => {
+    listParentRef.current?.scrollTo({ top: 0 });
+  }, [search, sortMode, organizationId]);
+
   const directoryReconcilePreview = useMemo(
     () => reconcileDirectoryContactDuplicates(contacts),
     [contacts],
@@ -230,8 +335,11 @@ export function OrganizationDirectoryContactsSection({
   const isValidEmail = (value: string): boolean =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
-  const persistContacts = async (nextContacts: DirectoryContactEntry[]): Promise<void> => {
-    if (!organizationId) return;
+  const persistContacts = async (
+    nextContacts: DirectoryContactEntry[],
+    options?: { skipSuccessToast?: boolean },
+  ): Promise<boolean> => {
+    if (!organizationId) return false;
     setSaving(true);
     try {
       const currentRow = await pullOrganizationAppData(organizationId);
@@ -252,11 +360,15 @@ export function OrganizationDirectoryContactsSection({
         maintenance_on_air_template: currentRow?.maintenance_on_air_template ?? null,
       } as OrganizationSnapshotPayload);
       setContacts(nextContacts);
-      toast.success('Organization directory contacts updated.');
+      if (!options?.skipSuccessToast) {
+        toast.success('Organization directory contacts updated.');
+      }
+      return true;
     } catch (error) {
       toast.error('Could not save organization directory contacts.', {
         description: error instanceof Error ? error.message : String(error),
       });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -465,6 +577,43 @@ export function OrganizationDirectoryContactsSection({
     downloadCsv(`organization-directory-${timestamp}.csv`, exportRows);
   };
 
+  const handleImportCsvFile = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !canEdit) return;
+    try {
+      const text = await file.text();
+      const imported = directoryContactsFromImportedCsv(text);
+      if (imported.length === 0) {
+        toast.error('No contacts found in CSV.');
+        return;
+      }
+      const saved = await persistContacts(imported, { skipSuccessToast: true });
+      if (saved) {
+        toast.success(`Imported ${imported.length} directory contact${imported.length === 1 ? '' : 's'}.`);
+      }
+    } catch (error) {
+      toast.error('Could not import CSV.', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const handleConfirmClearDirectory = async (): Promise<void> => {
+    setClearingDirectory(true);
+    try {
+      const cleared = await persistContacts([], { skipSuccessToast: true });
+      if (cleared) {
+        toast.success('Organization directory cleared.', {
+          description: 'Import a CSV backup from Maintain list when you are ready to restore.',
+        });
+        setClearDirectoryDialogOpen(false);
+      }
+    } finally {
+      setClearingDirectory(false);
+    }
+  };
+
   const handleReconcileDirectoryDuplicates = (): void => {
     if (directoryDuplicateGroups.length === 0) {
       toast.message('No duplicate name groups found.');
@@ -517,31 +666,56 @@ export function OrganizationDirectoryContactsSection({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle>Organization Directory (non-production contacts)</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setReconcileDialogOpen(true)}
-              disabled={directoryDuplicateGroups.length === 0 || saving}
-            >
-              Reconcile duplicates
-              {directoryDuplicateCount > 0 ? ` (${directoryDuplicateCount})` : ''}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExportDirectoryCsv}
-              disabled={filteredContacts.length === 0}
-            >
-              Export filtered CSV
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleOpenAddDialog}
-              disabled={!canEdit || saving}
-            >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" size="sm" disabled={saving}>
+                  <ClipboardList className="mr-1 h-4 w-4" />
+                  Maintain list
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[13rem]">
+                <DropdownMenuItem
+                  onSelect={() => setTimeout(() => setReconcileDialogOpen(true), 0)}
+                  disabled={directoryDuplicateGroups.length === 0 || saving}
+                >
+                  Reconcile duplicates
+                  {directoryDuplicateCount > 0 ? ` (${directoryDuplicateCount})` : ''}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => setTimeout(() => handleExportDirectoryCsv(), 0)}
+                  disabled={filteredContacts.length === 0}
+                >
+                  Export filtered CSV
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setTimeout(() => {
+                      importCsvInputRef.current?.click();
+                    }, 0)
+                  }
+                  disabled={!canEdit || saving}
+                >
+                  Import CSV…
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => setTimeout(() => setClearDirectoryDialogOpen(true), 0)}
+                  disabled={!canEdit || saving || contacts.length === 0}
+                >
+                  Clear directory…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <input
+              ref={importCsvInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              onChange={(event) => void handleImportCsvFile(event)}
+            />
+            <Button type="button" size="sm" onClick={handleOpenAddDialog} disabled={!canEdit || saving}>
               <Plus className="mr-1 h-4 w-4" />
               Add Directory Contact
             </Button>
@@ -574,108 +748,129 @@ export function OrganizationDirectoryContactsSection({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="bg-blue-600/20 text-blue-200 border border-blue-500/40">
+          <Badge className="border border-blue-300 bg-blue-100 font-medium text-blue-950 shadow-none dark:border-blue-500/40 dark:bg-blue-600/20 dark:text-blue-200">
             Total: {directoryTally.total}
           </Badge>
-          <Badge className="bg-emerald-600/20 text-emerald-200 border border-emerald-500/40">
+          <Badge className="border border-emerald-300 bg-emerald-100 font-medium text-emerald-950 shadow-none dark:border-emerald-500/40 dark:bg-emerald-600/20 dark:text-emerald-200">
             Filtered: {directoryTally.filtered}
           </Badge>
-          <Badge className="bg-cyan-600/20 text-cyan-200 border border-cyan-500/40">
+          <Badge className="border border-cyan-300 bg-cyan-100 font-medium text-cyan-950 shadow-none dark:border-cyan-500/40 dark:bg-cyan-600/20 dark:text-cyan-200">
             Phone: {directoryTally.withPhone}
           </Badge>
-          <Badge className="bg-violet-600/20 text-violet-200 border border-violet-500/40">
+          <Badge className="border border-violet-300 bg-violet-100 font-medium text-violet-950 shadow-none dark:border-violet-500/40 dark:bg-violet-600/20 dark:text-violet-200">
             Email: {directoryTally.withEmail}
           </Badge>
-          <Badge className="bg-amber-600/20 text-amber-200 border border-amber-500/40">
+          <Badge className="border border-amber-300 bg-amber-100 font-medium text-amber-950 shadow-none dark:border-amber-500/40 dark:bg-amber-600/20 dark:text-amber-200">
             Ext: {directoryTally.withExtension}
           </Badge>
         </div>
-        <div className="max-h-80 space-y-2 overflow-y-auto rounded-md border p-2">
-          {sortedFilteredContacts.map((entry) => (
-            <div
-              key={entry.id}
-              className="rounded-md border px-3 py-2 text-sm"
-              onDoubleClick={() => handleEdit(entry)}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-base font-semibold text-foreground">{entry.fullName}</p>
-                  {entry.jobTitle ? (
-                    <p className="mt-0.5 text-xs font-medium text-primary">{entry.jobTitle}</p>
-                  ) : null}
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {isInMasterCrew(entry.fullName) ? (
-                      <Badge className="text-[11px] bg-indigo-600/20 text-indigo-200 border border-indigo-500/40">
-                        In Master Crew
-                      </Badge>
-                    ) : null}
-                    {entry.phone ? (
-                      <Badge className="font-mono text-[11px] bg-cyan-600/20 text-cyan-200 border border-cyan-500/40">
-                        {entry.phone}
-                      </Badge>
-                    ) : null}
-                    {entry.extension ? (
-                      <Badge className="font-mono text-[11px] bg-amber-600/20 text-amber-200 border border-amber-500/40">
-                        x{entry.extension}
-                      </Badge>
-                    ) : null}
-                    {entry.email ? (
-                      <Badge className="text-[11px] bg-violet-600/20 text-violet-200 border border-violet-500/40">
-                        {entry.email}
-                      </Badge>
-                    ) : null}
-                    {entry.functionalArea ? (
-                      <Badge className="text-[11px] bg-emerald-600/20 text-emerald-200 border border-emerald-500/40">
-                        {entry.functionalArea}
-                      </Badge>
-                    ) : null}
-                    {entry.department ? (
-                      <Badge className="text-[11px] bg-blue-600/20 text-blue-200 border border-blue-500/40">
-                        Dept: {entry.department}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  {entry.notes ? (
-                    <p className="mt-1 text-xs text-muted-foreground">{entry.notes}</p>
-                  ) : null}
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onSelect={() => handleCopyEntryToMasterCrew(entry)}
-                      disabled={saving || isInMasterCrew(entry.fullName)}
-                    >
-                      {isInMasterCrew(entry.fullName)
-                        ? 'Already in Master Crew'
-                        : 'Copy to Master Crew'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => handleEdit(entry)}
-                      disabled={!canEdit || saving}
-                    >
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => setDeleteTarget(entry)}
-                      disabled={!canEdit || saving}
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          ))}
+        <div
+          ref={listParentRef}
+          className="max-h-[min(70vh,860px)] overflow-auto rounded-md border p-2"
+          role="list"
+          aria-label="Organization directory contacts"
+        >
           {sortedFilteredContacts.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="px-1 py-4 text-xs text-muted-foreground">
               {loading ? 'Loading contacts…' : 'No directory contacts found.'}
             </p>
-          ) : null}
+          ) : (
+            <div
+              className="relative w-full"
+              style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const entry = sortedFilteredContacts[virtualRow.index];
+                return (
+                  <div
+                    key={entry.id}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    className="absolute left-0 top-0 w-full px-0 pb-2"
+                    style={{
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <div
+                      className="rounded-md border px-3 py-2 text-sm"
+                      onDoubleClick={() => handleEdit(entry)}
+                      role="listitem"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-base font-semibold text-foreground">{entry.fullName}</p>
+                          {entry.jobTitle ? (
+                            <p className="mt-0.5 text-xs font-medium text-primary">{entry.jobTitle}</p>
+                          ) : null}
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {isInMasterCrew(entry.fullName) ? (
+                              <Badge className="text-[11px] border border-indigo-300 bg-indigo-100 font-medium text-indigo-950 shadow-none dark:border-indigo-500/40 dark:bg-indigo-600/20 dark:text-indigo-200">
+                                In Master Crew
+                              </Badge>
+                            ) : null}
+                            {entry.phone ? (
+                              <Badge className="font-mono text-[11px] border border-cyan-300 bg-cyan-100 font-medium text-cyan-950 shadow-none dark:border-cyan-500/40 dark:bg-cyan-600/20 dark:text-cyan-200">
+                                {entry.phone}
+                              </Badge>
+                            ) : null}
+                            {entry.extension ? (
+                              <Badge className="font-mono text-[11px] border border-amber-300 bg-amber-100 font-medium text-amber-950 shadow-none dark:border-amber-500/40 dark:bg-amber-600/20 dark:text-amber-200">
+                                x{entry.extension}
+                              </Badge>
+                            ) : null}
+                            {entry.email ? (
+                              <Badge className="text-[11px] border border-violet-300 bg-violet-100 font-medium text-violet-950 shadow-none dark:border-violet-500/40 dark:bg-violet-600/20 dark:text-violet-200">
+                                {entry.email}
+                              </Badge>
+                            ) : null}
+                            {entry.functionalArea ? (
+                              <Badge className="text-[11px] border border-emerald-300 bg-emerald-100 font-medium text-emerald-950 shadow-none dark:border-emerald-500/40 dark:bg-emerald-600/20 dark:text-emerald-200">
+                                {entry.functionalArea}
+                              </Badge>
+                            ) : null}
+                            {entry.department ? (
+                              <Badge className="text-[11px] border border-blue-300 bg-blue-100 font-medium text-blue-950 shadow-none dark:border-blue-500/40 dark:bg-blue-600/20 dark:text-blue-200">
+                                Dept: {entry.department}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          {entry.notes ? (
+                            <p className="mt-1 text-xs text-muted-foreground">{entry.notes}</p>
+                          ) : null}
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onSelect={() => handleCopyEntryToMasterCrew(entry)}
+                              disabled={saving || isInMasterCrew(entry.fullName)}
+                            >
+                              {isInMasterCrew(entry.fullName)
+                                ? 'Already in Master Crew'
+                                : 'Copy to Master Crew'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleEdit(entry)} disabled={!canEdit || saving}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => setDeleteTarget(entry)}
+                              disabled={!canEdit || saving}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
       </CardContent>
@@ -866,6 +1061,30 @@ export function OrganizationDirectoryContactsSection({
           </DialogFooter>
         </DraggableDialogContent>
       </Dialog>
+
+      <AlertDialog open={clearDirectoryDialogOpen} onOpenChange={setClearDirectoryDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear organization directory?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes every directory contact for this organization from the cloud (not Master Crew). Export a CSV
+              backup first if you might need to restore. After clearing, use Maintain list → Import CSV… to reload from a
+              file.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearingDirectory || saving}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={clearingDirectory || saving || !canEdit}
+              onClick={() => void handleConfirmClearDirectory()}
+            >
+              {clearingDirectory ? 'Clearing…' : 'Clear directory'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

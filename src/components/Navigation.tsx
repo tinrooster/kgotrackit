@@ -156,15 +156,15 @@ export function Navigation() {
             </Link>
             {showDataContextChip ? (
               <span
-                className="truncate rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                className="truncate rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/90 dark:text-muted-foreground"
                 title={
                   activeWorkspaceId
-                    ? `Organization: ${activeOrganizationName ?? 'Organization'} · Team workspace: ${activeWorkspaceName ?? activeWorkspaceId}${activeWorkspaceIsOwned ? ' (you own this workspace)' : ''}`
+                    ? `Organization: ${activeOrganizationName ?? 'Organization'} · Team workspace: ${activeWorkspaceName ?? activeWorkspaceId}${activeWorkspaceIsOwned ? ' (you are the workspace owner)' : ''}`
                     : 'Personal inventory (your user_app_data row)'
                 }
               >
                 {activeWorkspaceId
-                  ? `${activeOrganizationName ?? 'Organization'} · ${activeWorkspaceName ?? 'Workspace'}${activeWorkspaceIsOwned ? ' · Yours' : ''}`
+                  ? `${activeOrganizationName ?? 'Organization'} · ${activeWorkspaceName ?? 'Workspace'}${activeWorkspaceIsOwned ? ' · Owner' : ''}`
                   : 'Personal'}
               </span>
             ) : null}

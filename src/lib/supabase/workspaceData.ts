@@ -421,6 +421,15 @@ export async function pushWorkspaceSnapshot(workspaceId: string, snapshot: Works
   }
 }
 
+export async function updateWorkspaceDisplayName(workspaceId: string, name: string): Promise<void> {
+  const client = getSupabase();
+  if (!client) throw new Error('Supabase client unavailable');
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Workspace name is required.');
+  const { error } = await client.from('workspaces').update({ name: trimmed }).eq('id', workspaceId);
+  if (error) throw error;
+}
+
 export interface CreateWorkspaceWithSnapshotOptions {
   /**
    * Link the workspace to an existing organization the caller can access.

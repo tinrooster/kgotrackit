@@ -259,7 +259,6 @@ export function WorkspaceTeamTab({ showWorkspaceAdministration = true }: Workspa
 
         {activeWorkspaceId && showWorkspaceAdministration ? (
           <OrganizationWorkspaceScopeHint
-            workspaceName={activeWorkspaceRow?.name ?? null}
             linkedOrganizationName={activeWorkspaceRow?.organizationName ?? null}
           />
         ) : null}
@@ -458,7 +457,6 @@ export function WorkspaceTeamTab({ showWorkspaceAdministration = true }: Workspa
 
             {manageWorkspaceId ? (
               <OrganizationWorkspaceScopeHint
-                workspaceName={managedWorkspaceName || null}
                 linkedOrganizationName={managedWorkspaceRow?.organizationName ?? null}
               />
             ) : null}

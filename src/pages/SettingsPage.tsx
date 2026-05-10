@@ -393,8 +393,15 @@ function readLibrariesPanelFromSearch(): LibrariesPanel {
 export default function SettingsPage() {
   const location = useLocation();
   const { currentUser, authBackend } = useAuth();
-  const { activeWorkspaceId, activeWorkspaceRole, workspaces, loading: workspacesLoading, lastWorkspaceError } =
-    useWorkspace();
+  const {
+    activeWorkspaceId,
+    activeWorkspaceRole,
+    workspaces,
+    loading: workspacesLoading,
+    lastWorkspaceError,
+    selectWorkspace,
+    refreshWorkspaces,
+  } = useWorkspace();
   const {
     organizations,
     activeOrganizationId,
@@ -3258,6 +3265,11 @@ export default function SettingsPage() {
           workspaceName={activeWorkspaceName ?? 'Active workspace'}
           onClose={() => setWorkspaceUtilitiesOpen(false)}
           onApplied={() => void 0}
+          workspaceOptions={workspaces.filter((w) => w.workspaceId !== activeWorkspaceId)}
+          existingWorkspaceNames={workspaces.map((w) => w.name)}
+          onNewWorkspaceCreated={(newWorkspaceId) => selectWorkspace(newWorkspaceId)}
+          allWorkspaces={workspaces.map((w) => ({ workspaceId: w.workspaceId, name: w.name }))}
+          onWorkspaceRenamed={() => void refreshWorkspaces()}
         />
       ) : null}
 

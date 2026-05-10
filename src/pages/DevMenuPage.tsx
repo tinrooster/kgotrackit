@@ -1,6 +1,20 @@
+import * as React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 import { FlaskConical, Gauge, Layers, Wrench } from 'lucide-react';
+import { replaceProductionsWithInternalDemoSeed } from '@/lib/demoSeed';
 
 const devItems = [
   {
@@ -30,6 +44,26 @@ const devItems = [
 ];
 
 export default function DevMenuPage() {
+  const [confirmReplaceInternalOpen, setConfirmReplaceInternalOpen] = React.useState(false);
+  const [replaceBusy, setReplaceBusy] = React.useState(false);
+
+  const handleReplaceInternalProductions = (): void => {
+    setReplaceBusy(true);
+    try {
+      const n = replaceProductionsWithInternalDemoSeed();
+      toast.success('Productions replaced with internal demo seed', {
+        description: `${n} production${n === 1 ? '' : 's'} loaded from seedData.internal.ts. Sync to the workspace if you need this on other devices.`,
+      });
+    } catch (error) {
+      toast.error('Could not replace productions', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setReplaceBusy(false);
+      setConfirmReplaceInternalOpen(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <h1 className="text-2xl font-bold">Developer Menu</h1>
@@ -51,7 +85,53 @@ export default function DevMenuPage() {
           </Link>
         ))}
       </div>
+
+      <Card className="border-amber-500/25 bg-amber-500/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Internal demo productions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Replace <strong>every</strong> production in this browser with the full bundle from{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">seedData.internal.ts</code>. Does not depend on{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">VITE_DEMO_SEED_PROFILE</code>. Other demo data
+            (inventory, contacts) is unchanged — push to the workspace afterward if needed.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setConfirmReplaceInternalOpen(true)}
+              disabled={replaceBusy}
+            >
+              {replaceBusy ? 'Replacing…' : 'Replace all productions with internal seed'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmReplaceInternalOpen} onOpenChange={setConfirmReplaceInternalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace all productions with internal demo seed?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes every production currently stored locally (including non-demo shows) and replaces them with
+              only the productions defined in the internal seed bundle. Inventory and other data are not modified. This
+              cannot be undone from here — use a backup or cloud history if you need to recover.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={replaceBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleReplaceInternalProductions}
+              disabled={replaceBusy}
+            >
+              {replaceBusy ? 'Replacing…' : 'Replace productions'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
-

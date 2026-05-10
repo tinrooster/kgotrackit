@@ -35,6 +35,7 @@ import {
 } from './fingerprint';
 import { saveDemoSeedManifest, type DemoSeedManifest } from './manifest';
 import { DEMO_SEED_SOURCE } from './seedData';
+import { DEMO_SEED_SOURCE_INTERNAL } from './seedData.internal';
 
 /** Toggleable populate scopes. All default to true in `populateDemoData`. */
 export interface PopulateDemoDataOptions {
@@ -167,6 +168,20 @@ function applyProductions(): number {
   });
   const existing = getProductions();
   saveProductions(mergeById(existing, stamped));
+  return stamped.length;
+}
+
+/**
+ * Replace **all** persisted productions with the INTERNAL demo seed bundle only.
+ * Ignores `VITE_DEMO_SEED_PROFILE` — always uses `seedData.internal.ts`.
+ * Destructive: any production not defined in that bundle is removed from local storage.
+ */
+export function replaceProductionsWithInternalDemoSeed(): number {
+  const stamped: Production[] = DEMO_SEED_SOURCE_INTERNAL.productions.map((source) => {
+    const cloned = cloneJson(source);
+    return stampDemoEntity(cloned as unknown as Record<string, unknown>, 'production') as unknown as Production;
+  });
+  saveProductions(stamped);
   return stamped.length;
 }
 

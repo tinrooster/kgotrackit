@@ -28,6 +28,7 @@ export {
 
 export {
   populateDemoData,
+  replaceProductionsWithInternalDemoSeed,
   type PopulateDemoDataOptions,
   type PopulateDemoDataResult,
 } from './populate';
