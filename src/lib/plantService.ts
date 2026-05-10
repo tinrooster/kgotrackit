@@ -15,6 +15,7 @@ import type {
   PlantCampaignItem,
   PlantCampaignItemReviewStatus,
   PlantCampaignPreview,
+  EsSchematicJson,
 } from '@/types/plant';
 
 export const PLANT_CABLES_UPDATED_EVENT = 'trackit:plant-cables-updated';
@@ -357,6 +358,19 @@ export async function updateDrawing(id: string, updates: Partial<Pick<PlantDrawi
   return !error;
 }
 
+export async function saveDrawingSchematicJson(
+  drawingId: string,
+  json: EsSchematicJson | null,
+): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+  const { error } = await client
+    .from('plant_drawings')
+    .update({ schematic_json: json, updated_at: new Date().toISOString() })
+    .eq('id', drawingId);
+  return !error;
+}
+
 // ---------------------------------------------------------------------------
 // Location queries
 // ---------------------------------------------------------------------------
@@ -522,6 +536,7 @@ function rowToDrawing(r: any): PlantDrawing {
     visioFilePath: r.visio_file_path ?? undefined,
     easyschematicId: r.easyschematic_id ?? undefined,
     easyschematicShareToken: r.easyschematic_share_token ?? undefined,
+    schematicJson: r.schematic_json ?? undefined,
     notes: r.notes ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,

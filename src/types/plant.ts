@@ -78,6 +78,35 @@ export type PlantDrawingStatus =
   | 'superseded'
   | 'decommissioned';
 
+// EasySchematic JSON structure (subset we care about)
+export interface EsNode {
+  id: string;
+  data: {
+    label?: string;
+    deviceType?: string;
+    ports?: Array<{ id: string; label?: string; direction?: string; signalType?: string }>;
+  };
+}
+
+export interface EsEdge {
+  id: string;
+  source: string;       // node id
+  target: string;       // node id
+  sourceHandle: string; // "{port_id}-out"
+  targetHandle: string; // "{port_id}-in"
+  data?: {
+    label?: string;
+    signalType?: string;
+    cableIdLabelMode?: string;
+  };
+}
+
+export interface EsSchematicJson {
+  nodes: EsNode[];
+  edges: EsEdge[];
+  [key: string]: unknown;
+}
+
 export interface PlantDrawing {
   id: string;
   organizationId: string;
@@ -89,6 +118,7 @@ export interface PlantDrawing {
   visioFilePath?: string;         // UNC/local path to .vsd / .vsdx
   easyschematicId?: string;       // EasySchematic /schematics/:id
   easyschematicShareToken?: string;
+  schematicJson?: EsSchematicJson; // stored EasySchematic JSON for connection assignment
   notes?: string;
   createdAt: string;
   updatedAt: string;
