@@ -9,6 +9,10 @@ import { ChecklistEditor } from '@/components/productions/ChecklistEditor';
 import { VehiclePacklistEditor } from '@/components/productions/VehiclePacklistEditor';
 import { CrewEditor } from '@/components/productions/CrewEditor';
 import { CrewScheduleCalendar } from '@/components/productions/CrewScheduleCalendar';
+import {
+  PlannerOverviewSiteMapCard,
+  shouldShowPrideMarketSiteMap,
+} from '@/components/productions/PlannerOverviewSiteMap';
 import { ProductionFusedStripProgress } from '@/components/dashboard/ProductionDashboardProgress';
 import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
 import {
@@ -475,6 +479,9 @@ export default function PlannerWorkspacePage() {
                   </div>
                 </div>
               </div>
+              {shouldShowPrideMarketSiteMap(selectedProduction.name, selectedProduction.location) ? (
+                <PlannerOverviewSiteMapCard />
+              ) : null}
               {(() => {
                 const snap = getProductionProgressSnapshot(selectedProduction);
                 const blocks = selectedProduction.crewSchedule?.length ?? 0;
