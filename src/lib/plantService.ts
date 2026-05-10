@@ -9,6 +9,12 @@ import type {
   PlantLocation,
   PlantSystem,
   PlantCableFilters,
+  PlantCleanupCampaign,
+  PlantCampaignStatus,
+  PlantCampaignRule,
+  PlantCampaignItem,
+  PlantCampaignItemReviewStatus,
+  PlantCampaignPreview,
 } from '@/types/plant';
 
 export const PLANT_CABLES_UPDATED_EVENT = 'trackit:plant-cables-updated';
@@ -359,6 +365,455 @@ function rowToSystem(r: any): PlantSystem {
 
 function dispatchUpdate() {
   window.dispatchEvent(new CustomEvent(PLANT_CABLES_UPDATED_EVENT));
+}
+
+// ---------------------------------------------------------------------------
+// Campaign queries
+// ---------------------------------------------------------------------------
+
+export const CAMPAIGN_STATUS_LABELS: Record<PlantCampaignStatus, string> = {
+  draft:     'Draft',
+  active:    'Active',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+export const CAMPAIGN_STATUS_COLOURS: Record<PlantCampaignStatus, string> = {
+  draft:     'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  active:    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  cancelled: 'bg-muted text-muted-foreground',
+};
+
+export const REVIEW_STATUS_LABELS: Record<PlantCampaignItemReviewStatus, string> = {
+  pending:        'Pending',
+  confirmed_dead: 'Confirmed dead',
+  repurposed:     'Repurposed',
+  needs_check:    'Needs check',
+  cleared:        'Cleared (active)',
+};
+
+export async function listCampaigns(): Promise<PlantCleanupCampaign[]> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return [];
+  const { data, error } = await client
+    .from('plant_cleanup_campaigns')
+    .select('*')
+    .eq('organization_id', orgId)
+    .order('created_at', { ascending: false });
+  if (error) return [];
+  return (data ?? []).map(rowToCampaign);
+}
+
+export async function getCampaign(id: string): Promise<PlantCleanupCampaign | null> {
+  const client = getSupabase();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('plant_cleanup_campaigns')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !data) return null;
+  return rowToCampaign(data);
+}
+
+export async function createCampaign(input: {
+  name: string;
+  description?: string;
+  rules: PlantCampaignRule[];
+}): Promise<PlantCleanupCampaign | null> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return null;
+  const { data, error } = await client
+    .from('plant_cleanup_campaigns')
+    .insert({
+      organization_id: orgId,
+      name: input.name,
+      description: input.description ?? null,
+      rules: input.rules,
+      status: 'draft',
+    })
+    .select('*')
+    .single();
+  if (error || !data) {
+    console.error('[plantService] createCampaign error', error);
+    return null;
+  }
+  return rowToCampaign(data);
+}
+
+export async function updateCampaign(
+  id: string,
+  updates: Partial<Pick<PlantCleanupCampaign, 'name' | 'description' | 'rules' | 'status' | 'notes'>>
+): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (updates.name !== undefined)        payload.name = updates.name;
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.rules !== undefined)       payload.rules = updates.rules;
+  if (updates.status !== undefined)      payload.status = updates.status;
+  if (updates.notes !== undefined)       payload.notes = updates.notes;
+  const { error } = await client.from('plant_cleanup_campaigns').update(payload).eq('id', id);
+  return !error;
+}
+
+export async function deleteCampaign(id: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+  // Only allow deleting drafts — enforce in UI, double-check here
+  const { error } = await client
+    .from('plant_cleanup_campaigns')
+    .delete()
+    .eq('id', id)
+    .eq('status', 'draft');
+  return !error;
+}
+
+// ---------------------------------------------------------------------------
+// Campaign rule evaluation
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyRuleFilter(query: any, rule: PlantCampaignRule, drawingIdMap: Record<string, string>): any {
+  switch (rule.type) {
+    case 'system_name_match': {
+      const orParts: string[] = [];
+      const fields = rule.fields?.length ? rule.fields : (['origin_device', 'dest_device'] as const);
+      for (const term of rule.terms) {
+        for (const field of fields) {
+          orParts.push(`${field}.ilike.%${term}%`);
+        }
+      }
+      if (orParts.length) query = query.or(orParts.join(','));
+      break;
+    }
+    case 'location_code_match': {
+      const codesStr = rule.codes.join(',');
+      query = query.or(`origin_location_code.in.(${codesStr}),dest_location_code.in.(${codesStr})`);
+      break;
+    }
+    case 'drawing_match': {
+      const ids = rule.dwgNumbers.map((n) => drawingIdMap[n]).filter(Boolean);
+      if (ids.length) query = query.in('drawing_id', ids);
+      break;
+    }
+    case 'cable_family_match': {
+      query = query.in('cable_family', rule.families);
+      break;
+    }
+    case 'status_match': {
+      query = query.in('status', rule.statuses);
+      break;
+    }
+    case 'verified_before': {
+      query = query.or(`verified_at.is.null,verified_at.lt.${rule.date}`);
+      break;
+    }
+  }
+  return query;
+}
+
+async function fetchRuleMatchIds(
+  rule: PlantCampaignRule,
+  orgId: string,
+  drawingIdMap: Record<string, string>
+): Promise<string[]> {
+  const client = getSupabase();
+  if (!client) return [];
+
+  const ids: string[] = [];
+  const pageSize = 1000;
+  let offset = 0;
+
+  while (true) {
+    let q = client
+      .from('plant_cables')
+      .select('id')
+      .eq('organization_id', orgId)
+      .neq('status', 'archived')
+      .neq('status', 'decommissioned')
+      .range(offset, offset + pageSize - 1);
+
+    q = applyRuleFilter(q, rule, drawingIdMap);
+
+    const { data, error } = await q;
+    if (error || !data) break;
+    for (const row of data) ids.push(row.id);
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+  return ids;
+}
+
+export async function previewCampaignRules(
+  rules: PlantCampaignRule[]
+): Promise<PlantCampaignPreview> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId || rules.length === 0) {
+    return { totalMatched: 0, highConfidence: 0, mediumConfidence: 0, lowConfidence: 0, sampleCables: [], ruleBreakdown: [] };
+  }
+
+  const drawingIdMap = await getDrawingIdMap(orgId);
+  const ruleBreakdown: PlantCampaignPreview['ruleBreakdown'] = [];
+
+  // Per-rule counts + per-rule ID sets for merged total
+  const ruleIdSets: Set<string>[] = [];
+  for (let i = 0; i < rules.length; i++) {
+    const rule = rules[i];
+    let q = client
+      .from('plant_cables')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .neq('status', 'archived')
+      .neq('status', 'decommissioned');
+    q = applyRuleFilter(q, rule, drawingIdMap);
+    const { count } = await q;
+    ruleBreakdown.push({ ruleIndex: i, label: rule.label, matchCount: count ?? 0 });
+    ruleIdSets.push(new Set());
+  }
+
+  // Merged unique IDs for total + confidence
+  const idToRules = new Map<string, number[]>();
+  for (let i = 0; i < rules.length; i++) {
+    const ids = await fetchRuleMatchIds(rules[i], orgId, drawingIdMap);
+    for (const id of ids) {
+      const existing = idToRules.get(id) ?? [];
+      existing.push(i);
+      idToRules.set(id, existing);
+    }
+    ruleIdSets[i] = new Set(ids);
+  }
+
+  let high = 0, medium = 0, low = 0;
+  for (const matchedRules of idToRules.values()) {
+    if (matchedRules.length >= 2) high++;
+    else medium++;
+  }
+
+  // Fetch sample cables (first 20 matched IDs)
+  const sampleIds = [...idToRules.keys()].slice(0, 20);
+  let sampleCables: PlantCableSummary[] = [];
+  if (sampleIds.length) {
+    const { data } = await client
+      .from('plant_cables')
+      .select('id,cable_number,drawing_id,origin_location_code,origin_device,origin_port,dest_location_code,dest_device,dest_port,cable_family,jacket_color,signal_type,length_ft,status,verified_at,notes')
+      .in('id', sampleIds);
+    sampleCables = (data ?? []).map(rowToSummary);
+  }
+
+  return {
+    totalMatched: idToRules.size,
+    highConfidence: high,
+    mediumConfidence: medium,
+    lowConfidence: low,
+    sampleCables,
+    ruleBreakdown,
+  };
+}
+
+async function getDrawingIdMap(orgId: string): Promise<Record<string, string>> {
+  const client = getSupabase();
+  if (!client) return {};
+  const { data } = await client
+    .from('plant_drawings')
+    .select('id,dwg_number')
+    .eq('organization_id', orgId);
+  const map: Record<string, string> = {};
+  for (const row of (data ?? [])) {
+    if (row.dwg_number) map[row.dwg_number] = row.id;
+  }
+  return map;
+}
+
+export async function activateCampaign(campaignId: string): Promise<{ activated: number } | null> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return null;
+
+  const campaign = await getCampaign(campaignId);
+  if (!campaign || campaign.status !== 'draft') return null;
+
+  const rules = campaign.rules;
+  const drawingIdMap = await getDrawingIdMap(orgId);
+
+  // Collect IDs per rule → merge with confidence
+  const idToRules = new Map<string, number[]>();
+  for (let i = 0; i < rules.length; i++) {
+    const ids = await fetchRuleMatchIds(rules[i], orgId, drawingIdMap);
+    for (const id of ids) {
+      const existing = idToRules.get(id) ?? [];
+      existing.push(i);
+      idToRules.set(id, existing);
+    }
+  }
+
+  if (idToRules.size === 0) {
+    await updateCampaign(campaignId, { status: 'active' });
+    return { activated: 0 };
+  }
+
+  // Build campaign_items rows
+  const now = new Date().toISOString();
+  const itemRows = [...idToRules.entries()].map(([cableId, matchedRuleIdxs]) => ({
+    campaign_id: campaignId,
+    cable_id: cableId,
+    confidence: matchedRuleIdxs.length >= 2 ? 'high' : 'medium',
+    matched_rules: matchedRuleIdxs,
+    review_status: 'pending',
+    created_at: now,
+    updated_at: now,
+  }));
+
+  // Batch-insert items in chunks of 500
+  const BATCH = 500;
+  for (let i = 0; i < itemRows.length; i += BATCH) {
+    const batch = itemRows.slice(i, i + BATCH);
+    const { error } = await client
+      .from('plant_campaign_items')
+      .insert(batch);
+    if (error) {
+      console.error('[plantService] activateCampaign insert error', error);
+      return null;
+    }
+  }
+
+  // Batch-update cable statuses
+  const allIds = [...idToRules.keys()];
+  for (let i = 0; i < allIds.length; i += BATCH) {
+    const batch = allIds.slice(i, i + BATCH);
+    await client
+      .from('plant_cables')
+      .update({ status: 'decommissioning', updated_at: now })
+      .in('id', batch);
+  }
+
+  // Update campaign: status=active, matched counts
+  const high = itemRows.filter((r) => r.confidence === 'high').length;
+  const medium = itemRows.filter((r) => r.confidence === 'medium').length;
+  await client
+    .from('plant_cleanup_campaigns')
+    .update({
+      status: 'active',
+      matched_count: idToRules.size,
+      high_count: high,
+      medium_count: medium,
+      low_count: 0,
+      updated_at: now,
+    })
+    .eq('id', campaignId);
+
+  dispatchUpdate();
+  return { activated: idToRules.size };
+}
+
+export async function completeCampaign(id: string, notes?: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload: Record<string, any> = {
+    status: 'completed',
+    completed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (notes !== undefined) payload.notes = notes;
+  const { error } = await client.from('plant_cleanup_campaigns').update(payload).eq('id', id);
+  return !error;
+}
+
+export interface CampaignItemListResult {
+  items: PlantCampaignItem[];
+  total: number;
+}
+
+export async function getCampaignItems(
+  campaignId: string,
+  page = 0,
+  pageSize = 50
+): Promise<CampaignItemListResult> {
+  const client = getSupabase();
+  if (!client) return { items: [], total: 0 };
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+  const { data, error, count } = await client
+    .from('plant_campaign_items')
+    .select(
+      'id,campaign_id,cable_id,confidence,matched_rules,review_status,reviewed_by,reviewed_at,repurpose_notes,created_at,updated_at,' +
+      'plant_cables(id,cable_number,drawing_id,origin_location_code,origin_device,origin_port,dest_location_code,dest_device,dest_port,cable_family,jacket_color,signal_type,length_ft,status,verified_at,notes)',
+      { count: 'exact' }
+    )
+    .eq('campaign_id', campaignId)
+    .order('confidence', { ascending: false })
+    .order('created_at', { ascending: true })
+    .range(from, to);
+
+  if (error) {
+    console.error('[plantService] getCampaignItems error', error);
+    return { items: [], total: 0 };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = (data as any) ?? [];
+  const items: PlantCampaignItem[] = rows.map((r) => ({
+    id: r.id,
+    campaignId: r.campaign_id,
+    cableId: r.cable_id,
+    confidence: r.confidence,
+    matchedRules: Array.isArray(r.matched_rules) ? r.matched_rules : [],
+    reviewStatus: r.review_status,
+    reviewedBy: r.reviewed_by ?? undefined,
+    reviewedAt: r.reviewed_at ?? undefined,
+    repurposeNotes: r.repurpose_notes ?? undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    cable: r.plant_cables ? rowToSummary(r.plant_cables as any) : undefined,
+  }));
+
+  return { items, total: count ?? 0 };
+}
+
+export async function updateCampaignItemReview(
+  itemId: string,
+  reviewStatus: PlantCampaignItemReviewStatus,
+  notes?: string
+): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload: Record<string, any> = {
+    review_status: reviewStatus,
+    reviewed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (notes !== undefined) payload.repurpose_notes = notes;
+  const { error } = await client.from('plant_campaign_items').update(payload).eq('id', itemId);
+  return !error;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToCampaign(r: any): PlantCleanupCampaign {
+  return {
+    id: r.id,
+    organizationId: r.organization_id,
+    name: r.name,
+    description: r.description ?? undefined,
+    status: r.status,
+    rules: Array.isArray(r.rules) ? r.rules : [],
+    matchedCount: r.matched_count ?? undefined,
+    highCount: r.high_count ?? undefined,
+    mediumCount: r.medium_count ?? undefined,
+    lowCount: r.low_count ?? undefined,
+    createdBy: r.created_by ?? undefined,
+    completedAt: r.completed_at ?? undefined,
+    notes: r.notes ?? undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
 }
 
 // ---------------------------------------------------------------------------

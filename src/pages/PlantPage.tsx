@@ -3,6 +3,7 @@ import { Cable } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CableRegisterTab } from '@/components/plant/CableRegisterTab';
 import { DrawingsTab } from '@/components/plant/DrawingsTab';
+import { CampaignsTab } from '@/components/plant/CampaignsTab';
 
 type PlantTab = 'register' | 'drawings' | 'campaigns';
 
@@ -56,15 +57,7 @@ export default function PlantPage() {
       {/* Tab content */}
       {activeTab === 'register' && <CableRegisterTab />}
       {activeTab === 'drawings' && <DrawingsTab />}
-      {activeTab === 'campaigns' && (
-        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
-          <p className="text-muted-foreground text-sm">Cleanup campaigns — coming soon.</p>
-          <p className="text-xs text-muted-foreground max-w-md">
-            Campaigns let you bulk-decommission cables by system (e.g. all Grass Valley),
-            location, or drawing. Review a preview set before committing.
-          </p>
-        </div>
-      )}
+      {activeTab === 'campaigns' && <CampaignsTab />}
     </div>
   );
 }
