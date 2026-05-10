@@ -67,6 +67,57 @@ function supplierProfileHasContent(row: ItemWithSubcategories): boolean {
   );
 }
 
+/** Fields edited in the vendor profile popover (committed once on close — avoids freezing Settings on each keystroke). */
+type SupplierProfileDraft = Pick<
+  ItemWithSubcategories,
+  | 'website'
+  | 'contactName'
+  | 'contactEmail'
+  | 'contactPhone'
+  | 'supportEmail'
+  | 'supportPhone'
+  | 'accountReference'
+  | 'supplierNotes'
+>;
+
+function buildSupplierProfilePatch(
+  base: ItemWithSubcategories,
+  draft: SupplierProfileDraft,
+): Partial<ItemWithSubcategories> {
+  const patch: Partial<ItemWithSubcategories> = {};
+  const norm = (v: string | undefined) => (v ?? '').trim() || undefined;
+  ([
+    'website',
+    'contactName',
+    'contactEmail',
+    'contactPhone',
+    'supportEmail',
+    'supportPhone',
+    'accountReference',
+    'supplierNotes',
+  ] as const).forEach((key) => {
+    const next = norm(draft[key] as string | undefined);
+    const prev = norm(base[key] as string | undefined);
+    if (next !== prev) {
+      (patch as Record<string, unknown>)[key] = next;
+    }
+  });
+  return patch;
+}
+
+function supplierDraftFromItem(row: ItemWithSubcategories): SupplierProfileDraft {
+  return {
+    website: row.website ?? '',
+    contactName: row.contactName ?? '',
+    contactEmail: row.contactEmail ?? '',
+    contactPhone: row.contactPhone ?? '',
+    supportEmail: row.supportEmail ?? '',
+    supportPhone: row.supportPhone ?? '',
+    accountReference: row.accountReference ?? '',
+    supplierNotes: row.supplierNotes ?? '',
+  };
+}
+
 function singularFormForListTitle(title: string): string {
   const lower = title.trim().toLowerCase();
   const irregular: Record<string, string> = {
@@ -298,6 +349,7 @@ function SortableItem({
   const [newSubcategory, setNewSubcategory] = useState('');
   const [subAddOpen, setSubAddOpen] = useState(false);
   const [supplierDetailsOpen, setSupplierDetailsOpen] = useState(false);
+  const [supplierDraft, setSupplierDraft] = useState<SupplierProfileDraft | null>(null);
   const [editingSubcategory, setEditingSubcategory] = useState<string | null>(null);
   const [subsExpanded, setSubsExpanded] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
@@ -327,11 +379,14 @@ function SortableItem({
     }
   };
 
-  const parentLeafPresetRacks = React.useMemo(
-    () =>
-      item.children && item.children.length > 0 ? [] : getRackOptionsForFlatLocationLabel(item.name),
-    [item.children, item.name],
-  );
+  const parentLeafPresetRacks = React.useMemo(() => {
+    if (!locationRackExtension) {
+      return [];
+    }
+    return item.children && item.children.length > 0 ? [] : getRackOptionsForFlatLocationLabel(item.name);
+  }, [locationRackExtension, item.children, item.name]);
+
+  const supplierFieldValues = supplierDraft ?? supplierDraftFromItem(item);
 
   const handleAddSubcategory = () => {
     if (newSubcategory.trim()) {
@@ -511,7 +566,24 @@ function SortableItem({
             </Dialog>
           )}
           {perItemSupplierProfileFields && onPatchItem && (
-            <Popover open={supplierDetailsOpen} onOpenChange={setSupplierDetailsOpen}>
+            <Popover
+              open={supplierDetailsOpen}
+              onOpenChange={(open) => {
+                if (open) {
+                  setSupplierDraft(supplierDraftFromItem(item));
+                  setSupplierDetailsOpen(true);
+                  return;
+                }
+                if (supplierDraft) {
+                  const patch = buildSupplierProfilePatch(item, supplierDraft);
+                  if (Object.keys(patch).length > 0) {
+                    onPatchItem(item.id, patch);
+                  }
+                }
+                setSupplierDraft(null);
+                setSupplierDetailsOpen(false);
+              }}
+            >
               <PopoverTrigger asChild>
                 <Button
                   type="button"
@@ -532,11 +604,12 @@ function SortableItem({
                       type="url"
                       className="h-8 text-sm placeholder:text-muted-foreground/40"
                       placeholder="https://..."
-                      value={item.website ?? ''}
+                      value={supplierFieldValues.website}
                       onChange={(e) =>
-                        onPatchItem(item.id, {
-                          website: e.target.value.trim() || undefined,
-                        })
+                        setSupplierDraft((previous) => ({
+                          ...(previous ?? supplierDraftFromItem(item)),
+                          website: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -545,11 +618,12 @@ function SortableItem({
                     <Input
                       className="h-8 text-sm placeholder:text-muted-foreground/40"
                       placeholder="Primary contact"
-                      value={item.contactName ?? ''}
+                      value={supplierFieldValues.contactName}
                       onChange={(e) =>
-                        onPatchItem(item.id, {
-                          contactName: e.target.value.trim() || undefined,
-                        })
+                        setSupplierDraft((previous) => ({
+                          ...(previous ?? supplierDraftFromItem(item)),
+                          contactName: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -559,11 +633,12 @@ function SortableItem({
                       type="email"
                       className="h-8 text-sm placeholder:text-muted-foreground/40"
                       placeholder="name@company.com"
-                      value={item.contactEmail ?? ''}
+                      value={supplierFieldValues.contactEmail}
                       onChange={(e) =>
-                        onPatchItem(item.id, {
-                          contactEmail: e.target.value.trim() || undefined,
-                        })
+                        setSupplierDraft((previous) => ({
+                          ...(previous ?? supplierDraftFromItem(item)),
+                          contactEmail: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -572,11 +647,12 @@ function SortableItem({
                     <Input
                       className="h-8 text-sm placeholder:text-muted-foreground/40"
                       placeholder="+1 ..."
-                      value={item.contactPhone ?? ''}
+                      value={supplierFieldValues.contactPhone}
                       onChange={(e) =>
-                        onPatchItem(item.id, {
-                          contactPhone: e.target.value.trim() || undefined,
-                        })
+                        setSupplierDraft((previous) => ({
+                          ...(previous ?? supplierDraftFromItem(item)),
+                          contactPhone: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -586,11 +662,12 @@ function SortableItem({
                       type="email"
                       className="h-8 text-sm placeholder:text-muted-foreground/40"
                       placeholder="support@company.com"
-                      value={item.supportEmail ?? ''}
+                      value={supplierFieldValues.supportEmail}
                       onChange={(e) =>
-                        onPatchItem(item.id, {
-                          supportEmail: e.target.value.trim() || undefined,
-                        })
+                        setSupplierDraft((previous) => ({
+                          ...(previous ?? supplierDraftFromItem(item)),
+                          supportEmail: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -599,11 +676,12 @@ function SortableItem({
                     <Input
                       className="h-8 text-sm placeholder:text-muted-foreground/40"
                       placeholder="+1 ..."
-                      value={item.supportPhone ?? ''}
+                      value={supplierFieldValues.supportPhone}
                       onChange={(e) =>
-                        onPatchItem(item.id, {
-                          supportPhone: e.target.value.trim() || undefined,
-                        })
+                        setSupplierDraft((previous) => ({
+                          ...(previous ?? supplierDraftFromItem(item)),
+                          supportPhone: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -612,11 +690,12 @@ function SortableItem({
                     <Input
                       className="h-8 text-sm placeholder:text-muted-foreground/40"
                       placeholder="Customer/account number"
-                      value={item.accountReference ?? ''}
+                      value={supplierFieldValues.accountReference}
                       onChange={(e) =>
-                        onPatchItem(item.id, {
-                          accountReference: e.target.value.trim() || undefined,
-                        })
+                        setSupplierDraft((previous) => ({
+                          ...(previous ?? supplierDraftFromItem(item)),
+                          accountReference: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -625,11 +704,12 @@ function SortableItem({
                     <Textarea
                       className="min-h-[72px] text-sm placeholder:text-muted-foreground/40"
                       placeholder="SLA, procurement notes, escalation details..."
-                      value={item.supplierNotes ?? ''}
+                      value={supplierFieldValues.supplierNotes}
                       onChange={(e) =>
-                        onPatchItem(item.id, {
-                          supplierNotes: e.target.value.trim() || undefined,
-                        })
+                        setSupplierDraft((previous) => ({
+                          ...(previous ?? supplierDraftFromItem(item)),
+                          supplierNotes: e.target.value,
+                        }))
                       }
                     />
                   </div>
@@ -846,7 +926,7 @@ export function EditableItemWithSubcategoriesList({
       return;
     }
     const newItem: ItemWithSubcategories = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       name: value,
       ...(showColorPicker ? { color: DEFAULT_CATEGORY_COLORS[items.length % DEFAULT_CATEGORY_COLORS.length] } : {}),
       children: [],
@@ -912,7 +992,7 @@ export function EditableItemWithSubcategoriesList({
         return {
           ...item,
           children: [...(item.children || []), {
-            id: Date.now().toString(),
+            id: crypto.randomUUID(),
             name: subcategoryName
           }],
         };

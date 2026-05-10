@@ -153,6 +153,12 @@ export function OrganizationBrandingSection({
     <Card>
       <CardHeader>
         <CardTitle>Organization Branding</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Logos are embedded as data URLs in this browser&apos;s local storage (
+          <code className="rounded bg-muted px-1 text-xs">trackit:app-branding:v1</code>
+          ) for instant display. Saving to the organization copies the same payload to your Supabase org row so other
+          devices can pull it.
+        </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">

@@ -26,9 +26,7 @@ export interface OrganizationSettingsSectionProps {
   orgMaintenanceTemplateStored: MaintenanceOnAirSchedule | null;
   onAfterOrgMaintenanceSave: () => void;
   onNavigateToDataTab: () => void;
-  /** Omitted for workspace editors/viewers — they do not have the Workspaces admin tab. */
-  onNavigateToWorkspacesTab?: () => void;
-  onNavigateToLibrariesPositionTemplates: () => void;
+  onNavigateToWorkspacesTab: () => void;
 }
 
 /**
@@ -52,7 +50,6 @@ export function OrganizationSettingsSection({
   onAfterOrgMaintenanceSave,
   onNavigateToDataTab,
   onNavigateToWorkspacesTab,
-  onNavigateToLibrariesPositionTemplates,
 }: OrganizationSettingsSectionProps) {
   const useOrgTabsScope = useMemo(() => createTabsScope(), []);
   const orgTabsScope = useOrgTabsScope(undefined);
@@ -115,18 +112,10 @@ export function OrganizationSettingsSection({
                 <Button type="button" variant="outline" onClick={onNavigateToDataTab}>
                   Open Data Management
                 </Button>
-                {onNavigateToWorkspacesTab ? (
-                  <Button type="button" variant="outline" onClick={onNavigateToWorkspacesTab}>
-                    Workspaces and invites
-                  </Button>
-                ) : null}
+                <Button type="button" variant="outline" onClick={onNavigateToWorkspacesTab}>
+                  Workspaces and invites
+                </Button>
               </div>
-              {authBackend === 'supabase' && !onNavigateToWorkspacesTab ? (
-                <p className="text-xs text-muted-foreground">
-                  Workspaces, invites, and workspace utilities are limited to workspace admins. Ask an admin if you need
-                  access changes.
-                </p>
-              ) : null}
             </CardContent>
           </Card>
 
@@ -143,15 +132,13 @@ export function OrganizationSettingsSection({
                 org data, exports, and org-scoped libraries to that tenant.
               </p>
               <div className="flex flex-wrap gap-2">
-                {onNavigateToWorkspacesTab ? (
-                  <Button type="button" onClick={onNavigateToWorkspacesTab}>
-                    Set up workspace (new org)
-                  </Button>
-                ) : null}
-                <Button type="button" variant="outline" onClick={onNavigateToLibrariesPositionTemplates}>
-                  Crew position templates (org library)
+                <Button type="button" onClick={onNavigateToWorkspacesTab}>
+                  Set up workspace (new org)
                 </Button>
               </div>
+              <p className="text-xs">
+                Crew position templates live under Settings → Libraries → Crew position templates.
+              </p>
               {authBackend !== 'supabase' ? (
                 <p className="text-xs">
                   Organization features apply after you sign in with Supabase and use a team workspace.

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowDownAZ, ArrowUpZA, Download, RefreshCw, RotateCcw, Search } from "lucide-react";
 import { getLogs as getStoredLogs, logger } from "@/lib/logging";
 import { useAuth } from "@/contexts/AuthContext";
+import { PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY } from "@/lib/productionService";
 
 interface LogEntry {
   timestamp: Date;
@@ -26,6 +27,10 @@ export function SystemLogs() {
   const [showRawDetails, setShowRawDetails] = React.useState(false);
   const [isCompactView, setIsCompactView] = React.useState(true);
   const [isViewCleared, setIsViewCleared] = React.useState(false);
+  /** Narrow check-in/out rows: cabinets / Checkout page vs production-linked inventory actions. */
+  const [checkoutSourceFilter, setCheckoutSourceFilter] = React.useState<
+    "all" | "cabinet" | "production" | "no_checkout"
+  >("all");
 
   const loadInventoryAuditLogs = React.useCallback((): LogEntry[] => {
     try {
@@ -57,13 +62,30 @@ export function SystemLogs() {
     }
   }, []);
 
+  const loadProductionCheckoutLogs = React.useCallback((): LogEntry[] => {
+    try {
+      const raw = localStorage.getItem(PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as LogEntry[];
+      return Array.isArray(parsed)
+        ? parsed.map((entry) => ({
+            ...entry,
+            timestamp: entry.timestamp ? new Date(entry.timestamp as unknown as string) : new Date(),
+          }))
+        : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
   const loadAndSetLogs = React.useCallback(() => {
     const inMemoryLogs = logger.getLogs() as unknown as LogEntry[];
     const durableLogs = getStoredLogs() as unknown as LogEntry[];
     const legacyInventoryLogs = loadInventoryAuditLogs();
+    const productionCheckoutLogs = loadProductionCheckoutLogs();
 
     const seenKeys = new Set<string>();
-    const combinedLogs = [...inMemoryLogs, ...durableLogs, ...legacyInventoryLogs]
+    const combinedLogs = [...inMemoryLogs, ...durableLogs, ...legacyInventoryLogs, ...productionCheckoutLogs]
       .filter((entry) => {
         if (!entry?.timestamp || !entry?.message) return false;
         const key = `${new Date(entry.timestamp).getTime()}:${entry.message}:${entry.component ?? ''}`;
@@ -74,7 +96,7 @@ export function SystemLogs() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     setLogs(combinedLogs);
-  }, [loadInventoryAuditLogs]);
+  }, [loadInventoryAuditLogs, loadProductionCheckoutLogs]);
 
   const refreshLogs = React.useCallback(() => {
     loadAndSetLogs();
@@ -90,18 +112,41 @@ export function SystemLogs() {
   }, [loadAndSetLogs]);
 
   const filteredLogs = React.useMemo(() => {
-    const matchedLogs = logs.filter(log => {
-      const matchesSearch = log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const isCheckoutMessage = (log: LogEntry) =>
+      log.message === "ITEM_CHECKIN" || log.message === "ITEM_CHECKOUT";
+    const isProductionCheckout = (log: LogEntry) =>
+      String((log.details as Record<string, unknown> | undefined)?.source ?? "") === "productions-module";
+
+    const matchedLogs = logs.filter((log) => {
+      const matchesSearch =
+        log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (log.details && JSON.stringify(log.details).toLowerCase().includes(searchQuery.toLowerCase()));
-      
+
       const matchesLevel = selectedLevel === "all" || log.level === selectedLevel;
       const matchesType = selectedType === "all" || log.type === selectedType;
-      
-      return matchesSearch && matchesLevel && matchesType;
+
+      let matchesCheckoutFilter = true;
+      if (checkoutSourceFilter === "no_checkout") {
+        matchesCheckoutFilter = !isCheckoutMessage(log);
+      } else if (checkoutSourceFilter === "cabinet") {
+        matchesCheckoutFilter = !isCheckoutMessage(log) || !isProductionCheckout(log);
+      } else if (checkoutSourceFilter === "production") {
+        matchesCheckoutFilter = !isCheckoutMessage(log) || isProductionCheckout(log);
+      }
+
+      return matchesSearch && matchesLevel && matchesType && matchesCheckoutFilter;
     });
     const orderedLogs = isNewestFirst ? matchedLogs : [...matchedLogs].reverse();
     return isViewCleared ? [] : orderedLogs;
-  }, [logs, searchQuery, selectedLevel, selectedType, isNewestFirst, isViewCleared]);
+  }, [
+    logs,
+    searchQuery,
+    selectedLevel,
+    selectedType,
+    checkoutSourceFilter,
+    isNewestFirst,
+    isViewCleared,
+  ]);
 
   const parseLogSummary = (log: LogEntry) => {
     const details = (log.details || {}) as Record<string, unknown>;
@@ -356,6 +401,21 @@ export function SystemLogs() {
               <option value="performance">Performance</option>
               <option value="security">Security</option>
             </select>
+            <select
+              value={checkoutSourceFilter}
+              onChange={(e) =>
+                setCheckoutSourceFilter(
+                  e.target.value as "all" | "cabinet" | "production" | "no_checkout",
+                )
+              }
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+              title="Filter check-in/out rows by where they were recorded"
+            >
+              <option value="all">All check-in/out</option>
+              <option value="cabinet">Cabinets / Checkout page</option>
+              <option value="production">Production-linked only</option>
+              <option value="no_checkout">Hide check-in/out</option>
+            </select>
           </div>
         </div>
 
@@ -388,8 +448,11 @@ export function SystemLogs() {
                     <div className="text-sm font-medium truncate">
                       {parseLogSummary(log)}
                     </div>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {format(log.timestamp, 'MMM d, yyyy HH:mm:ss')}
+                    <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                      <span className="block">{format(log.timestamp, "yyyy-MM-dd HH:mm:ss.SSS")}</span>
+                      <span className="block text-[10px] font-normal opacity-75">
+                        {log.timestamp.toISOString()}
+                      </span>
                     </span>
                   </div>
                   {!isCompactView && (

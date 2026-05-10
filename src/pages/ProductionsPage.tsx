@@ -136,6 +136,15 @@ export default function ProductionsPage() {
   }, []);
 
   useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEYS.ITEMS) return;
+      setInventoryItems(getItems());
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  useEffect(() => {
     if (!productionIdFromQuery) return;
     const queryProduction = productions.find((production) => production.id === productionIdFromQuery);
     if (queryProduction) {
@@ -485,6 +494,7 @@ export default function ProductionsPage() {
       <ProductionDetail
         production={selectedProduction}
         inventoryItems={inventoryItems}
+        onRefreshInventory={() => setInventoryItems(getItems())}
         currentUsername={currentUser?.username || currentUser?.displayName}
         onUpdate={handleUpdate}
         onDelete={handleDelete}

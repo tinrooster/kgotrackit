@@ -1,6 +1,7 @@
 import { type Dispatch, type SetStateAction } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { FinancialCodesTab } from '@/components/settings/FinancialCodesTab';
 import { ItemWithSubcategories } from '@/types/inventory';
 import { FinancialCodeEntry, saveFinancialSettings } from '@/lib/financialSettingsService';
@@ -130,6 +131,18 @@ export function UserDefinedListsSection({
           <CardTitle>Lookup Lists</CardTitle>
         </CardHeader>
         <CardContent className="lookup-lists-mobile-compact space-y-3 sm:space-y-4">
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/80 bg-muted/20 px-2 py-1.5 text-xs">
+            <Badge variant="outline">Categories {settings.categories.length}</Badge>
+            <Badge variant="outline">Locations {settings.locations.length}</Badge>
+            <Badge variant="outline">Projects {settings.projects.length}</Badge>
+            <Badge variant="outline">Units {settings.units.length}</Badge>
+            <Badge variant="outline">
+              Expense types {financialSettings.expenseTypes.length}
+            </Badge>
+            <Badge variant="outline">
+              Cost centers {financialSettings.costCenters.length}
+            </Badge>
+          </div>
           <div
             className="lookup-lists-nav-shell relative"
             data-overflowing={isListNavOverflowing ? 'true' : 'false'}
@@ -280,6 +293,7 @@ export function UserDefinedListsSection({
 
           {panel === 'financial' && (
             <FinancialCodesTab
+              lookupPanelCardClassName={lookupPanelCardClassName}
               expenseTypes={financialSettings.expenseTypes}
               costCenters={financialSettings.costCenters}
               onChangeExpenseTypes={(entries) => {

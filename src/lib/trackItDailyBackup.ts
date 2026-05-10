@@ -2,7 +2,7 @@ import { getItems, getSettings, getTemplates } from '@/lib/storageService';
 import { getFinancialSettings } from '@/lib/financialSettingsService';
 import { SettingsService } from '@/lib/settingsService';
 import { getDeviceLibrary } from '@/lib/deviceLibraryStorage';
-import { getProductions } from '@/lib/productionService';
+import { getProductions, PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY } from '@/lib/productionService';
 import { getCrewContacts } from '@/lib/crewContactsService';
 
 function readStoredArray(storageKey: string): unknown[] {
@@ -33,6 +33,7 @@ export async function buildFullOfflineBackupPayload(): Promise<{
   const customReportDefinitions = readStoredArray('inventory-custom-report-definitions');
   const inventoryHistory = readStoredArray('inventoryHistory');
   const checkoutRecentActivities = readStoredArray('checkout-recent-activities');
+  const productionCheckoutRecentActivities = readStoredArray(PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY);
 
   return {
     version: '1.2',
@@ -55,6 +56,7 @@ export async function buildFullOfflineBackupPayload(): Promise<{
       customReportDefinitions,
       inventoryHistory,
       checkoutRecentActivities,
+      productionCheckoutRecentActivities,
     },
   };
 }

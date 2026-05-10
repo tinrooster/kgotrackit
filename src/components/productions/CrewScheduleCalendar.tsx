@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { CrewScheduleEntry, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,7 @@ import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsible';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import {
-  formatShiftDurationFromMinutes,
-  minutesToTime,
-  normalizeQuarterHourTime,
-  parseTimeToMinutes,
-} from '@/lib/dateTimeInputs';
+import { minutesToTime, normalizeQuarterHourTime, parseTimeToMinutes } from '@/lib/dateTimeInputs';
 import { loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding';
 import {
   AlertDialog,
@@ -51,23 +44,12 @@ interface ScheduleConflict {
   message: string;
 }
 
-const SCHEDULE_UNDO_LIMIT = 40;
-
-function cloneScheduleEntries(entries: CrewScheduleEntry[]): CrewScheduleEntry[] {
-  try {
-    return structuredClone(entries);
-  } catch {
-    return JSON.parse(JSON.stringify(entries)) as CrewScheduleEntry[];
-  }
-}
-
 const SHIFT_TEMPLATE_STORAGE_KEY = 'trackit:schedule-shift-templates:v1';
 const ROLE_COVERAGE_TARGETS_STORAGE_KEY = 'trackit:schedule-role-coverage-targets:v1';
 const DAY_LOCKS_STORAGE_KEY_PREFIX = 'trackit:schedule-day-locks:v1';
 const CRITICAL_ROLES_STORAGE_KEY_PREFIX = 'trackit:schedule-critical-roles:v1';
 const CRITICAL_FOCUS_MODE_STORAGE_KEY_PREFIX = 'trackit:schedule-critical-focus-mode:v1';
 const SCHEDULE_VIEW_MODE_STORAGE_KEY_PREFIX = 'trackit:schedule-view-mode:v1';
-const DAY_BOARD_TIME_GRID_STORAGE_KEY_PREFIX = 'trackit:schedule-day-board-time-grid:v1';
 /**
  * Temporarily hidden for current production workflow.
  * Keep implementation in place for future projects that need staffing targets.
@@ -91,6 +73,16 @@ interface CrewScheduleCalendarProps {
   requireDeleteConfirm?: boolean;
   resources?: Array<{ id: string; label: string; quantity: number }>;
   onChange: (schedule: CrewScheduleEntry[]) => void;
+}
+
+/** Two-hour ticks across a 24h axis (matches `grid-cols-12` under the day timeline). */
+const TIMELINE_AXIS_HOURS = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22] as const;
+
+function formatTimelineHourLabel(hour: number): string {
+  if (hour === 0) return '12a';
+  if (hour < 12) return `${hour}a`;
+  if (hour === 12) return '12p';
+  return `${hour - 12}p`;
 }
 
 function resolveCrewLabel(crewMembers: ProductionCrewMember[], crewMemberId: string): string {
@@ -210,23 +202,6 @@ function resolveEffectiveEntryRole(
   crewMembers: ProductionCrewMember[]
 ): string {
   return (entry.role || crewMembers.find((member) => member.id === entry.crewMemberId)?.role || '').trim();
-}
-
-/** Matches {@link minutesToTime} quarter-hour grid used when persisting drag commits. */
-function roundMinutesToQuarterHour(totalMinutes: number): number {
-  return Math.max(0, Math.min(24 * 60, Math.round(totalMinutes / 15) * 15));
-}
-
-function entryTimesMatchPendingMinutes(
-  entry: CrewScheduleEntry,
-  startMin: number,
-  endMin: number
-): boolean {
-  const expectS = minutesToTime(roundMinutesToQuarterHour(startMin));
-  const expectE = minutesToTime(roundMinutesToQuarterHour(endMin));
-  const gotS = entry.startTime ? normalizeQuarterHourTime(entry.startTime) : '';
-  const gotE = entry.endTime ? normalizeQuarterHourTime(entry.endTime) : '';
-  return gotS === expectS && gotE === expectE;
 }
 
 function shouldIncludeEntryInCriticalFocus(
@@ -356,75 +331,6 @@ export function CrewScheduleCalendar({
     notes: '',
   });
 
-  const scheduleUndoStackRef = useRef<CrewScheduleEntry[][]>([]);
-  const scheduleRedoStackRef = useRef<CrewScheduleEntry[][]>([]);
-
-  const scheduleRef = useRef(schedule);
-  scheduleRef.current = schedule;
-
-  const commitSchedule = (next: CrewScheduleEntry[]) => {
-    scheduleUndoStackRef.current.push(cloneScheduleEntries(scheduleRef.current));
-    scheduleRedoStackRef.current = [];
-    while (scheduleUndoStackRef.current.length > SCHEDULE_UNDO_LIMIT) {
-      scheduleUndoStackRef.current.shift();
-    }
-    onChange(next);
-  };
-
-  const undoSchedule = () => {
-    const prev = scheduleUndoStackRef.current.pop();
-    if (!prev) return;
-    scheduleRedoStackRef.current.push(cloneScheduleEntries(scheduleRef.current));
-    while (scheduleRedoStackRef.current.length > SCHEDULE_UNDO_LIMIT) {
-      scheduleRedoStackRef.current.shift();
-    }
-    onChange(prev);
-  };
-
-  const redoSchedule = () => {
-    const next = scheduleRedoStackRef.current.pop();
-    if (!next) return;
-    scheduleUndoStackRef.current.push(cloneScheduleEntries(scheduleRef.current));
-    while (scheduleUndoStackRef.current.length > SCHEDULE_UNDO_LIMIT) {
-      scheduleUndoStackRef.current.shift();
-    }
-    onChange(next);
-  };
-
-  const undoFromKeyboardRef = useRef(() => {});
-  const redoFromKeyboardRef = useRef(() => {});
-  undoFromKeyboardRef.current = undoSchedule;
-  redoFromKeyboardRef.current = redoSchedule;
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
-      e.preventDefault();
-      if (e.shiftKey) {
-        redoFromKeyboardRef.current();
-      } else {
-        undoFromKeyboardRef.current();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
-
-  useEffect(() => {
-    scheduleUndoStackRef.current = [];
-    scheduleRedoStackRef.current = [];
-  }, [scheduleScopeKey]);
-
   useEffect(() => {
     if (!useProjectedDefaults) return;
     setDraft((previous) => ({
@@ -524,35 +430,6 @@ export function CrewScheduleCalendar({
     window.localStorage.setItem(`${SCHEDULE_VIEW_MODE_STORAGE_KEY_PREFIX}:${scheduleScopeKey}`, scheduleViewMode);
   }, [scheduleViewMode, scheduleScopeKey]);
 
-  const [showDayBoardTimeGrid, setShowDayBoardTimeGrid] = useState(() => {
-    try {
-      return window.localStorage.getItem(`${DAY_BOARD_TIME_GRID_STORAGE_KEY_PREFIX}:${scheduleScopeKey}`) === '1';
-    } catch {
-      return false;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      setShowDayBoardTimeGrid(
-        window.localStorage.getItem(`${DAY_BOARD_TIME_GRID_STORAGE_KEY_PREFIX}:${scheduleScopeKey}`) === '1'
-      );
-    } catch {
-      setShowDayBoardTimeGrid(false);
-    }
-  }, [scheduleScopeKey]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        `${DAY_BOARD_TIME_GRID_STORAGE_KEY_PREFIX}:${scheduleScopeKey}`,
-        showDayBoardTimeGrid ? '1' : '0'
-      );
-    } catch {
-      /* ignore */
-    }
-  }, [showDayBoardTimeGrid, scheduleScopeKey]);
-
   useEffect(() => {
     if (!callSheetShowName && productionName) {
       setCallSheetShowName(productionName);
@@ -575,7 +452,7 @@ export function CrewScheduleCalendar({
     if (!skipLockCheck && !requestLockOverride(dayFilter, 'adding a schedule entry', () => addEntry(true))) return;
     if (!draft.crewMemberId || !draft.date) return;
     if (!isDateWithinProjectRange(draft.date, projectStartDate, projectEndDate)) return;
-    commitSchedule([
+    onChange([
       ...schedule,
       {
         ...draft,
@@ -603,7 +480,7 @@ export function CrewScheduleCalendar({
     const entry = schedule.find((item) => item.id === id);
     if (!entry) return;
     if (!skipLockCheck && !requestLockOverride(entry.date, 'deleting a schedule entry', () => removeEntry(id, true))) return;
-    commitSchedule(schedule.filter((entry) => entry.id !== id));
+    onChange(schedule.filter((entry) => entry.id !== id));
   };
 
   const runDeleteAction = (entryId: string) => {
@@ -683,7 +560,7 @@ export function CrewScheduleCalendar({
       setQuickApplySummary(`Applied to 0 crew, skipped ${skippedCount} already scheduled.`);
       return;
     }
-    commitSchedule([...schedule, ...newEntries]);
+    onChange([...schedule, ...newEntries]);
     setQuickApplySummary(`Applied to ${newEntries.length} crew, skipped ${skippedCount} already scheduled.`);
   };
 
@@ -698,7 +575,7 @@ export function CrewScheduleCalendar({
     const sourceEntries = schedule.filter((entry) => entry.date === dayFilter);
     if (sourceEntries.length === 0) return;
     const copiedEntries = sourceEntries.map((entry) => ({ ...entry, id: crypto.randomUUID(), date: copyToDate }));
-    commitSchedule([...schedule, ...copiedEntries]);
+    onChange([...schedule, ...copiedEntries]);
   };
 
   const getDayBoardCsvContent = () => {
@@ -1009,7 +886,7 @@ export function CrewScheduleCalendar({
     ) {
       return;
     }
-    commitSchedule(
+    onChange(
       schedule.map((entry) => {
         if (entry.id !== entryId) return entry;
         const existing = entry.resourceIds ?? [];
@@ -1056,7 +933,7 @@ export function CrewScheduleCalendar({
       return;
     }
     if (!isDateWithinProjectRange(editingDraft.date, projectStartDate, projectEndDate)) return;
-    commitSchedule(
+    onChange(
       schedule.map((entry) =>
         entry.id === editingEntryId
           ? {
@@ -1068,6 +945,7 @@ export function CrewScheduleCalendar({
               role: editingDraft.role || undefined,
               location: editingDraft.location || undefined,
               notes: editingDraft.notes || undefined,
+              resourceIds: entry.resourceIds?.length ? [...entry.resourceIds] : undefined,
             }
           : entry
       )
@@ -1122,23 +1000,12 @@ export function CrewScheduleCalendar({
   const isDayActuallyLocked = Boolean(dayLocksByDate[dayFilter]);
   const isDayOverrideEnabled = Boolean(lockOverridesByDate[dayFilter]);
   const timelineContainerRef = useRef<HTMLDivElement | null>(null);
-  const blockRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [dragState, setDragState] = useState<{
     entryId: string;
     mode: 'move' | 'resize';
     startX: number;
     initialStartMinutes: number;
     initialEndMinutes: number;
-    previewStartMinutes: number;
-    previewEndMinutes: number;
-    /** Timeline track width (px); blocks use % of this, not the full day-board stack width. */
-    trackWidthPx: number;
-  } | null>(null);
-  /** Keeps the bar at the drop position until `schedule` props reflect the commit (avoids flash back). */
-  const [pendingDragRelease, setPendingDragRelease] = useState<{
-    entryId: string;
-    startMinutes: number;
-    endMinutes: number;
   } | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<Omit<CrewScheduleEntry, 'id'> | null>(null);
@@ -1149,14 +1016,6 @@ export function CrewScheduleCalendar({
     () => schedule.find((entry) => entry.id === editingEntryId) ?? null,
     [schedule, editingEntryId]
   );
-
-  useLayoutEffect(() => {
-    if (!pendingDragRelease) return;
-    const entry = schedule.find((item) => item.id === pendingDragRelease.entryId);
-    if (entry && entryTimesMatchPendingMinutes(entry, pendingDragRelease.startMinutes, pendingDragRelease.endMinutes)) {
-      setPendingDragRelease(null);
-    }
-  }, [schedule, pendingDragRelease]);
 
   const updateDayFilter = (nextDayValue: string) => {
     const clamped = clampDateToProjectRange(nextDayValue, projectStartDate, projectEndDate);
@@ -1199,37 +1058,38 @@ export function CrewScheduleCalendar({
   }, [conflictList]);
   const availabilityConflictCount = availabilityConflictEntryIds.size;
 
-  const dayEntries = useMemo(() => {
-    const orderIndex = new Map(schedule.map((entry, index) => [entry.id, index]));
-    return schedule
-      .filter((entry) => entry.date === dayFilter)
-      .filter((entry) => {
-        if (roleFilter !== 'all') {
-          const effectiveRole = resolveEffectiveEntryRole(entry, crewMembers);
-          if (effectiveRole !== roleFilter) return false;
-        }
-        if (locationFilter !== 'all') {
-          const effectiveLocation = (entry.location || '').trim();
-          if (effectiveLocation !== locationFilter) return false;
-        }
-        if (availabilityFilter === 'availability-conflicts' && !availabilityConflictEntryIds.has(entry.id)) {
-          return false;
-        }
-        if (!shouldIncludeEntryInCriticalFocus(entry, crewMembers, criticalFocusModeEnabled, criticalRoleNames)) return false;
-        return true;
-      })
-      .sort((left, right) => (orderIndex.get(left.id) ?? 0) - (orderIndex.get(right.id) ?? 0));
-  }, [
-    schedule,
-    dayFilter,
-    roleFilter,
-    locationFilter,
-    availabilityFilter,
-    availabilityConflictEntryIds,
-    crewMembers,
-    criticalFocusModeEnabled,
-    criticalRoleNames,
-  ]);
+  const dayEntries = useMemo(
+    () =>
+      schedule
+        .filter((entry) => entry.date === dayFilter)
+        .filter((entry) => {
+          if (roleFilter !== 'all') {
+            const effectiveRole = resolveEffectiveEntryRole(entry, crewMembers);
+            if (effectiveRole !== roleFilter) return false;
+          }
+          if (locationFilter !== 'all') {
+            const effectiveLocation = (entry.location || '').trim();
+            if (effectiveLocation !== locationFilter) return false;
+          }
+          if (availabilityFilter === 'availability-conflicts' && !availabilityConflictEntryIds.has(entry.id)) {
+            return false;
+          }
+          if (!shouldIncludeEntryInCriticalFocus(entry, crewMembers, criticalFocusModeEnabled, criticalRoleNames)) return false;
+          return true;
+        })
+        .sort((left, right) => `${left.startTime || ''}`.localeCompare(right.startTime || '')),
+    [
+      schedule,
+      dayFilter,
+      roleFilter,
+      locationFilter,
+      availabilityFilter,
+      availabilityConflictEntryIds,
+      crewMembers,
+      criticalFocusModeEnabled,
+      criticalRoleNames,
+    ]
+  );
 
   const dayEntriesAllRoles = useMemo(
     () =>
@@ -1298,28 +1158,19 @@ export function CrewScheduleCalendar({
     return candidates[0] ?? null;
   }, [schedule]);
 
-  const timelineBlocks = useMemo(() => {
-    return dayEntries.map((entry) => {
-      const defaultStartMinutes = parseTimeToMinutes(derivedWindowStart, 0);
-      const defaultEndMinutes = parseTimeToMinutes(derivedWindowEnd, defaultStartMinutes + 15);
-      let startMinutes = parseTimeToMinutes(entry.startTime, defaultStartMinutes);
-      let endMinutes = Math.max(startMinutes + 15, parseTimeToMinutes(entry.endTime, defaultEndMinutes));
-      if (dragState && dragState.entryId === entry.id) {
-        startMinutes = dragState.previewStartMinutes;
-        endMinutes = dragState.previewEndMinutes;
-      } else if (pendingDragRelease && pendingDragRelease.entryId === entry.id) {
-        startMinutes = pendingDragRelease.startMinutes;
-        endMinutes = pendingDragRelease.endMinutes;
-      }
-      return {
-        entry,
-        startMinutes,
-        endMinutes,
-        leftPercent: (startMinutes / (24 * 60)) * 100,
-        widthPercent: ((endMinutes - startMinutes) / (24 * 60)) * 100,
-      };
-    });
-  }, [dayEntries, derivedWindowStart, derivedWindowEnd, dragState, pendingDragRelease]);
+  const timelineBlocks = dayEntries.map((entry) => {
+    const defaultStartMinutes = parseTimeToMinutes(derivedWindowStart, 0);
+    const defaultEndMinutes = parseTimeToMinutes(derivedWindowEnd, defaultStartMinutes + 15);
+    const startMinutes = parseTimeToMinutes(entry.startTime, defaultStartMinutes);
+    const endMinutes = Math.max(startMinutes + 15, parseTimeToMinutes(entry.endTime, defaultEndMinutes));
+    return {
+      entry,
+      startMinutes,
+      endMinutes,
+      leftPercent: (startMinutes / (24 * 60)) * 100,
+      widthPercent: ((endMinutes - startMinutes) / (24 * 60)) * 100,
+    };
+  });
 
   const dayHandoffSummary = useMemo(() => {
     const selectedDayEntries = schedule.filter((entry) => entry.date === dayFilter);
@@ -1381,8 +1232,7 @@ export function CrewScheduleCalendar({
     nextEndMinutes: number,
     skipLockCheck = false
   ) => {
-    const snapshot = scheduleRef.current;
-    const entryForLockCheck = snapshot.find((item) => item.id === entryId);
+    const entryForLockCheck = schedule.find((item) => item.id === entryId);
     if (!entryForLockCheck) return;
     if (
       !skipLockCheck &&
@@ -1392,21 +1242,10 @@ export function CrewScheduleCalendar({
     ) {
       return;
     }
-    const fallbackStart = parseTimeToMinutes(entryForLockCheck.startTime, 0);
-    const fallbackEnd = Math.max(
-      fallbackStart + 15,
-      parseTimeToMinutes(entryForLockCheck.endTime, fallbackStart + 60)
-    );
-    const boundedStart = Math.max(
-      0,
-      Math.min(24 * 60 - 15, Number.isFinite(nextStartMinutes) ? nextStartMinutes : fallbackStart)
-    );
-    const boundedEnd = Math.max(
-      boundedStart + 15,
-      Math.min(24 * 60, Number.isFinite(nextEndMinutes) ? nextEndMinutes : fallbackEnd)
-    );
-    commitSchedule(
-      snapshot.map((entry) =>
+    const boundedStart = Math.max(0, Math.min(24 * 60 - 15, nextStartMinutes));
+    const boundedEnd = Math.max(boundedStart + 15, Math.min(24 * 60, nextEndMinutes));
+    onChange(
+      schedule.map((entry) =>
         entry.id === entryId
           ? {
               ...entry,
@@ -1418,115 +1257,45 @@ export function CrewScheduleCalendar({
     );
   };
 
-  const scheduleEntryUsesResource = (entry: CrewScheduleEntry, resource: { id: string; label: string }) => {
-    const ids = entry.resourceIds ?? [];
-    if (ids.includes(resource.id)) return true;
-    return ids.some((storedId) => {
-      const resolved = resources.find((item) => item.id === storedId)?.label;
-      if (resolved === resource.label) return true;
-      const legacyLabel = storedId.replace(/^\d+-/, '');
-      return legacyLabel === resource.label;
-    });
-  };
-
-  const jumpToFirstScheduleBlockForResource = (resource: { id: string; label: string }) => {
-    const ordered = [...timelineBlocks].sort((left, right) => left.startMinutes - right.startMinutes);
-    const block = ordered.find((item) => scheduleEntryUsesResource(item.entry, resource));
-    if (!block) return;
-    const row = blockRowRefs.current.get(block.entry.id);
-    row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    openEditEntry(block.entry);
-  };
-
   const handleBlockPointerDown = (
     event: React.MouseEvent<HTMLDivElement>,
     block: (typeof timelineBlocks)[number],
     mode: 'move' | 'resize'
   ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const startX = event.clientX;
-    const initialStartMinutes = block.startMinutes;
-    const initialEndMinutes = block.endMinutes;
-    const entryId = block.entry.id;
-
-    const trackEl = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-day-board-track]');
-    const measuredTrackWidth = trackEl?.getBoundingClientRect().width ?? 0;
-    const stackWidth = timelineContainerRef.current?.clientWidth ?? 0;
-    const estimatedTrackWidth =
-      stackWidth >= 200 ? Math.max(48, stackWidth - 192) : stackWidth;
-    const trackWidthPx = Math.max(48, measuredTrackWidth || estimatedTrackWidth || 200);
-
     const startDrag = () => {
-      setPendingDragRelease(null);
       setDragState({
-        entryId,
+        entryId: block.entry.id,
         mode,
-        startX,
-        initialStartMinutes,
-        initialEndMinutes,
-        previewStartMinutes: initialStartMinutes,
-        previewEndMinutes: initialEndMinutes,
-        trackWidthPx,
+        startX: event.clientX,
+        initialStartMinutes: block.startMinutes,
+        initialEndMinutes: block.endMinutes,
       });
-
-      const onMove = (moveEvent: MouseEvent) => {
-        const deltaPx = moveEvent.clientX - startX;
-        setDragState((prev) => {
-          if (!prev || prev.entryId !== entryId) return prev;
-          const width = Math.max(48, prev.trackWidthPx);
-          const deltaMinutes = (deltaPx / width) * 24 * 60;
-          if (prev.mode === 'move') {
-            const duration = prev.initialEndMinutes - prev.initialStartMinutes;
-            const nextStart = prev.initialStartMinutes + deltaMinutes;
-            const boundedStart = Math.max(0, Math.min(24 * 60 - 15, nextStart));
-            const boundedEnd = Math.max(boundedStart + 15, Math.min(24 * 60, boundedStart + duration));
-            return { ...prev, previewStartMinutes: boundedStart, previewEndMinutes: boundedEnd };
-          }
-          const nextEnd = prev.initialEndMinutes + deltaMinutes;
-          const boundedEnd = Math.max(prev.initialStartMinutes + 15, Math.min(24 * 60, nextEnd));
-          return { ...prev, previewStartMinutes: prev.initialStartMinutes, previewEndMinutes: boundedEnd };
-        });
-      };
-
-      const onEnd = () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onEnd);
-        let commitPayload: { entryId: string; startMin: number; endMin: number } | null = null;
-        setDragState((prev) => {
-          if (prev && prev.entryId === entryId) {
-            const startMin = Number.isFinite(prev.previewStartMinutes)
-              ? prev.previewStartMinutes
-              : prev.initialStartMinutes;
-            const endMin = Number.isFinite(prev.previewEndMinutes)
-              ? prev.previewEndMinutes
-              : prev.initialEndMinutes;
-            commitPayload = { entryId: prev.entryId, startMin, endMin };
-          }
-          return null;
-        });
-        if (commitPayload) {
-          setPendingDragRelease({
-            entryId: commitPayload.entryId,
-            startMinutes: commitPayload.startMin,
-            endMinutes: commitPayload.endMin,
-          });
-          const { entryId: commitEntryId, startMin, endMin } = commitPayload;
-          // Never call onChange / updateProduction inside another component's setState updater —
-          // it updates the parent synchronously during React's update and can infinite-loop / freeze.
-          queueMicrotask(() => {
-            updateEntryTimeRange(commitEntryId, startMin, endMin, true);
-          });
-        }
-      };
-
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onEnd);
     };
-
     if (!requestLockOverride(block.entry.date, 'dragging or resizing this schedule block', startDrag)) return;
     startDrag();
+  };
+
+  const handlePointerMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragState || !timelineContainerRef.current) return;
+    const width = timelineContainerRef.current.clientWidth || 1;
+    const deltaPx = event.clientX - dragState.startX;
+    const deltaMinutes = (deltaPx / width) * 24 * 60;
+    if (dragState.mode === 'move') {
+      const duration = dragState.initialEndMinutes - dragState.initialStartMinutes;
+      const nextStart = dragState.initialStartMinutes + deltaMinutes;
+      updateEntryTimeRange(dragState.entryId, nextStart, nextStart + duration);
+      return;
+    }
+    updateEntryTimeRange(
+      dragState.entryId,
+      dragState.initialStartMinutes,
+      dragState.initialEndMinutes + deltaMinutes
+    );
+  };
+
+  const handlePointerUp = () => {
+    if (!dragState) return;
+    setDragState(null);
   };
 
   const projectSpanDates = useMemo(() => {
@@ -1659,9 +1428,7 @@ export function CrewScheduleCalendar({
           ) : null}
           <TimeInput
             className="h-7 w-[130px]"
-            value={
-              projectedWindowStartTime ? normalizeQuarterHourTime(projectedWindowStartTime) : ''
-            }
+            value={derivedWindowStart}
             onChange={(event) =>
               onProjectedWindowChange?.({
                 startTime: event.target.value ? normalizeQuarterHourTime(event.target.value) : undefined,
@@ -1675,12 +1442,9 @@ export function CrewScheduleCalendar({
               })
             }
           />
-          {!projectedWindowStartTime && derivedWindowStart ? (
-            <span className="text-[10px] text-muted-foreground tabular-nums">Suggested {derivedWindowStart}</span>
-          ) : null}
           <TimeInput
             className="h-7 w-[130px]"
-            value={projectedWindowEndTime ? normalizeQuarterHourTime(projectedWindowEndTime) : ''}
+            value={derivedWindowEnd}
             onChange={(event) =>
               onProjectedWindowChange?.({
                 startTime: projectedWindowStartTime,
@@ -1694,9 +1458,6 @@ export function CrewScheduleCalendar({
               })
             }
           />
-          {!projectedWindowEndTime && derivedWindowEnd ? (
-            <span className="text-[10px] text-muted-foreground tabular-nums">Suggested {derivedWindowEnd}</span>
-          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -1766,18 +1527,29 @@ export function CrewScheduleCalendar({
             {isDetailedView ? <TabsTrigger value="project-span">Project Span</TabsTrigger> : null}
             {isDetailedView ? <TabsTrigger value="week-cards">Week Cards</TabsTrigger> : null}
           </TabsList>
-          <div className="inline-flex h-8 items-center gap-2 rounded border bg-background px-2">
-            <Label htmlFor="schedule-view-mode-toggle" className="text-xs text-muted-foreground">
+          <div
+            className="inline-flex h-8 rounded-md border bg-muted/30 p-0.5"
+            role="group"
+            aria-label="Schedule view density"
+          >
+            <Button
+              type="button"
+              variant={isDetailedView ? 'ghost' : 'secondary'}
+              size="sm"
+              className="h-7 rounded-sm px-3 text-xs"
+              onClick={() => setScheduleViewMode('simple')}
+            >
               Simple
-            </Label>
-            <Switch
-              id="schedule-view-mode-toggle"
-              checked={isDetailedView}
-              onCheckedChange={(checked) => setScheduleViewMode(checked ? 'detailed' : 'simple')}
-            />
-            <Label htmlFor="schedule-view-mode-toggle" className="text-xs text-muted-foreground">
+            </Button>
+            <Button
+              type="button"
+              variant={isDetailedView ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 rounded-sm px-3 text-xs"
+              onClick={() => setScheduleViewMode('detailed')}
+            >
               Detailed
-            </Label>
+            </Button>
           </div>
         </div>
 
@@ -2064,58 +1836,29 @@ export function CrewScheduleCalendar({
             </div>
           </div> : null}
           <div className="rounded-md border p-3">
-            <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-              <div className="grid min-w-0 flex-1 grid-cols-8 text-[10px] text-muted-foreground">
-                {['00', '03', '06', '09', '12', '15', '18', '21'].map((hour) => (
-                  <span key={hour}>{hour}:00</span>
-                ))}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Switch
-                  id="day-board-time-grid"
-                  checked={showDayBoardTimeGrid}
-                  onCheckedChange={setShowDayBoardTimeGrid}
-                  className="scale-90"
-                />
-                <Label htmlFor="day-board-time-grid" className="cursor-pointer text-xs text-muted-foreground">
-                  Time grid
-                </Label>
-              </div>
+            <div className="mb-2 grid grid-cols-12 gap-0 text-[10px] text-muted-foreground">
+              {TIMELINE_AXIS_HOURS.map((hour) => (
+                <span key={hour} className="text-center tabular-nums">
+                  {formatTimelineHourLabel(hour)}
+                </span>
+              ))}
             </div>
-            <div ref={timelineContainerRef} className="space-y-2 rounded bg-muted/20 p-2">
+            <div
+              ref={timelineContainerRef}
+              className="space-y-2 rounded bg-muted/20 p-2"
+              onMouseMove={handlePointerMove}
+              onMouseUp={handlePointerUp}
+              onMouseLeave={handlePointerUp}
+            >
               {timelineBlocks.length === 0 ? (
                 <p className="p-3 text-xs text-muted-foreground">No shifts scheduled for this day.</p>
               ) : null}
-              {timelineBlocks.map((block) => {
-                const durationLabel = formatShiftDurationFromMinutes(block.endMinutes - block.startMinutes);
-                return (
-                <div
-                  key={block.entry.id}
-                  ref={(element) => {
-                    if (element) {
-                      blockRowRefs.current.set(block.entry.id, element);
-                    } else {
-                      blockRowRefs.current.delete(block.entry.id);
-                    }
-                  }}
-                  className="grid grid-cols-[180px_1fr] items-center gap-3"
-                >
-                  <div
-                    className="cursor-pointer text-xs"
-                    onDoubleClick={(event) => {
-                      event.stopPropagation();
-                      openEditEntry(block.entry);
-                    }}
-                    title="Double-click to edit this shift"
-                  >
+              {timelineBlocks.map((block) => (
+                <div key={block.entry.id} className="grid grid-cols-[180px_1fr] items-center gap-3">
+                  <div className="text-xs">
                     <p className="truncate font-medium">{resolveCrewLabel(crewMembers, block.entry.crewMemberId)}</p>
                     <p className="text-muted-foreground">
-                      {dragState?.entryId === block.entry.id
-                        ? `${minutesToTime(dragState.previewStartMinutes)} - ${minutesToTime(dragState.previewEndMinutes)}`
-                        : pendingDragRelease?.entryId === block.entry.id
-                          ? `${minutesToTime(pendingDragRelease.startMinutes)} - ${minutesToTime(pendingDragRelease.endMinutes)}`
-                          : `${block.entry.startTime || '--:--'} - ${block.entry.endTime || '--:--'}`}
-                      {durationLabel ? ` · ${durationLabel}` : ''}
+                      {block.entry.startTime || '--:--'} - {block.entry.endTime || '--:--'}
                     </p>
                     {(conflictsByEntryId.get(block.entry.id) ?? []).map((conflict) => (
                       <p
@@ -2126,21 +1869,9 @@ export function CrewScheduleCalendar({
                       </p>
                     ))}
                   </div>
-                  <div className="relative h-12 rounded border bg-background/70" data-day-board-track>
-                    {showDayBoardTimeGrid ? (
-                      <div
-                        className="pointer-events-none absolute inset-0 z-0 rounded-[inherit]"
-                        style={{
-                          backgroundImage: [
-                            `repeating-linear-gradient(90deg, hsl(var(--border) / 0.2) 0 1px, transparent 1px ${100 / 24}%)`,
-                            `repeating-linear-gradient(90deg, hsl(var(--border) / 0.38) 0 1px, transparent 1px ${100 / 8}%)`,
-                          ].join(','),
-                        }}
-                        aria-hidden
-                      />
-                    ) : null}
+                  <div className="relative h-12 rounded border bg-background/70">
                     <div
-                      className="absolute top-1 z-[1] h-10 cursor-grab select-none rounded border px-2 py-1 text-[11px] active:cursor-grabbing"
+                      className="absolute top-1 h-10 cursor-grab rounded border px-2 py-1 text-[11px] active:cursor-grabbing"
                       style={{
                         left: `${block.leftPercent}%`,
                         width: `${Math.max(block.widthPercent, 4)}%`,
@@ -2148,20 +1879,55 @@ export function CrewScheduleCalendar({
                         borderColor: 'hsl(var(--primary) / 0.5)',
                       }}
                       onMouseDown={(event) => handleBlockPointerDown(event, block, 'move')}
-                      title="Drag to move · resize from right edge"
+                      title="Drag to move block"
                     >
-                      <div className="truncate pr-2 font-medium">{block.entry.location || 'Scheduled block'}</div>
-                      <div className="truncate pr-2 text-[10px] text-muted-foreground">{block.entry.notes || 'Drag to move'}</div>
+                      <div className="flex flex-wrap items-center gap-1 pr-14">
+                        <span className="truncate rounded border border-background/50 bg-background/25 px-1.5 py-0 text-[10px] font-semibold">
+                          {resolveCrewLabel(crewMembers, block.entry.crewMemberId)}
+                        </span>
+                      </div>
+                      <div className="truncate pr-14 text-[11px] font-medium">
+                        {block.entry.location || 'Scheduled block'}
+                      </div>
+                      <div className="truncate pr-14 text-[10px] text-muted-foreground">
+                        {block.entry.notes || 'Drag to move'}
+                      </div>
                       {(block.entry.resourceIds ?? []).length > 0 ? (
-                        <div className="mt-0.5 truncate pr-2 text-[10px] text-blue-700 dark:text-blue-300">
+                        <div className="mt-0.5 truncate text-[10px] text-blue-700 dark:text-blue-300">
                           {(block.entry.resourceIds ?? [])
                             .map((resourceId) => resources.find((resource) => resource.id === resourceId)?.label)
                             .filter(Boolean)
                             .join(' | ')}
                         </div>
                       ) : null}
+                      <div className="absolute right-1 top-1 flex items-center gap-0.5 rounded border bg-background/90 px-1 py-0.5 shadow-sm">
+                        <button
+                          type="button"
+                          className="rounded border bg-background/80 p-0.5 hover:bg-background"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEditEntry(block.entry);
+                          }}
+                          title="Edit block"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className={`rounded border p-0.5 ${
+                            'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
+                          }`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            runDeleteAction(block.entry.id);
+                          }}
+                          title="Delete block"
+                        >
+                          <Trash2 className="h-3 w-3 text-red-300" />
+                        </button>
+                      </div>
                       <div
-                        className="absolute right-0 top-0 z-[2] h-full w-2 cursor-ew-resize rounded-r bg-primary/40"
+                        className="absolute right-0 top-0 h-full w-2 cursor-ew-resize rounded-r bg-primary/40"
                         onMouseDown={(event) => {
                           event.stopPropagation();
                           handleBlockPointerDown(event, block, 'resize');
@@ -2171,8 +1937,7 @@ export function CrewScheduleCalendar({
                     </div>
                   </div>
                 </div>
-                );
-              })}
+              ))}
             </div>
           </div>
           {isDetailedView ? <div className="rounded-md border p-3">
@@ -2181,37 +1946,45 @@ export function CrewScheduleCalendar({
               <p className="text-xs text-muted-foreground">No linked resources.</p>
             ) : (
               <div className="grid gap-1 sm:grid-cols-2">
-                {resources.map((resource) => (
-                  <button
-                    key={resource.id}
-                    type="button"
-                    className="flex w-full cursor-pointer items-center justify-between rounded border bg-muted/20 px-2 py-1 text-left text-xs font-normal shadow-none outline-none ring-offset-background hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
-                    onDoubleClick={(event) => {
-                      event.preventDefault();
-                      jumpToFirstScheduleBlockForResource(resource);
-                    }}
-                    title={
-                      schedule.some(
-                        (entry) => entry.date === dayFilter && scheduleEntryUsesResource(entry, resource)
-                      )
-                        ? 'Double-click to jump to the first shift using this resource today'
-                        : 'No shift on this day assigns this resource yet'
-                    }
-                  >
-                    <span className="truncate">{resource.label}</span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">
-                        assigned{' '}
-                        {
-                          schedule.filter(
-                            (entry) => entry.date === dayFilter && scheduleEntryUsesResource(entry, resource)
-                          ).length
-                        }
+                {resources.map((resource) => {
+                  const assigneeLabels = [
+                    ...new Set(
+                      schedule
+                        .filter((entry) => (entry.resourceIds ?? []).includes(resource.id))
+                        .map((entry) => resolveCrewLabel(crewMembers, entry.crewMemberId)),
+                    ),
+                  ];
+                  return (
+                    <div
+                      key={resource.id}
+                      className="flex flex-col gap-1 rounded border bg-muted/20 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <span className="block truncate font-medium">{resource.label}</span>
+                        {assigneeLabels.length > 0 ? (
+                          <div className="mt-1 flex flex-wrap gap-0.5">
+                            {assigneeLabels.map((name) => (
+                              <span
+                                key={`${resource.id}-${name}`}
+                                className="max-w-full truncate rounded border border-primary/25 bg-primary/10 px-1.5 py-0 text-[10px] text-primary"
+                              >
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="mt-0.5 block text-[10px] text-muted-foreground">No assignees yet</span>
+                        )}
+                      </div>
+                      <span className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+                        <span className="text-[10px] text-muted-foreground">
+                          assigned {schedule.filter((entry) => (entry.resourceIds ?? []).includes(resource.id)).length}
+                        </span>
+                        <span className="font-medium">x{resource.quantity}</span>
                       </span>
-                      <span className="font-medium">x{resource.quantity}</span>
-                    </span>
-                  </button>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div> : null}

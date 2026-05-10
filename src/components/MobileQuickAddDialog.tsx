@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { DraggableDialogContent } from "@/components/ui/draggable-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InventoryItem, OrderStatus, ItemWithSubcategories, CategoryNode } from "@/types/inventory";
@@ -51,6 +52,26 @@ import { estimateDataUrlBytes, normalizeImageFileToDataUrl } from "@/lib/imageNo
 const PREFS_KEY = "trackit:quickAddPrefs";
 const LAST_KEY = "trackit:quickAddLast";
 const USAGE_KEY = "trackit:quickAddUsage";
+const WIZARD_FLOW_KEY = "trackit:quickAddWizardFlow";
+const WIDE_LAYOUT_KEY = "trackit:quickAddWideLayout";
+
+function loadWizardFlowPref(): boolean {
+  try {
+    const raw = window.localStorage.getItem(WIZARD_FLOW_KEY);
+    if (raw === null) return true;
+    return raw === "1" || raw === "true";
+  } catch {
+    return true;
+  }
+}
+
+function loadWideLayoutPref(): boolean {
+  try {
+    return window.localStorage.getItem(WIDE_LAYOUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 const TARGET_PHOTO_BYTES = 1_800_000;
 const FAVORITES_TOP = 5;
 
@@ -220,6 +241,8 @@ export function MobileQuickAddDialog({
   const [openSection, setOpenSection] = React.useState<
     "details" | "location" | "category" | "unit" | "project" | null
   >(null);
+  const [wizardSectionFlow, setWizardSectionFlow] = React.useState(loadWizardFlowPref);
+  const [expandedSectionLayout, setExpandedSectionLayout] = React.useState(loadWideLayoutPref);
 
   // refs for scroll-into-view
   const sectionNameRef = React.useRef<HTMLDivElement>(null);
@@ -333,6 +356,19 @@ export function MobileQuickAddDialog({
     setSubPickerParent(parent?.children?.length ? parent : null);
   }, [locations]);
 
+  const advanceSectionAfterPick = React.useCallback(
+    (from: "location" | "category" | "unit") => {
+      if (expandedSectionLayout || !wizardSectionFlow) return;
+      const nextMap = {
+        location: "category",
+        category: "unit",
+        unit: "project",
+      } as const;
+      setOpenSection(nextMap[from]);
+    },
+    [expandedSectionLayout, wizardSectionFlow],
+  );
+
   const selectParentLocation = (loc: ItemWithSubcategories) => {
     let nextId = "";
     if (loc.children?.length) {
@@ -345,24 +381,30 @@ export function MobileQuickAddDialog({
     }
     setLocationId(nextId);
     setRackLocation(getDefaultRackSlotForLocationFlatId(locations, nextId));
+    advanceSectionAfterPick("location");
   };
 
   const selectSubLocation = (parent: ItemWithSubcategories, subId: string) => {
     const nextId = `${parent.id}/${subId}`;
     setLocationId(nextId);
     setRackLocation(getDefaultRackSlotForLocationFlatId(locations, nextId));
+    advanceSectionAfterPick("location");
   };
 
-  const selectParentUnit = React.useCallback((u: ItemWithSubcategories) => {
-    setUnit(u.name);
-    if (u.children?.length) {
-      setUnitSubPickerParent(u);
-      setUnitSubcategory(u.children[0].name);
-    } else {
-      setUnitSubPickerParent(null);
-      setUnitSubcategory("");
-    }
-  }, []);
+  const selectParentUnit = React.useCallback(
+    (u: ItemWithSubcategories) => {
+      setUnit(u.name);
+      if (u.children?.length) {
+        setUnitSubPickerParent(u);
+        setUnitSubcategory(u.children[0].name);
+      } else {
+        setUnitSubPickerParent(null);
+        setUnitSubcategory("");
+        advanceSectionAfterPick("unit");
+      }
+    },
+    [advanceSectionAfterPick],
+  );
 
   const hydrate = React.useCallback(() => {
     const prefs = loadPrefs();
@@ -602,11 +644,38 @@ export function MobileQuickAddDialog({
 
   // ── section expand state ────────────────────────────────────────────────────
 
-  const detailsOpen = openSection === "details";
-  const allLocOpen = openSection === "location";
-  const allCatOpen = openSection === "category";
-  const allUnitOpen = openSection === "unit";
-  const allProjOpen = openSection === "project";
+  const detailsOpen = expandedSectionLayout || openSection === "details";
+  const allLocOpen = expandedSectionLayout || openSection === "location";
+  const allCatOpen = expandedSectionLayout || openSection === "category";
+  const allUnitOpen = expandedSectionLayout || openSection === "unit";
+  const allProjOpen = expandedSectionLayout || openSection === "project";
+
+  const persistWizardFlow = React.useCallback((value: boolean) => {
+    setWizardSectionFlow(value);
+    try {
+      window.localStorage.setItem(WIZARD_FLOW_KEY, value ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persistExpandedLayout = React.useCallback((value: boolean) => {
+    setExpandedSectionLayout(value);
+    try {
+      window.localStorage.setItem(WIDE_LAYOUT_KEY, value ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const pickProject = React.useCallback(
+    (nextProjectId: string) => {
+      setProject(nextProjectId);
+      if (expandedSectionLayout || !wizardSectionFlow) return;
+      setOpenSection(null);
+    },
+    [expandedSectionLayout, wizardSectionFlow],
+  );
 
   const sectionHeader = (
     icon: React.ReactNode,
@@ -675,8 +744,10 @@ export function MobileQuickAddDialog({
         <DraggableDialogContent
           showOverlay={false}
           className={cn(
-            "w-[min(calc(100vw-1rem),680px)] gap-0 p-0",
-            "h-[min(92vh,680px)]",
+            "gap-0 p-0",
+            expandedSectionLayout
+              ? "w-[min(calc(100vw-1rem),920px)] h-[min(92vh,820px)]"
+              : "w-[min(calc(100vw-1rem),680px)] h-[min(92vh,680px)]",
           )}
           minWidth={320}
           minHeight={300}
@@ -688,6 +759,24 @@ export function MobileQuickAddDialog({
               <Zap className="h-4 w-4 text-amber-500" aria-hidden />
               Quick add
             </DialogTitle>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={wizardSectionFlow}
+                  onCheckedChange={(checked) => persistWizardFlow(checked === true)}
+                  aria-label="Step through sections"
+                />
+                Step through sections
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={expandedSectionLayout}
+                  onCheckedChange={(checked) => persistExpandedLayout(checked === true)}
+                  aria-label="Show all picker sections"
+                />
+                Show all picker sections (wider)
+              </label>
+            </div>
           </DialogHeader>
 
           {/* ── SELECTION STRIP — current values, tap to jump ───────────────── */}
@@ -892,7 +981,10 @@ export function MobileQuickAddDialog({
                     key={id}
                     type="button"
                     className={chipClass(locationId === id)}
-                    onClick={() => applyLocationId(id)}
+                    onClick={() => {
+                      applyLocationId(id);
+                      advanceSectionAfterPick("location");
+                    }}
                   >
                     {resolveLocationLabel(id, locations)}
                   </button>
@@ -902,7 +994,10 @@ export function MobileQuickAddDialog({
                     key={path}
                     type="button"
                     className={chipClass(category === path)}
-                    onClick={() => setCategory(path)}
+                    onClick={() => {
+                      setCategory(path);
+                      advanceSectionAfterPick("category");
+                    }}
                   >
                     {path}
                   </button>
@@ -1023,7 +1118,10 @@ export function MobileQuickAddDialog({
                             key={path}
                             type="button"
                             className={chipClass(category === path)}
-                            onClick={() => setCategory(path)}
+                            onClick={() => {
+                              setCategory(path);
+                              advanceSectionAfterPick("category");
+                            }}
                           >
                             {path}
                           </button>
@@ -1069,7 +1167,10 @@ export function MobileQuickAddDialog({
                               key={sub.id}
                               type="button"
                               className={chipClass(unit === unitSubPickerParent.name && unitSubcategory === sub.name)}
-                              onClick={() => setUnitSubcategory(sub.name)}
+                              onClick={() => {
+                                setUnitSubcategory(sub.name);
+                                advanceSectionAfterPick("unit");
+                              }}
                             >
                               {sub.name}
                             </button>
@@ -1094,7 +1195,7 @@ export function MobileQuickAddDialog({
                 {allProjOpen && (
                   <div className="px-3 pb-3 pt-1.5">
                     <div className="flex flex-wrap gap-1">
-                      <button type="button" className={chipClass(!project)} onClick={() => setProject("")}>
+                      <button type="button" className={chipClass(!project)} onClick={() => pickProject("")}>
                         None
                       </button>
                       {projects.map((p) => (
@@ -1102,7 +1203,7 @@ export function MobileQuickAddDialog({
                           key={p.id}
                           type="button"
                           className={chipClass(project === p.id || project === p.name)}
-                          onClick={() => setProject(p.id)}
+                          onClick={() => pickProject(p.id)}
                         >
                           {p.name}
                         </button>

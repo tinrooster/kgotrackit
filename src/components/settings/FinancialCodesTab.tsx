@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { FinancialCodeEntry } from '@/lib/financialSettingsService';
 import {
   AlertDialog,
@@ -20,16 +21,20 @@ interface FinancialCodesTabProps {
   costCenters: FinancialCodeEntry[];
   onChangeExpenseTypes: (entries: FinancialCodeEntry[]) => void;
   onChangeCostCenters: (entries: FinancialCodeEntry[]) => void;
+  /** Match Settings lookup-list panel shell (e.g. Categories). */
+  lookupPanelCardClassName?: string;
 }
 
 const FinancialCodeEditor = ({
   title,
   entries,
   onChange,
+  cardClassName,
 }: {
   title: string;
   entries: FinancialCodeEntry[];
   onChange: (entries: FinancialCodeEntry[]) => void;
+  cardClassName?: string;
 }) => {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -59,7 +64,7 @@ const FinancialCodeEditor = ({
   const pendingEntry = pendingDeleteId ? entries.find((e) => e.id === pendingDeleteId) : undefined;
 
   return (
-    <Card>
+    <Card className={cn(cardClassName)}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
@@ -130,11 +135,22 @@ export function FinancialCodesTab({
   costCenters,
   onChangeExpenseTypes,
   onChangeCostCenters,
+  lookupPanelCardClassName,
 }: FinancialCodesTabProps) {
   return (
     <div className="space-y-4">
-      <FinancialCodeEditor title="Expense Type" entries={expenseTypes} onChange={onChangeExpenseTypes} />
-      <FinancialCodeEditor title="Cost Center / Allocation" entries={costCenters} onChange={onChangeCostCenters} />
+      <FinancialCodeEditor
+        title="Expense Type"
+        entries={expenseTypes}
+        onChange={onChangeExpenseTypes}
+        cardClassName={lookupPanelCardClassName}
+      />
+      <FinancialCodeEditor
+        title="Cost Center / Allocation"
+        entries={costCenters}
+        onChange={onChangeCostCenters}
+        cardClassName={lookupPanelCardClassName}
+      />
     </div>
   );
 }

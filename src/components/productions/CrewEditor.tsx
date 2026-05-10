@@ -113,7 +113,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
   const [expandedDepartmentNames, setExpandedDepartmentNames] = useState<string[]>([]);
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
   const [memberSortMode, setMemberSortMode] = useState<CrewSortMode>('manual');
-  const [cardDensityMode, setCardDensityMode] = useState<CrewCardDensityMode>('detailed');
+  const [cardDensityMode, setCardDensityMode] = useState<CrewCardDensityMode>('compact');
   const [expandedMemberIds, setExpandedMemberIds] = useState<string[]>([]);
   const [draggingDepartmentName, setDraggingDepartmentName] = useState<string | null>(null);
   const [draggingMemberId, setDraggingMemberId] = useState<string | null>(null);
@@ -811,7 +811,22 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                       clearDraggingMemberState();
                     }}
                   >
-                    <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <button
+                      type="button"
+                      className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title="Double-click to expand full details"
+                      aria-label={`Open details for ${member.name || 'crew member'}`}
+                      onDoubleClick={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        if (readOnly) return;
+                        setExpandedMemberIds((previous) =>
+                          previous.includes(member.id) ? previous : [...previous, member.id],
+                        );
+                      }}
+                    >
+                      <User className="h-4 w-4" aria-hidden />
+                    </button>
                     <div className="min-w-0 flex-1 space-y-2">
                       {matchedMasterContact ? (
                         <div className="flex flex-wrap items-center gap-1">
@@ -918,7 +933,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                   <OptionalFormCollapsible title="Assignment shifts">
                                     <div className="space-y-2">
                                       {(member.shifts ?? []).map((shift) => (
-                                        <div key={shift.id} className="grid grid-cols-6 gap-1 rounded border p-1.5">
+                                        <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 lg:grid-cols-6">
                                           <Input className="h-7 text-xs" type="date" value={shift.date} onChange={(event) => updateShiftForMember(member.id, shift.id, { date: normalizeDateInputValue(event.target.value) })} />
                                           <TimeInput
                                             className="h-7 text-xs"
@@ -947,7 +962,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                           <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
                                         </div>
                                       ))}
-                                      <div className="grid grid-cols-6 gap-1 rounded border border-dashed p-1.5">
+                                      <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 lg:grid-cols-6">
                                         <Input className="h-7 text-xs" type="date" value={getShiftDraft(member.id).date} onChange={(event) => updateShiftDraft(member.id, { date: normalizeDateInputValue(event.target.value) })} />
                                         <TimeInput
                                           className="h-7 text-xs"
@@ -968,7 +983,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                           onBlurCommit={(value) => updateShiftDraft(member.id, { endTime: value ?? '' })}
                                         />
                                         <Input className="h-7 text-xs" placeholder="Location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
-                                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift</Button>
+                                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift row</Button>
                                         <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
                                       </div>
                                     </div>
@@ -1025,7 +1040,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                               <OptionalFormCollapsible title="Assignment shifts">
                                 <div className="space-y-2">
                                   {(member.shifts ?? []).map((shift) => (
-                                    <div key={shift.id} className="grid grid-cols-6 gap-1 rounded border p-1.5">
+                                    <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 lg:grid-cols-6">
                                       <Input className="h-7 text-xs" type="date" value={shift.date} onChange={(event) => updateShiftForMember(member.id, shift.id, { date: normalizeDateInputValue(event.target.value) })} />
                                       <TimeInput
                                         className="h-7 text-xs"
@@ -1054,7 +1069,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                       <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
                                     </div>
                                   ))}
-                                  <div className="grid grid-cols-6 gap-1 rounded border border-dashed p-1.5">
+                                  <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 lg:grid-cols-6">
                                     <Input className="h-7 text-xs" type="date" value={getShiftDraft(member.id).date} onChange={(event) => updateShiftDraft(member.id, { date: normalizeDateInputValue(event.target.value) })} />
                                     <TimeInput
                                       className="h-7 text-xs"
@@ -1075,7 +1090,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                       onBlurCommit={(value) => updateShiftDraft(member.id, { endTime: value ?? '' })}
                                     />
                                     <Input className="h-7 text-xs" placeholder="Location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
-                                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift</Button>
+                                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift row</Button>
                                     <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
                                   </div>
                                 </div>

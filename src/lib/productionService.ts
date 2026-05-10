@@ -8,6 +8,9 @@ import {
 } from '@/lib/vehiclePacklistUtils';
 
 export const PRODUCTIONS_UPDATED_EVENT = 'trackit:productions-updated';
+
+/** Check-in/out audit trail for production-linked inventory (separate from cabinet Checkout page). */
+export const PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY = 'production-inventory-checkout-activities';
 export const INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT = 'trackit:inventory-production-allocation-updated';
 
 export interface InventoryProductionAllocation {
@@ -169,10 +172,10 @@ function recordCheckoutRecentActivity(
     component: 'ProductionDetail',
   };
   try {
-    const raw = localStorage.getItem('checkout-recent-activities');
+    const raw = localStorage.getItem(PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY);
     const existing = raw ? JSON.parse(raw) : [];
     const next = Array.isArray(existing) ? [...existing, entry] : [entry];
-    localStorage.setItem('checkout-recent-activities', JSON.stringify(next.slice(-500)));
+    localStorage.setItem(PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY, JSON.stringify(next.slice(-500)));
   } catch {
     // ignore recent activity persistence failures
   }

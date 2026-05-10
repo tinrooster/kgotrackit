@@ -95,6 +95,16 @@ export function BulkInventorySelectionDialog({
     setOpen(false);
   };
 
+  const selectAllFiltered = () => {
+    setSelectedIds((previous) => {
+      const next = { ...previous };
+      for (const item of filteredItems) next[item.id] = true;
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds({});
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -141,6 +151,28 @@ export function BulkInventorySelectionDialog({
                 <SelectItem value="remote">Remote production only</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-8"
+              disabled={filteredItems.length === 0}
+              onClick={selectAllFiltered}
+            >
+              Select all in view
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={selectedCount === 0}
+              onClick={clearSelection}
+            >
+              Clear selection
+            </Button>
           </div>
 
           <div className="overflow-auto px-4 py-3">

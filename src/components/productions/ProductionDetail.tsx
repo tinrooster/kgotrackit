@@ -58,6 +58,8 @@ function formatDate(d?: string) {
 interface ProductionDetailProps {
   production: Production | null;
   inventoryItems: InventoryItem[];
+  /** Reload inventory from storage (e.g. after edits on Inventory page). */
+  onRefreshInventory?: () => void;
   currentUsername?: string;
   onUpdate: (id: string, updates: Partial<Production>) => void;
   onDelete: (id: string) => void;
@@ -70,6 +72,7 @@ interface ProductionDetailProps {
 export function ProductionDetail({
   production,
   inventoryItems,
+  onRefreshInventory,
   currentUsername,
   onUpdate,
   onDelete,
@@ -365,6 +368,7 @@ export function ProductionDetail({
                     groups={production.checklistGroups}
                     onChange={handleChecklistChange}
                     inventoryItems={inventoryItems}
+                    onRefreshInventory={onRefreshInventory}
                     requireDeleteConfirm={confirmListDeletes}
                   />
                 </TabsContent>

@@ -255,6 +255,7 @@ export default function PlannerWorkspacePage() {
                   handleUpdate({ checklistGroups, vehiclePacklists });
                 }}
                 inventoryItems={inventoryItems}
+                onRefreshInventory={() => setInventoryItems(getItems())}
                 requireDeleteConfirm={confirmListDeletes}
               />
             </TabsContent>
@@ -303,6 +304,12 @@ export default function PlannerWorkspacePage() {
               />
             </TabsContent>
             <TabsContent value="overview" className="space-y-3 text-sm">
+              <div className="max-w-xl">
+                <ProductionFusedStripProgress
+                  metrics={getProductionProgressSnapshot(selectedProduction)}
+                  density="comfortable"
+                />
+              </div>
               <div className="rounded-md border bg-muted/20 p-2">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="rounded-md border bg-background px-3 py-2">
@@ -316,7 +323,8 @@ export default function PlannerWorkspacePage() {
                   <div className="rounded-md border bg-background px-3 py-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Dates</p>
                     <p className="text-sm">
-                      {selectedProduction.startDate || '—'} {selectedProduction.endDate ? `to ${selectedProduction.endDate}` : ''}
+                      {selectedProduction.startDate || '—'}{' '}
+                      {selectedProduction.endDate ? `to ${selectedProduction.endDate}` : ''}
                     </p>
                   </div>
                   <div className="rounded-md border bg-background px-3 py-2">
@@ -325,6 +333,35 @@ export default function PlannerWorkspacePage() {
                   </div>
                 </div>
               </div>
+              {(() => {
+                const snap = getProductionProgressSnapshot(selectedProduction);
+                const blocks = selectedProduction.crewSchedule?.length ?? 0;
+                const vehicles = selectedProduction.vehiclePacklists.length;
+                return (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="rounded-md border bg-background px-3 py-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Field checklist</p>
+                      <p className="text-sm tabular-nums">
+                        {snap.checklist.done}/{snap.checklist.total} done ({snap.checklist.percent}%)
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-background px-3 py-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vehicle packlists</p>
+                      <p className="text-sm tabular-nums">
+                        {snap.packlists.done}/{snap.packlists.total} done ({snap.packlists.percent}%) · {vehicles}{' '}
+                        vehicle{vehicles === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-background px-3 py-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Crew & schedule</p>
+                      <p className="text-sm tabular-nums">
+                        {snap.crew.scheduled}/{snap.crew.crewCount} on schedule ({snap.crew.percent}%) · {blocks} block
+                        {blocks === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </div>

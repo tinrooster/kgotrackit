@@ -1,16 +1,5 @@
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
-import {
-  Plus,
-  Trash2,
-  GripVertical,
-  Link2,
-  Unlink,
-  ChevronDown,
-  ChevronRight,
-  MoreHorizontal,
-  Layers,
-  Pencil,
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2, GripVertical, Link2, Unlink, ChevronDown, ChevronRight, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { ChecklistGroup, ChecklistItem } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { Button } from '@/components/ui/button';
@@ -18,10 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ListExpandAllSwitch } from '@/components/ui/list-expand-all-switch';
-import { LineCompletionBadge } from '@/components/list-rows';
 import { cn } from '@/lib/utils';
-import { getStableGroupAccentHex } from '@/lib/groupAccentColor';
 import { InventoryItemPicker } from './InventoryItemPicker';
 import { BulkInventorySelectionDialog, BulkSelectionResult } from './BulkInventorySelectionDialog';
 import {
@@ -45,23 +31,11 @@ interface ChecklistEditorProps {
   groups: ChecklistGroup[];
   onChange: (groups: ChecklistGroup[]) => void;
   inventoryItems?: InventoryItem[];
+  /** Reload inventory list from storage (names/links after changes elsewhere). */
+  onRefreshInventory?: () => void;
   /** When true, renders compact read-only checkboxes only (no edit controls). */
   readOnly?: boolean;
   requireDeleteConfirm?: boolean;
-  /**
-   * When set, checkbox toggles apply these patches instead of only `{ completed }`
-   * (e.g. field sign-off timestamps on Field checklist).
-   */
-  mergeOnCompletionToggle?: (item: ChecklistItem, completed: boolean) => Partial<ChecklistItem>;
-  /** Called after a checkbox toggle (e.g. audit logging). */
-  onCompletionToggle?: (args: {
-    groupId: string;
-    groupTitle: string;
-    item: ChecklistItem;
-    completed: boolean;
-  }) => void;
-  /** Extra content under the item label (e.g. field completed-by line). */
-  renderItemBelowLabel?: (item: ChecklistItem) => ReactNode;
 }
 
 function newItem(label: string): ChecklistItem {
@@ -72,76 +46,56 @@ function newGroup(title: string): ChecklistGroup {
   return { id: crypto.randomUUID(), title, items: [] };
 }
 
+function getGroupAccentHex(groupTitle: string): string {
+  const key = groupTitle.trim().toLowerCase() || 'group';
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 70% 58%)`;
+}
+
 export function ChecklistEditor({
   groups,
   onChange,
   inventoryItems = [],
+  onRefreshInventory,
   readOnly = false,
   requireDeleteConfirm = false,
-  mergeOnCompletionToggle,
-  onCompletionToggle,
-  renderItemBelowLabel,
 }: ChecklistEditorProps) {
   const [newGroupTitle, setNewGroupTitle] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<{ groupId?: string; itemId?: string } | null>(null);
   const [expandedGroupIds, setExpandedGroupIds] = useState<string[]>([]);
-  /** Inline add row per section: hidden until user clicks + on that section (Theme 11). */
-  const [inlineAddOpenByGroup, setInlineAddOpenByGroup] = useState<Record<string, boolean>>({});
-
-  const [editingGroupTitleId, setEditingGroupTitleId] = useState<string | null>(null);
-  const [editingGroupTitleText, setEditingGroupTitleText] = useState('');
+  /** When true, the dashed "Add item…" row is shown for that section (header action toggles). */
+  const [addItemRowVisibleByGroupId, setAddItemRowVisibleByGroupId] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const validIds = new Set(groups.map((group) => group.id));
     setExpandedGroupIds((previous) => previous.filter((id) => validIds.has(id)));
-    setInlineAddOpenByGroup((prev) => {
-      const next = { ...prev };
-      for (const id of Object.keys(next)) {
-        if (!validIds.has(id)) delete next[id];
+    setAddItemRowVisibleByGroupId((previous) => {
+      const next: Record<string, boolean> = {};
+      let changed = false;
+      for (const [groupId, visible] of Object.entries(previous)) {
+        if (validIds.has(groupId)) next[groupId] = visible;
+        else changed = true;
       }
+      if (!changed && Object.keys(next).length === Object.keys(previous).length) return previous;
       return next;
     });
-    setEditingGroupTitleId((id) => (id && validIds.has(id) ? id : null));
   }, [groups]);
-
-  /** Dropping a section from expanded state clears its add-row draft so nothing stays “sticky” while collapsed. */
-  useEffect(() => {
-    const expanded = new Set(expandedGroupIds);
-    setInlineAddOpenByGroup((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const gid of Object.keys(next)) {
-        if (!expanded.has(gid) && next[gid]) {
-          next[gid] = false;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-    setNewItemLabels((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const gid of Object.keys(next)) {
-        if (!expanded.has(gid) && next[gid]) {
-          delete next[gid];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [expandedGroupIds]);
   const [draggingItem, setDraggingItem] = useState<{ groupId: string; itemId: string } | null>(null);
   const [editingItem, setEditingItem] = useState<{ groupId: string; itemId: string } | null>(null);
   const [editingLabel, setEditingLabel] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupTitle, setEditingGroupTitle] = useState('');
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [completionFilter, setCompletionFilter] = useState<'all' | 'open' | 'done'>('all');
   const [sortMode, setSortMode] = useState<'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'>('manual');
 
-  const expandAllSwitchId = useId();
   const allGroupIds = useMemo(() => groups.map((group) => group.id), [groups]);
-  const allSectionsExpanded =
-    allGroupIds.length > 0 && allGroupIds.every((id) => expandedGroupIds.includes(id));
 
   const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
     if (!requireDeleteConfirm) {
@@ -195,11 +149,43 @@ export function ChecklistEditor({
   };
 
   const toggleGroupExpanded = (groupId: string) => {
-    setExpandedGroupIds((previous) =>
-      previous.includes(groupId)
-        ? previous.filter((id) => id !== groupId)
-        : [...previous, groupId]
-    );
+    setExpandedGroupIds((previous) => {
+      if (previous.includes(groupId)) {
+        setAddItemRowVisibleByGroupId((v) => ({ ...v, [groupId]: false }));
+        return previous.filter((id) => id !== groupId);
+      }
+      return [...previous, groupId];
+    });
+  };
+
+  const toggleAddItemRowForGroup = (groupId: string) => {
+    setAddItemRowVisibleByGroupId((previous) => {
+      const willShow = !previous[groupId];
+      if (willShow) {
+        setExpandedGroupIds((expanded) => (expanded.includes(groupId) ? expanded : [...expanded, groupId]));
+      }
+      return { ...previous, [groupId]: willShow };
+    });
+  };
+
+  const startGroupTitleEdit = (groupId: string, currentTitle: string) => {
+    setEditingGroupId(groupId);
+    setEditingGroupTitle(currentTitle);
+  };
+
+  const commitGroupTitleEdit = () => {
+    if (!editingGroupId) return;
+    const nextTitle = editingGroupTitle.trim();
+    if (nextTitle) {
+      updateGroup(editingGroupId, { title: nextTitle });
+    }
+    setEditingGroupId(null);
+    setEditingGroupTitle('');
+  };
+
+  const cancelGroupTitleEdit = () => {
+    setEditingGroupId(null);
+    setEditingGroupTitle('');
   };
 
   const moveItemInGroup = (groupId: string, sourceItemId: string, targetItemId: string) => {
@@ -292,79 +278,111 @@ export function ChecklistEditor({
   return (
     <div className="space-y-3">
       <div className="rounded-md border bg-muted/20 p-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
           <Input
             placeholder="Search checklist items..."
             value={listSearchQuery}
             onChange={(event) => setListSearchQuery(event.target.value)}
-            className="h-8 min-w-[min(100%,12rem)] flex-1 text-sm"
+            className="h-8 text-sm"
           />
-          <Select value={completionFilter} onValueChange={(value) => setCompletionFilter(value as 'all' | 'open' | 'done')}>
-            <SelectTrigger className="h-8 w-full sm:w-[180px]">
-              <SelectValue placeholder="Filter status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All status</SelectItem>
-              <SelectItem value="open">Open only</SelectItem>
-              <SelectItem value="done">Completed only</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={sortMode}
-            onValueChange={(value) => setSortMode(value as 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc')}
-          >
-            <SelectTrigger className="h-8 w-full sm:w-[180px]">
-              <SelectValue placeholder="Sort" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="manual">Manual order</SelectItem>
-              <SelectItem value="name_asc">Name (A-Z)</SelectItem>
-              <SelectItem value="name_desc">Name (Z-A)</SelectItem>
-              <SelectItem value="qty_asc">Qty (low-high)</SelectItem>
-              <SelectItem value="qty_desc">Qty (high-low)</SelectItem>
-            </SelectContent>
-          </Select>
-          <ListExpandAllSwitch
-            className="sm:ml-auto"
-            id={expandAllSwitchId}
-            label="Expand all"
-            allExpanded={allSectionsExpanded}
-            onExpandAll={() => setExpandedGroupIds([...allGroupIds])}
-            onCollapseAll={() => setExpandedGroupIds([])}
+          <div className="flex items-center gap-2">
+            <Select value={completionFilter} onValueChange={(value) => setCompletionFilter(value as 'all' | 'open' | 'done')}>
+              <SelectTrigger className="h-8 w-full sm:w-[180px]">
+                <SelectValue placeholder="Filter status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="open">Open only</SelectItem>
+                <SelectItem value="done">Completed only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={sortMode}
+              onValueChange={(value) => setSortMode(value as 'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc')}
+            >
+              <SelectTrigger className="h-8 w-full sm:w-[180px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Manual order</SelectItem>
+                <SelectItem value="name_asc">Name (A-Z)</SelectItem>
+                <SelectItem value="name_desc">Name (Z-A)</SelectItem>
+                <SelectItem value="qty_asc">Qty (low-high)</SelectItem>
+                <SelectItem value="qty_desc">Qty (high-low)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+          {onRefreshInventory ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1"
+              onClick={() => onRefreshInventory()}
+              title="Reload inventory from storage"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Sync inventory
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setExpandedGroupIds(allGroupIds)}
             disabled={allGroupIds.length === 0}
-          />
+          >
+            Expand all
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => {
+              setExpandedGroupIds([]);
+              setAddItemRowVisibleByGroupId({});
+            }}
+            disabled={expandedGroupIds.length === 0}
+          >
+            Collapse all
+          </Button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/80 bg-background/70 px-2 py-1.5">
+          <span className="text-xs font-medium text-foreground/90">Legend:</span>
+          <Badge className="border border-green-300 bg-green-100 text-green-800 dark:border-green-500/40 dark:bg-green-600/20 dark:text-green-200">
+            Completed
+          </Badge>
+          <Badge className="border border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-500/40 dark:bg-slate-600/20 dark:text-slate-200">
+            Open
+          </Badge>
+          <Badge className="border border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-500/40 dark:bg-blue-600/20 dark:text-blue-200">
+            Linked
+          </Badge>
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Item checkbox marks completion status only (not multi-select for list actions).
+      </p>
       {groups.map((group) => (
         <div
           key={group.id}
           className="rounded-lg border border-border/90 bg-card/95 p-2.5 shadow-sm"
-          style={{ borderLeftColor: getStableGroupAccentHex(group.title), borderLeftWidth: '4px' }}
+          style={{ borderLeftColor: getGroupAccentHex(group.title), borderLeftWidth: '4px' }}
         >
           <div
-            className="mb-2 flex items-center gap-2 rounded-md border border-border/70 bg-muted/75 px-2 py-1.5 shadow-sm dark:bg-muted/55"
-            onDoubleClick={(event) => {
-              if ((event.target as HTMLElement).closest('button, input, a, [role="menuitem"]')) return;
-              toggleGroupExpanded(group.id);
-            }}
+            className="mb-2 flex items-center gap-2 rounded-md border border-border/80 bg-muted/50 px-2 py-1.5"
+            onDoubleClick={() => toggleGroupExpanded(group.id)}
           >
             <Button
               variant="ghost"
               size="icon"
-              className={cn(
-                'h-7 w-7 shrink-0 rounded-md border border-transparent bg-background/90 shadow-sm transition-colors hover:bg-background dark:bg-background/60',
-                !expandedGroupIds.includes(group.id) &&
-                  group.items.length > 0 &&
-                  'border-primary/30 text-primary ring-1 ring-primary/20 ring-offset-1 ring-offset-background',
-              )}
+              className="h-6 w-6 shrink-0"
               onClick={() => toggleGroupExpanded(group.id)}
               title={expandedGroupIds.includes(group.id) ? 'Collapse section' : 'Expand section'}
-              aria-expanded={expandedGroupIds.includes(group.id)}
-              aria-label={
-                expandedGroupIds.includes(group.id)
-                  ? 'Collapse section'
-                  : `Expand section (${group.items.length} lines)`
-              }
             >
               {expandedGroupIds.includes(group.id) ? (
                 <ChevronDown className="h-3.5 w-3.5" />
@@ -373,59 +391,45 @@ export function ChecklistEditor({
               )}
             </Button>
             {!readOnly && <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
-            {readOnly ? (
-              <span className="flex-1 text-sm font-medium">{group.title}</span>
-            ) : editingGroupTitleId === group.id ? (
+            {editingGroupId === group.id && !readOnly ? (
               <Input
-                className="h-7 flex-1 min-w-0 border-input bg-background px-2 text-sm font-medium shadow-sm focus-visible:ring-2"
-                value={editingGroupTitleText}
+                className="h-7 flex-1 border-none bg-transparent p-0 text-sm font-medium shadow-none focus-visible:ring-0"
+                value={editingGroupTitle}
+                onChange={(event) => setEditingGroupTitle(event.target.value)}
+                onBlur={commitGroupTitleEdit}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    commitGroupTitleEdit();
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cancelGroupTitleEdit();
+                  }
+                }}
                 autoFocus
-                onChange={(e) => setEditingGroupTitleText(e.target.value)}
-                onBlur={() => {
-                  const next = editingGroupTitleText.trim();
-                  if (next.length > 0) {
-                    updateGroup(group.id, { title: next });
-                  }
-                  setEditingGroupTitleId(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    (e.target as HTMLInputElement).blur();
-                  }
-                  if (e.key === 'Escape') {
-                    e.preventDefault();
-                    setEditingGroupTitleText(group.title);
-                    setEditingGroupTitleId(null);
-                  }
-                }}
               />
             ) : (
-              <span className="flex-1 min-w-0 px-1.5 py-1 text-left text-sm font-medium leading-snug line-clamp-2 break-words">
-                {group.title || 'Untitled section'}
-              </span>
+              <span className="flex-1 text-sm font-medium">{group.title}</span>
             )}
-            <Badge
-              variant="secondary"
-              className={cn(
-                'shrink-0 gap-1 tabular-nums font-semibold shadow-sm',
-                group.items.length > 0 && 'border border-primary/20 bg-primary/10 text-foreground dark:bg-primary/15',
-              )}
-              title={group.items.length === 1 ? '1 line in this section' : `${group.items.length} lines in this section`}
-            >
-              <Layers className="h-3 w-3 opacity-80" aria-hidden />
-              {group.items.length}
-            </Badge>
+            <span className="rounded bg-background/80 px-1.5 py-0.5 text-xs text-muted-foreground">
+              {group.items.length} items
+            </span>
             {!readOnly && (
               <Button
                 type="button"
-                variant="ghost"
+                variant={addItemRowVisibleByGroupId[group.id] ? 'secondary' : 'ghost'}
                 size="icon"
                 className="h-6 w-6 shrink-0"
-                title="Add items to this section"
-                onClick={() => {
-                  setExpandedGroupIds((prev) => (prev.includes(group.id) ? prev : [...prev, group.id]));
-                  setInlineAddOpenByGroup((prev) => ({ ...prev, [group.id]: true }));
+                title={
+                  addItemRowVisibleByGroupId[group.id]
+                    ? 'Hide add-item row'
+                    : 'Add items (typed, link inventory, or bulk pick)'
+                }
+                aria-pressed={addItemRowVisibleByGroupId[group.id] ? true : false}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleAddItemRowForGroup(group.id);
                 }}
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -442,12 +446,19 @@ export function ChecklistEditor({
                   <DropdownMenuItem
                     onSelect={(event) => {
                       event.preventDefault();
-                      setEditingGroupTitleId(group.id);
-                      setEditingGroupTitleText(group.title);
+                      startGroupTitleEdit(group.id, group.title);
                     }}
                   >
-                    <Pencil className="mr-2 h-3.5 w-3.5" />
-                    Rename section
+                    Edit section name
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      toggleAddItemRowForGroup(group.id);
+                    }}
+                  >
+                    <Plus className="mr-2 h-3.5 w-3.5" />
+                    {addItemRowVisibleByGroupId[group.id] ? 'Hide add items row' : 'Add items…'}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
@@ -462,9 +473,7 @@ export function ChecklistEditor({
               </DropdownMenu>
             )}
           </div>
-          {expandedGroupIds.includes(group.id) && (
-          <div className="ml-3 border-l-2 border-border/55 pl-3 md:ml-4 md:pl-4">
-          <div className="divide-y rounded-md border border-border/70 bg-background">
+          {expandedGroupIds.includes(group.id) && <div className="divide-y rounded-md border border-border/70 bg-background">
             {getVisibleItems(group.items).map((item) => {
               const invName = resolveInventoryName(item.inventoryItemId);
               const isEditingItemLabel =
@@ -488,21 +497,10 @@ export function ChecklistEditor({
                 >
                   {!readOnly && <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground" />}
                   <Checkbox
-                    className="focus-visible:ring-1 focus-visible:ring-offset-1"
                     checked={item.completed}
-                    onCheckedChange={(checked) => {
-                      const completed = Boolean(checked);
-                      const patches = mergeOnCompletionToggle
-                        ? mergeOnCompletionToggle(item, completed)
-                        : { completed };
-                      updateItem(group.id, item.id, patches);
-                      onCompletionToggle?.({
-                        groupId: group.id,
-                        groupTitle: group.title,
-                        item: { ...item, ...patches },
-                        completed,
-                      });
-                    }}
+                    onCheckedChange={(checked) =>
+                      updateItem(group.id, item.id, { completed: Boolean(checked) })
+                    }
                     title={item.completed ? 'Mark as not completed' : 'Mark as completed'}
                   />
                   {isEditingItemLabel ? (
@@ -534,58 +532,58 @@ export function ChecklistEditor({
                       autoFocus
                     />
                   ) : (
-                    <div className="min-w-0 flex-1">
-                      <span className={cn('text-sm', item.completed && 'text-muted-foreground')}>
-                        {item.label}
-                        {invName && item.inventoryItemId && item.label !== invName && (
-                          <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
-                        )}
-                        {item.inventoryItemId && (
-                          <Link2 className="ml-1 inline h-3 w-3 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
-                        )}
-                      </span>
-                      {renderItemBelowLabel?.(item)}
-                    </div>
-                  )}
-                  {item.completed && <LineCompletionBadge kind="completed" />}
-                  {!readOnly ? (
-                    <Input
-                      type="number"
-                      min={1}
-                      className="h-7 w-16 min-w-[2.75rem] shrink-0 border-2 border-border bg-muted/50 text-center text-sm font-semibold tabular-nums text-foreground shadow-sm"
-                      value={item.quantity ?? 1}
-                      onChange={(e) =>
-                        updateItem(group.id, item.id, {
-                          quantity: Math.max(1, Number(e.target.value) || 1),
-                        })
-                      }
-                    />
-                  ) : (
-                    <span
-                      className="inline-flex h-7 min-w-[2.5rem] shrink-0 items-center justify-center rounded-md border border-border bg-muted/50 px-2 text-sm font-semibold tabular-nums text-foreground shadow-sm"
-                      title="Quantity"
-                    >
-                      ×{item.quantity ?? 1}
-                    </span>
-                  )}
-                  {item.reservedQuantity ? (
-                    <span className="text-xs text-amber-700 dark:text-amber-300">
-                      reserved {item.reservedQuantity}
-                    </span>
-                  ) : null}
-                  {item.checkedOutQuantity ? (
-                    <span className="text-xs text-blue-700 dark:text-blue-300">
-                      out {item.checkedOutQuantity}
-                    </span>
-                  ) : null}
-                  {!readOnly && (
-                    <>
-                      {inventoryItems.length > 0 && !item.inventoryItemId && (
-                        <InventoryItemPicker
-                          inventoryItems={inventoryItems}
-                          onSelect={(inv) => linkInventoryItem(group.id, item.id, inv)}
-                        />
+                    <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
+                      {item.label}
+                      {invName && item.inventoryItemId && item.label !== invName && (
+                        <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
                       )}
+                      {item.inventoryItemId && (
+                        <Link2 className="ml-1 inline h-3 w-3 text-blue-500" />
+                      )}
+                      {item.completed && (
+                        <span className="ml-2 rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-300">
+                          Completed
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-2 shrink-0">
+                    {item.reservedQuantity ? (
+                      <span className="text-xs text-amber-700 dark:text-amber-300">
+                        reserved {item.reservedQuantity}
+                      </span>
+                    ) : null}
+                    {item.checkedOutQuantity ? (
+                      <span className="text-xs text-blue-700 dark:text-blue-300">
+                        out {item.checkedOutQuantity}
+                      </span>
+                    ) : null}
+                    {!readOnly ? (
+                      <Input
+                        type="number"
+                        min={1}
+                        className="h-7 w-16 text-xs"
+                        value={item.quantity ?? 1}
+                        onChange={(e) =>
+                          updateItem(group.id, item.id, {
+                            quantity: Math.max(1, Number(e.target.value) || 1),
+                          })
+                        }
+                      />
+                    ) : (
+                      <span className="w-16 text-right text-xs text-muted-foreground">×{item.quantity ?? 1}</span>
+                    )}
+                    {!readOnly ? (
+                      <div className="w-7">
+                        {inventoryItems.length > 0 && !item.inventoryItemId ? (
+                          <InventoryItemPicker
+                            inventoryItems={inventoryItems}
+                            onSelect={(inv) => linkInventoryItem(group.id, item.id, inv)}
+                          />
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {!readOnly ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Item actions">
@@ -624,14 +622,14 @@ export function ChecklistEditor({
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </>
-                  )}
+                    ) : null}
+                  </div>
                 </div>
               );
             })}
-          </div>
-          {!readOnly && inlineAddOpenByGroup[group.id] && (
-            <div className="mt-2 flex gap-2 rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-2 dark:bg-muted/10">
+          </div>}
+          {!readOnly && expandedGroupIds.includes(group.id) && addItemRowVisibleByGroupId[group.id] && (
+            <div className="mt-2 flex gap-2 rounded-md border border-dashed border-border/80 px-3 py-2">
               <Input
                 placeholder="Add item..."
                 className="h-7 text-sm"
@@ -665,8 +663,6 @@ export function ChecklistEditor({
                 </>
               )}
             </div>
-          )}
-          </div>
           )}
         </div>
       ))}

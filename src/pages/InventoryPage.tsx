@@ -850,7 +850,19 @@ export default function InventoryPage() {
   const flattenedCategories = useMemo(() => flattenCategories(categories), [categories]);
 
   // Get unique values for filters
-  const uniqueLocations = useMemo(() => locations.map(loc => loc.name), [locations]);
+  /** Labels accepted by `normalizeLocationValue` (parents, parent/child paths, leaf names). */
+  const uniqueLocations = useMemo(() => {
+    const labels = new Set<string>();
+    for (const loc of locations) {
+      if (loc.name) labels.add(loc.name);
+      for (const child of loc.children || []) {
+        if (!child.name) continue;
+        labels.add(`${loc.name}/${child.name}`);
+        labels.add(child.name);
+      }
+    }
+    return Array.from(labels).sort((a, b) => a.localeCompare(b));
+  }, [locations]);
   const uniqueProjects = useMemo(() => projects.map(proj => proj.name), [projects]);
   const uniqueSuppliers = useMemo(() => suppliers.map(sup => sup.name), [suppliers]);
   const uniqueUnits = useMemo(() => units.map(u => u.name), [units]);

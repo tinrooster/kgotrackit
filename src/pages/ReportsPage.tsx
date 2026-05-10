@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, Copy, Download, FileSpreadsheet, Save, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Download, FileSpreadsheet, Printer, Save, Sparkles, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -21,6 +21,7 @@ import { logger } from '@/lib/logging';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
 import { resolveProjectDisplay } from '@/lib/projectOptions';
+import { loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding';
 
 type BuiltInReportId =
   | 'asset-availability'
@@ -63,6 +64,14 @@ const USER_REPORT_COLUMN_OPTIONS = [
   'decomCutoverDate',
   'decomNotes',
 ];
+
+function escapeHtmlForPrint(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 const BUILT_IN_REPORTS: ReportDefinition[] = [
   { id: 'asset-availability', name: 'Asset Availability', columns: ['recordId', 'assetId', 'name', 'assetStatus', 'location', 'project', 'quantity', 'expenseTypeCode', 'costCenterCode'], kind: 'built-in' },
@@ -414,6 +423,105 @@ export default function ReportsPage() {
     toast({ title: 'Excel report generated', description: `${filename} has been downloaded.` });
   };
 
+  const openPrintableReportPreview = () => {
+    const rows = toReportRows(selectedReport.columns);
+    const headers = selectedReport.columns;
+    const branding = loadAppBranding();
+    const logoSrc = resolveBrandLogoForTheme(branding);
+    const appTitle = branding.appName?.trim() || 'TEd_trackIT';
+    const filtersApplied = [
+      projectFilter !== 'all' ? `Project: ${projectFilter}` : null,
+      locationFilter !== 'all' ? `Location: ${locationFilter}` : null,
+      statusFilter !== 'all' ? `Status: ${statusFilter}` : null,
+      expenseTypeFilter !== 'all' ? `Expense type: ${expenseTypeFilter}` : null,
+    ].filter(Boolean) as string[];
+    const metaParts = [
+      `Generated ${new Date().toLocaleString()}`,
+      `${rows.length} row${rows.length === 1 ? '' : 's'}`,
+      filtersApplied.length > 0 ? `Filters: ${filtersApplied.join(' · ')}` : 'Filters: none',
+    ];
+    const thead = `<tr>${headers.map((h) => `<th>${escapeHtmlForPrint(h)}</th>`).join('')}</tr>`;
+    const tbody = rows
+      .map(
+        (row) =>
+          `<tr>${headers.map((h) => `<td>${escapeHtmlForPrint(String(row[h] ?? ''))}</td>`).join('')}</tr>`
+      )
+      .join('');
+    const logoHtml = logoSrc
+      ? `<img class="brand-logo" src="${escapeHtmlForPrint(logoSrc)}" alt="" />`
+      : '';
+
+    const doc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtmlForPrint(selectedReport.name)}</title>
+  <style>
+    body { font-family: system-ui, "Segoe UI", Roboto, sans-serif; margin: 0; color: #111827; background: #f3f4f6; }
+    .toolbar {
+      position: sticky; top: 0; z-index: 2;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; flex-wrap: wrap;
+      padding: 12px 16px; background: #111827; color: #fff;
+    }
+    .toolbar button {
+      padding: 8px 14px; border-radius: 6px; border: 0; cursor: pointer;
+      background: #2563eb; color: #fff; font-weight: 600; font-size: 14px;
+    }
+    .sheet { max-width: 11in; margin: 16px auto; padding: 24px; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
+    .header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px; }
+    .brand-logo { max-height: 52px; max-width: 220px; object-fit: contain; }
+    h1 { margin: 0 0 6px; font-size: 1.35rem; font-weight: 700; }
+    .meta { margin: 0; font-size: 12px; color: #6b7280; line-height: 1.45; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; word-break: break-word; }
+    th { background: #f9fafb; font-weight: 600; }
+    tr:nth-child(even) td { background: #fafafa; }
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      .sheet { margin: 0; padding: 0; box-shadow: none; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span>Print or save as PDF from the browser dialog.</span>
+    <button type="button" onclick="window.print()">Print / Save PDF</button>
+  </div>
+  <div class="sheet">
+    <div class="header">
+      ${logoHtml}
+      <div>
+        <h1>${escapeHtmlForPrint(appTitle)} — ${escapeHtmlForPrint(selectedReport.name)}</h1>
+        <p class="meta">${escapeHtmlForPrint(metaParts.join(' · '))}</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>${thead}</thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const previewWindow = window.open('', '_blank', 'width=1100,height=850');
+    if (!previewWindow) {
+      toast({
+        title: 'Popup blocked',
+        description: 'Allow popups for this site to open the print preview.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    previewWindow.document.open();
+    previewWindow.document.write(doc);
+    previewWindow.document.close();
+  };
+
   const toggleCustomColumn = (column: string) => {
     setCustomColumns((prev) => (prev.includes(column) ? prev.filter((entry) => entry !== column) : [...prev, column]));
   };
@@ -720,6 +828,10 @@ export default function ReportsPage() {
               <Button size="sm" variant="outline" onClick={exportSelectedReportExcel}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Export Excel
+              </Button>
+              <Button size="sm" variant="outline" onClick={openPrintableReportPreview}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print preview
               </Button>
               <Button
                 type="button"

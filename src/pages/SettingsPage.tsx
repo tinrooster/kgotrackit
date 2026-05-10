@@ -91,7 +91,7 @@ import {
 } from '@/lib/crewDirectoryMigration'
 import { parseContactWorkbookFile, type ParsedContactCandidate } from '@/lib/contactWorkbookImport'
 import { canonicalNameKey, parseContactDisplayName } from '@/lib/contactName'
-import { saveProductions } from '@/lib/productionService'
+import { saveProductions, PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY } from '@/lib/productionService'
 
 type ParsedContactDestination = 'production' | 'org_directory';
 
@@ -373,14 +373,7 @@ function readUserDefinedPanelFromSearch(): UserDefinedPanel {
 function readLibrariesPanelFromSearch(): LibrariesPanel {
   try {
     const raw = new URLSearchParams(window.location.search).get('lp');
-    const allowedPanels: LibrariesPanel[] = [
-      'suppliers',
-      'positionTemplates',
-      'templates',
-      'deviceLibrary',
-      'cabinets',
-      'maintenanceCautions',
-    ];
+    const allowedPanels: LibrariesPanel[] = ['suppliers', 'positionTemplates', 'templates', 'deviceLibrary', 'cabinets'];
     if (raw && allowedPanels.includes(raw as LibrariesPanel)) {
       return raw as LibrariesPanel;
     }
@@ -393,15 +386,8 @@ function readLibrariesPanelFromSearch(): LibrariesPanel {
 export default function SettingsPage() {
   const location = useLocation();
   const { currentUser, authBackend } = useAuth();
-  const {
-    activeWorkspaceId,
-    activeWorkspaceRole,
-    workspaces,
-    loading: workspacesLoading,
-    lastWorkspaceError,
-    selectWorkspace,
-    refreshWorkspaces,
-  } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspaceRole, workspaces, loading: workspacesLoading, lastWorkspaceError } =
+    useWorkspace();
   const {
     organizations,
     activeOrganizationId,
@@ -411,11 +397,9 @@ export default function SettingsPage() {
     refreshOrganizations,
     selectOrganization,
   } = useOrganization();
-  const activeWorkspaceRowForSettings = activeWorkspaceId
-    ? workspaces.find((workspace) => workspace.workspaceId === activeWorkspaceId)
-    : undefined;
-  const activeWorkspaceName = activeWorkspaceRowForSettings?.name ?? null;
-  const activeWorkspaceLinkedOrgName = activeWorkspaceRowForSettings?.organizationName ?? null;
+  const activeWorkspaceName = activeWorkspaceId
+    ? workspaces.find((workspace) => workspace.workspaceId === activeWorkspaceId)?.name ?? null
+    : null;
   
   // Initialize states from URL parameters
   const [mainTab, setMainTab] = useState(() => {
@@ -511,15 +495,7 @@ export default function SettingsPage() {
   /** Member admin UI is backed by workspace-member-admin, which allows workspace admin or owner (not editors). */
   const canManageWorkspaceUsers =
     !!activeWorkspaceId && (activeWorkspaceRole === 'admin' || isActiveWorkspaceOwner);
-  /** Any Supabase user: open Workspaces tab to switch among memberships (viewers/editors included). */
   const canAccessWorkspacesTab = authBackend === 'supabase';
-  /** Workspace utilities, create/delete workspace, manage members — workspace admins + owners only. */
-  const canAccessWorkspaceAdminTab =
-    authBackend === 'supabase' &&
-    (!activeWorkspaceId ||
-      workspacesLoading ||
-      activeWorkspaceRole === 'admin' ||
-      isActiveWorkspaceOwner);
   const activeWorkspaceMissingFromList =
     !!activeWorkspaceId &&
     !workspacesLoading &&
@@ -731,14 +707,7 @@ export default function SettingsPage() {
 
     if (nextSettingsTab === 'libraries') {
       const lpRaw = search.get('lp');
-      const allowedLibraryPanels: LibrariesPanel[] = [
-        'suppliers',
-        'positionTemplates',
-        'templates',
-        'deviceLibrary',
-        'cabinets',
-        'maintenanceCautions',
-      ];
+      const allowedLibraryPanels: LibrariesPanel[] = ['suppliers', 'positionTemplates', 'templates', 'deviceLibrary', 'cabinets'];
       const nextLibraryPanel =
         lpRaw && allowedLibraryPanels.includes(lpRaw as LibrariesPanel)
           ? (lpRaw as LibrariesPanel)
@@ -1320,8 +1289,7 @@ export default function SettingsPage() {
   };
 
   const inferParsedContactDestination = (candidate: ParsedContactCandidate): ParsedContactDestination => {
-    const source =
-      `${candidate.functionalArea ?? ''} ${candidate.department ?? ''} ${candidate.notes ?? ''} ${candidate.sourceSheet ?? ''}`.toLowerCase();
+    const source = `${candidate.functionalArea ?? ''} ${candidate.sourceSheet ?? ''}`.toLowerCase();
     const generalSignals = [
       'facilities',
       'building',
@@ -1430,11 +1398,6 @@ export default function SettingsPage() {
             extension: existing.extension || candidate.extension,
             email: existing.email || candidate.email,
             functionalArea: existing.functionalArea || candidate.functionalArea,
-            department: existing.department || candidate.department,
-            jobTitle: existing.jobTitle || candidate.jobTitle,
-            notes: existing.notes || candidate.notes,
-            preferredVehicle: existing.preferredVehicle || candidate.preferredVehicle,
-            vehicleNotes: existing.vehicleNotes || candidate.vehicleNotes,
           });
         }
       }
@@ -1524,11 +1487,11 @@ export default function SettingsPage() {
             defaultEquipmentItemIds: [],
             organizationName: undefined,
             functionalArea: candidate.functionalArea?.trim() || undefined,
-            preferredVehicle: candidate.preferredVehicle?.trim() || undefined,
-            vehicleNotes: candidate.vehicleNotes?.trim() || undefined,
+            preferredVehicle: undefined,
+            vehicleNotes: undefined,
             phone: candidate.phone?.trim() || undefined,
             email: candidate.email?.trim() || undefined,
-            notes: mergeNotesWithExtension(candidate.notes?.trim(), candidate.extension),
+            notes: mergeNotesWithExtension(undefined, candidate.extension),
             baseLocation: undefined,
             unionStatus: undefined,
             isActive: true,
@@ -1542,12 +1505,7 @@ export default function SettingsPage() {
         const nextPhone = candidate.phone?.trim() || existing.phone;
         const nextEmail = candidate.email?.trim() || existing.email;
         const nextFunctionalArea = candidate.functionalArea?.trim() || existing.functionalArea;
-        const mergedNoteBody =
-          [existing.notes?.trim(), candidate.notes?.trim()].filter(Boolean).join(' | ') || undefined;
-        const nextNotes = mergeNotesWithExtension(mergedNoteBody, candidate.extension);
-        const nextPreferredVehicle =
-          candidate.preferredVehicle?.trim() || existing.preferredVehicle;
-        const nextVehicleNotes = candidate.vehicleNotes?.trim() || existing.vehicleNotes;
+        const nextNotes = mergeNotesWithExtension(existing.notes, candidate.extension);
         const nextRoleTags = mergeRoleTags(existing.roleTags, ['production']);
 
         const changed =
@@ -1555,8 +1513,6 @@ export default function SettingsPage() {
           nextEmail !== existing.email ||
           nextFunctionalArea !== existing.functionalArea ||
           nextNotes !== existing.notes ||
-          nextPreferredVehicle !== existing.preferredVehicle ||
-          nextVehicleNotes !== existing.vehicleNotes ||
           nextRoleTags.join('|').toLowerCase() !== (existing.roleTags ?? []).join('|').toLowerCase();
 
         if (!changed) {
@@ -1570,8 +1526,6 @@ export default function SettingsPage() {
           email: nextEmail,
           functionalArea: nextFunctionalArea,
           notes: nextNotes,
-          preferredVehicle: nextPreferredVehicle,
-          vehicleNotes: nextVehicleNotes,
           roleTags: nextRoleTags,
           updatedAt: new Date().toISOString(),
         };
@@ -1617,11 +1571,7 @@ export default function SettingsPage() {
               phone: candidate.phone?.trim() || undefined,
               email: candidate.email?.trim() || undefined,
               extension: candidate.extension?.trim() || undefined,
-              department: candidate.department?.trim() || undefined,
-              jobTitle: candidate.jobTitle?.trim() || undefined,
               functionalArea: candidate.functionalArea?.trim() || undefined,
-              notes:
-                [candidate.notes, candidate.vehicleNotes].filter(Boolean).join(' | ') || undefined,
               sourceFile: candidate.sourceFile,
               sourceSheet: candidate.sourceSheet,
               updatedAt: new Date().toISOString(),
@@ -1629,24 +1579,16 @@ export default function SettingsPage() {
             orgDirectoryAdded += 1;
             continue;
           }
-          const combinedNotes =
-            [candidate.notes, candidate.vehicleNotes].filter(Boolean).join(' | ') || undefined;
           const updatedEntry = {
             ...existingEntry,
             phone: (existingEntry.phone as string | undefined) || candidate.phone?.trim() || undefined,
             email: (existingEntry.email as string | undefined) || candidate.email?.trim() || undefined,
             extension:
               (existingEntry.extension as string | undefined) || candidate.extension?.trim() || undefined,
-            department:
-              (existingEntry.department as string | undefined) || candidate.department?.trim() || undefined,
-            jobTitle:
-              (existingEntry.jobTitle as string | undefined) || candidate.jobTitle?.trim() || undefined,
             functionalArea:
               (existingEntry.functionalArea as string | undefined) ||
               candidate.functionalArea?.trim() ||
               undefined,
-            notes:
-              (existingEntry.notes as string | undefined) || combinedNotes || undefined,
             updatedAt: new Date().toISOString(),
           };
           const existingIndex = nextDirectoryContacts.findIndex(
@@ -1708,11 +1650,11 @@ export default function SettingsPage() {
       defaultEquipmentItemIds: [] as string[],
       organizationName: undefined,
       functionalArea: candidate.functionalArea?.trim() || undefined,
-      preferredVehicle: candidate.preferredVehicle?.trim() || undefined,
-      vehicleNotes: candidate.vehicleNotes?.trim() || undefined,
+      preferredVehicle: undefined,
+      vehicleNotes: undefined,
       phone: candidate.phone?.trim() || undefined,
       email: candidate.email?.trim() || undefined,
-      notes: mergeNotesWithExtension(candidate.notes?.trim(), candidate.extension),
+      notes: mergeNotesWithExtension(undefined, candidate.extension),
       baseLocation: undefined,
       unionStatus: undefined,
       isActive: true,
@@ -1727,10 +1669,7 @@ export default function SettingsPage() {
         phone: candidate.phone?.trim() || undefined,
         email: candidate.email?.trim() || undefined,
         extension: candidate.extension?.trim() || undefined,
-        department: candidate.department?.trim() || undefined,
-        jobTitle: candidate.jobTitle?.trim() || undefined,
         functionalArea: candidate.functionalArea?.trim() || undefined,
-        notes: [candidate.notes, candidate.vehicleNotes].filter(Boolean).join(' | ') || undefined,
         sourceFile: candidate.sourceFile,
         sourceSheet: candidate.sourceSheet,
         updatedAt: nowIso,
@@ -2705,6 +2644,15 @@ export default function SettingsPage() {
       localStorage.removeItem('checkout-recent-activities');
     }
 
+    if (Array.isArray(data.productionCheckoutRecentActivities)) {
+      localStorage.setItem(
+        PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY,
+        JSON.stringify(data.productionCheckoutRecentActivities),
+      );
+    } else {
+      localStorage.removeItem(PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY);
+    }
+
     window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT, { detail: getSettings() }));
   };
 
@@ -2924,6 +2872,8 @@ export default function SettingsPage() {
             currentUsername={currentUser?.username ?? 'admin'}
             canEditAssetTagPrefix={canManageSharedConfig}
             canEditAdminNotificationEmail={canManageSharedConfig}
+            organizationMaintenanceTemplate={orgMaintenanceTemplateStored}
+            activeOrganizationId={activeOrganizationId}
           />
         </TabsContent>
 
@@ -2953,10 +2903,6 @@ export default function SettingsPage() {
               updateSettingsList={updateSettingsList}
               onRequestDeleteReconcile={requestListDeleteReconcile}
               canDeleteItems={canManageSharedConfig}
-              workspaceDefaultSettings={defaultSettings}
-              onWorkspaceDefaultSettingsChange={handleGeneralSettingsChange}
-              organizationMaintenanceTemplate={orgMaintenanceTemplateStored}
-              activeOrganizationId={activeOrganizationId}
             />
           </TabsContent>
         )}
@@ -2977,13 +2923,7 @@ export default function SettingsPage() {
               orgMaintenanceTemplateStored={orgMaintenanceTemplateStored}
               onAfterOrgMaintenanceSave={() => void refreshOrgMaintenanceTemplate()}
               onNavigateToDataTab={() => setSettingsTab('data')}
-              onNavigateToWorkspacesTab={
-                canAccessWorkspacesTab ? () => setSettingsTab('workspaces') : undefined
-              }
-              onNavigateToLibrariesPositionTemplates={() => {
-                setSettingsTab('libraries');
-                setLibrariesPanel('positionTemplates');
-              }}
+              onNavigateToWorkspacesTab={() => setSettingsTab('workspaces')}
             />
           </TabsContent>
         )}
@@ -3001,18 +2941,14 @@ export default function SettingsPage() {
                       <p className="mt-1 text-amber-100/90">
                         User management calls the API with that id; if the row does not exist in Supabase you will see
                         errors or empty members. Open{' '}
-                        {canAccessWorkspacesTab ? (
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="h-auto p-0 text-amber-200 underline"
-                            onClick={() => setSettingsTab('workspaces')}
-                          >
-                            Workspaces
-                          </Button>
-                        ) : (
-                          <span className="font-medium text-amber-100">Workspaces</span>
-                        )}{' '}
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto p-0 text-amber-200 underline"
+                          onClick={() => setSettingsTab('workspaces')}
+                        >
+                          Workspaces
+                        </Button>{' '}
                         and activate the correct team, or compare{' '}
                         <code className="rounded bg-black/30 px-1">VITE_SUPABASE_URL</code> with the project you query in
                         the SQL editor. To list real ids:{' '}
@@ -3030,7 +2966,6 @@ export default function SettingsPage() {
                   <SupabaseWorkspaceUsersCard
                     workspaceId={activeWorkspaceId}
                     workspaceName={activeWorkspaceName}
-                    linkedOrganizationName={activeWorkspaceLinkedOrgName}
                     currentUserId={currentUser?.id || ''}
                     canManageUsers={canManageWorkspaceUsers}
                   />
@@ -3083,140 +3018,138 @@ export default function SettingsPage() {
 
         {canAccessWorkspacesTab && (
           <TabsContent value="workspaces" className="space-y-6">
-            <WorkspaceTeamTab showWorkspaceAdministration={canAccessWorkspaceAdminTab} />
-            {canAccessWorkspaceAdminTab ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Workspace Utilities</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Run workspace-level utility actions and migrate assigned production crew into the
-                    Master Crew Directory.
+            <WorkspaceTeamTab />
+            <Card>
+              <CardHeader>
+                <CardTitle>Workspace Utilities</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Run workspace-level utility actions and migrate assigned production crew into the
+                  Master Crew Directory.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setWorkspaceUtilitiesOpen(true)}
+                    disabled={!activeWorkspaceId}
+                  >
+                    Open Workspace Utilities
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handlePromoteProductionCrew}
+                    disabled={crewPromotionBusy}
+                  >
+                    {crewPromotionBusy
+                      ? 'Migrating…'
+                      : 'Promote Production Crew to Master Directory'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => contactExcelImportRef.current?.click()}
+                    disabled={contactParseBusy}
+                  >
+                    {contactParseBusy ? 'Parsing…' : 'Parse Contact Excel Files'}
+                  </Button>
+                  <input
+                    type="file"
+                    ref={contactExcelImportRef}
+                    accept=".xlsx,.xls"
+                    multiple
+                    onChange={(event) => void handleParseContactExcelFiles(event)}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void handleImportParsedContactsToMaster()}
+                    disabled={contactImportBusy || parsedContactRows.length === 0}
+                  >
+                    {contactImportBusy ? 'Importing…' : 'Import Parsed Contacts to Master'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setContactPreviewOpen(true)}
+                    disabled={parsedContactRows.length === 0}
+                  >
+                    Preview Parsed Contacts
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDownloadParsedContactsAsOrganizationJson}
+                    disabled={parsedContactRows.length === 0}
+                  >
+                    Download Parsed Contacts as Org JSON
+                  </Button>
+                </div>
+                {!activeWorkspaceId ? (
+                  <p className="text-xs text-muted-foreground">
+                    Select an active team workspace to open Workspace Utilities.
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setWorkspaceUtilitiesOpen(true)}
-                      disabled={!activeWorkspaceId}
-                    >
-                      Open Workspace Utilities
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handlePromoteProductionCrew}
-                      disabled={crewPromotionBusy}
-                    >
-                      {crewPromotionBusy
-                        ? 'Migrating…'
-                        : 'Promote Production Crew to Master Directory'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => contactExcelImportRef.current?.click()}
-                      disabled={contactParseBusy}
-                    >
-                      {contactParseBusy ? 'Parsing…' : 'Parse Contact Excel Files'}
-                    </Button>
-                    <input
-                      type="file"
-                      ref={contactExcelImportRef}
-                      accept=".xlsx,.xls"
-                      multiple
-                      onChange={(event) => void handleParseContactExcelFiles(event)}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => void handleImportParsedContactsToMaster()}
-                      disabled={contactImportBusy || parsedContactRows.length === 0}
-                    >
-                      {contactImportBusy ? 'Importing…' : 'Import Parsed Contacts to Master'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setContactPreviewOpen(true)}
-                      disabled={parsedContactRows.length === 0}
-                    >
-                      Preview Parsed Contacts
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleDownloadParsedContactsAsOrganizationJson}
-                      disabled={parsedContactRows.length === 0}
-                    >
-                      Download Parsed Contacts as Org JSON
-                    </Button>
-                  </div>
-                  {!activeWorkspaceId ? (
-                    <p className="text-xs text-muted-foreground">
-                      Select an active team workspace to open Workspace Utilities.
+                ) : null}
+                {parsedContactSourceSummary ? (
+                  <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                    <p>
+                      Parsed {parsedContactRows.length} contact candidate
+                      {parsedContactRows.length === 1 ? '' : 's'} from{' '}
+                      {parsedContactSourceSummary.files} file
+                      {parsedContactSourceSummary.files === 1 ? '' : 's'}, {' '}
+                      {parsedContactSourceSummary.sheets} sheet
+                      {parsedContactSourceSummary.sheets === 1 ? '' : 's'}, {' '}
+                      {parsedContactSourceSummary.rows} scanned row
+                      {parsedContactSourceSummary.rows === 1 ? '' : 's'}.
                     </p>
-                  ) : null}
-                  {parsedContactSourceSummary ? (
-                    <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                      <p>
-                        Parsed {parsedContactRows.length} contact candidate
-                        {parsedContactRows.length === 1 ? '' : 's'} from{' '}
-                        {parsedContactSourceSummary.files} file
-                        {parsedContactSourceSummary.files === 1 ? '' : 's'}, {' '}
-                        {parsedContactSourceSummary.sheets} sheet
-                        {parsedContactSourceSummary.sheets === 1 ? '' : 's'}, {' '}
-                        {parsedContactSourceSummary.rows} scanned row
-                        {parsedContactSourceSummary.rows === 1 ? '' : 's'}.
-                      </p>
-                      <div className="mt-2 max-h-24 overflow-y-auto rounded border border-border/50 bg-background/40 p-2">
-                        {parsedContactSourceSummary.sheetSummaries.map((summary) => (
-                          <p key={`${summary.fileName}-${summary.sheetName}`}>
-                            {summary.fileName} → {summary.sheetName}: {summary.candidatesFound} candidate
-                            {summary.candidatesFound === 1 ? '' : 's'}
-                          </p>
-                        ))}
-                      </div>
+                    <div className="mt-2 max-h-24 overflow-y-auto rounded border border-border/50 bg-background/40 p-2">
+                      {parsedContactSourceSummary.sheetSummaries.map((summary) => (
+                        <p key={`${summary.fileName}-${summary.sheetName}`}>
+                          {summary.fileName} → {summary.sheetName}: {summary.candidatesFound} candidate
+                          {summary.candidatesFound === 1 ? '' : 's'}
+                        </p>
+                      ))}
                     </div>
-                  ) : null}
-                  {contactParseBusy && contactParseProgress ? (
-                    <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                      <p className="font-medium text-foreground">
-                        Parsing in progress — you can keep using the app while this runs.
-                      </p>
-                      <p className="mt-1">
-                        File {contactParseProgress.fileIndex} of {contactParseProgress.fileTotal}:{' '}
-                        {contactParseProgress.fileName}
-                      </p>
-                      <p>
-                        Sheet {contactParseProgress.sheetIndex} of {contactParseProgress.sheetTotal}:{' '}
-                        {contactParseProgress.sheetName}
-                      </p>
-                    </div>
-                  ) : null}
-                  {lastCrewPromotionResult ? (
-                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                      <p>
-                        Scanned: {lastCrewPromotionResult.scannedCrewMembers} crew member
-                        {lastCrewPromotionResult.scannedCrewMembers === 1 ? '' : 's'}
-                      </p>
-                      <p>
-                        Added: {lastCrewPromotionResult.addedContacts} contact
-                        {lastCrewPromotionResult.addedContacts === 1 ? '' : 's'}
-                      </p>
-                      <p>
-                        Skipped existing: {lastCrewPromotionResult.skippedExistingContacts}
-                      </p>
-                      <p>
-                        Skipped invalid: {lastCrewPromotionResult.skippedInvalidCrewMembers}
-                      </p>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ) : null}
+                  </div>
+                ) : null}
+                {contactParseBusy && contactParseProgress ? (
+                  <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                    <p className="font-medium text-foreground">
+                      Parsing in progress — you can keep using the app while this runs.
+                    </p>
+                    <p className="mt-1">
+                      File {contactParseProgress.fileIndex} of {contactParseProgress.fileTotal}:{' '}
+                      {contactParseProgress.fileName}
+                    </p>
+                    <p>
+                      Sheet {contactParseProgress.sheetIndex} of {contactParseProgress.sheetTotal}:{' '}
+                      {contactParseProgress.sheetName}
+                    </p>
+                  </div>
+                ) : null}
+                {lastCrewPromotionResult ? (
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    <p>
+                      Scanned: {lastCrewPromotionResult.scannedCrewMembers} crew member
+                      {lastCrewPromotionResult.scannedCrewMembers === 1 ? '' : 's'}
+                    </p>
+                    <p>
+                      Added: {lastCrewPromotionResult.addedContacts} contact
+                      {lastCrewPromotionResult.addedContacts === 1 ? '' : 's'}
+                    </p>
+                    <p>
+                      Skipped existing: {lastCrewPromotionResult.skippedExistingContacts}
+                    </p>
+                    <p>
+                      Skipped invalid: {lastCrewPromotionResult.skippedInvalidCrewMembers}
+                    </p>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
 
@@ -3258,18 +3191,13 @@ export default function SettingsPage() {
         />
       )}
 
-      {activeWorkspaceId && canAccessWorkspaceAdminTab ? (
+      {activeWorkspaceId ? (
         <WorkspaceUtilitiesDialog
           open={workspaceUtilitiesOpen}
           workspaceId={activeWorkspaceId}
           workspaceName={activeWorkspaceName ?? 'Active workspace'}
           onClose={() => setWorkspaceUtilitiesOpen(false)}
           onApplied={() => void 0}
-          workspaceOptions={workspaces.filter((w) => w.workspaceId !== activeWorkspaceId)}
-          existingWorkspaceNames={workspaces.map((w) => w.name)}
-          onNewWorkspaceCreated={(newWorkspaceId) => selectWorkspace(newWorkspaceId)}
-          allWorkspaces={workspaces.map((w) => ({ workspaceId: w.workspaceId, name: w.name }))}
-          onWorkspaceRenamed={() => void refreshWorkspaces()}
         />
       ) : null}
 
@@ -3442,14 +3370,10 @@ export default function SettingsPage() {
                   <tr className="border-b border-border/60">
                     <th className="px-2 py-2">Use</th>
                     <th className="px-2 py-2">Name</th>
-                    <th className="px-2 py-2">Dept</th>
-                    <th className="px-2 py-2">Title</th>
                     <th className="px-2 py-2">Phone</th>
                     <th className="px-2 py-2">Ext</th>
                     <th className="px-2 py-2">Email</th>
                     <th className="px-2 py-2">Area</th>
-                    <th className="px-2 py-2">Vehicle</th>
-                    <th className="px-2 py-2">Notes</th>
                     <th className="px-2 py-2">Match</th>
                     <th className="px-2 py-2">Issues</th>
                     <th className="px-2 py-2">Destination</th>
@@ -3474,24 +3398,10 @@ export default function SettingsPage() {
                         />
                       </td>
                       <td className="px-2 py-2">{row.fullName}</td>
-                      <td className="px-2 py-2">{row.department ?? ''}</td>
-                      <td className="px-2 py-2">{row.jobTitle ?? ''}</td>
                       <td className="px-2 py-2">{row.phone ?? ''}</td>
                       <td className="px-2 py-2">{row.extension ?? ''}</td>
                       <td className="px-2 py-2">{row.email ?? ''}</td>
                       <td className="px-2 py-2">{row.functionalArea ?? ''}</td>
-                      <td className="px-2 py-2 max-w-[140px] truncate" title={row.preferredVehicle ?? ''}>
-                        {row.preferredVehicle ?? ''}
-                      </td>
-                      <td className="px-2 py-2 max-w-[200px] truncate" title={
-                        [row.notes, row.vehicleNotes].filter(Boolean).join(' | ') || ''
-                      }>
-                        {(() => {
-                          const merged = [row.notes, row.vehicleNotes].filter(Boolean).join(' | ');
-                          if (!merged) return '';
-                          return merged.length > 56 ? `${merged.slice(0, 56)}…` : merged;
-                        })()}
-                      </td>
                       <td className="px-2 py-2">
                         {row.matchedMasterContactId ? (
                           <Badge className="bg-violet-600/20 text-violet-200 border border-violet-500/40">

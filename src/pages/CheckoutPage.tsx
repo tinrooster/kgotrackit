@@ -17,6 +17,7 @@ import type { Cabinet } from '@/types/cabinets'
 import { format } from 'date-fns'
 import { logger } from '@/lib/logging'
 import { LogEntry } from '@/lib/logging'
+import { Badge } from '@/components/ui/badge'
 import { ActionRail, type ActionRailItem } from '@/components/ui/action-rail'
 import { useHorizontalScrollHints } from '@/components/ui/useHorizontalScrollHints'
 import { ArrowDownUp, Building2, ChevronLeft, ChevronRight, Clock3, ScanLine, Trash2 } from 'lucide-react'
@@ -35,6 +36,8 @@ export default function CheckoutPage() {
   const [activityView, setActivityView] = useState<'list' | 'cabinet'>('list')
   const [activitySortBy, setActivitySortBy] = useState<'cabinet' | 'time'>('time')
   const [activitySortDirection, setActivitySortDirection] = useState<'asc' | 'desc'>('desc')
+  const [activityTypeFilter, setActivityTypeFilter] = useState<'all' | 'check-in' | 'check-out'>('all')
+  const [activitySearchQuery, setActivitySearchQuery] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scannerMode, setScannerMode] = useState<'check-in' | 'check-out'>('check-out')
   const {
@@ -342,7 +345,16 @@ export default function CheckoutPage() {
       timestamp: new Date(activity.timestamp),
     }));
 
-  const sortedActivityList = [...normalizedActivities].sort((left, right) => {
+  const filteredActivityList = normalizedActivities.filter((activity) => {
+    const matchesType = activityTypeFilter === 'all' || activity.type === activityTypeFilter;
+    const normalizedQuery = activitySearchQuery.trim().toLowerCase();
+    const matchesQuery =
+      !normalizedQuery ||
+      [activity.itemName, activity.cabinetName, activity.performedBy].join(' ').toLowerCase().includes(normalizedQuery);
+    return matchesType && matchesQuery;
+  });
+
+  const sortedActivityList = [...filteredActivityList].sort((left, right) => {
     const directionMultiplier = activitySortDirection === 'asc' ? 1 : -1;
     if (activitySortBy === 'cabinet') {
       const compareCabinet = left.cabinetName.localeCompare(right.cabinetName);
@@ -551,6 +563,41 @@ export default function CheckoutPage() {
           <CardContent className="relative px-4 pb-4 sm:px-6 sm:pb-6">
             <Tabs value={activityView} onValueChange={(value) => setActivityView(value as 'list' | 'cabinet')}>
               <div className="mb-3 flex flex-col gap-3">
+                <div className="rounded-md border bg-muted/20 p-2">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                    <Input
+                      value={activitySearchQuery}
+                      onChange={(event) => setActivitySearchQuery(event.target.value)}
+                      placeholder="Search activity by item, cabinet, or user..."
+                      className="h-8 text-sm"
+                    />
+                    <Select
+                      value={activityTypeFilter}
+                      onValueChange={(value) => setActivityTypeFilter(value as 'all' | 'check-in' | 'check-out')}
+                    >
+                      <SelectTrigger className="h-8 w-full sm:w-[150px]">
+                        <SelectValue placeholder="Filter type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All activity</SelectItem>
+                        <SelectItem value="check-in">Check-ins</SelectItem>
+                        <SelectItem value="check-out">Check-outs</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center text-xs text-muted-foreground">
+                      {sortedActivityList.length} result{sortedActivityList.length === 1 ? '' : 's'}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/80 bg-background/70 px-2 py-1.5">
+                    <span className="text-xs font-medium text-foreground/90">Legend:</span>
+                    <Badge className="border border-green-300 bg-green-100 text-green-800 dark:border-green-500/40 dark:bg-green-600/20 dark:text-green-200">
+                      Check In
+                    </Badge>
+                    <Badge className="border border-red-300 bg-red-100 text-red-800 dark:border-red-500/40 dark:bg-red-600/20 dark:text-red-200">
+                      Check Out
+                    </Badge>
+                  </div>
+                </div>
                 <div
                   className="scroll-hints-shell relative"
                   data-overflowing={isActivityTabsOverflowing ? 'true' : 'false'}
