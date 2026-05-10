@@ -22,6 +22,7 @@ export type OrganizationAppDataRow = {
   role_tags: unknown;
   branding: unknown;
   maintenance_on_air_template?: MaintenanceOnAirSchedule | null;
+  fleet?: unknown;
   updated_at?: string;
 };
 

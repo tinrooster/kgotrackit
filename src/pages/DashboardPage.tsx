@@ -15,6 +15,7 @@ import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
 import { Production, ProductionStatus, PRODUCTION_STATUS_LABELS } from '@/types/productions';
 import { ProductionDashboardProgress } from '@/components/dashboard/ProductionDashboardProgress';
 import { cn } from '@/lib/utils';
+import { productionListingTileClassName } from '@/lib/productionListingTileStyles';
 
 const ACTIVE_PRODUCTION_STATUS_FILTERS: ProductionStatus[] = ['planning', 'confirmed', 'in_progress'];
 const PRODUCTION_STATUS_BADGE_CLASSES: Record<ProductionStatus, string> = {
@@ -548,14 +549,14 @@ export default function DashboardPage() {
                       No productions match this filter.
                     </div>
                   ) : (
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-6 sm:grid-cols-2 sm:gap-7 lg:gap-8">
                       {filteredProductions.map((production) => {
                         const progressSnapshot = getProductionProgressSnapshot(production);
                         const productionQueryId = encodeURIComponent(production.id);
                         return (
                         <div
                           key={production.id}
-                          className="overflow-hidden rounded-lg border border-border/70 bg-card text-left shadow-sm shadow-black/10 ring-offset-background dark:border-border/50 dark:bg-card/90 dark:shadow-black/35"
+                          className={productionListingTileClassName}
                         >
                           <button
                             type="button"
