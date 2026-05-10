@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Navigation } from './components/Navigation';
+import { AppSidebar } from './components/AppSidebar';
 import InventoryPage from './pages/InventoryPage';
 import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
@@ -29,6 +29,7 @@ import DevMenuPage from './pages/DevMenuPage';
 import PlannerWorkspacePage from './pages/PlannerWorkspacePage';
 import FieldChecklistPage from './pages/FieldChecklistPage';
 import PlantPage from './pages/PlantPage';
+import FleetPage from './pages/FleetPage';
 import {
   LAST_ROUTE_STORAGE_KEY,
   shouldPersistLastVisitedRoute,
@@ -174,22 +175,24 @@ export default function App() {
   return (
     <>
       <ErrorBoundary>
-        <div className="min-h-screen bg-background">
+        <div className="flex h-screen overflow-hidden bg-background">
           <InitialDefaultsDialog
             open={showInitialDefaultsDialog}
             onApply={handleApplySetupDefaults}
             onDismiss={handleDismissSetupDialog}
           />
-          <Navigation />
-          <AppBreadcrumbs />
-          <main
-            className={cn(
-              'min-w-0 py-6',
-              inventoryFullBleed
-                ? 'box-border w-full max-w-full px-3 sm:px-4 lg:px-6'
-                : 'mx-auto box-border w-full max-w-[min(100%,1200px)] px-4 sm:px-6 xl:max-w-[1400px]'
-            )}
-          >
+          <AppSidebar />
+          <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+            <AppBreadcrumbs />
+            <div className="flex-1 overflow-y-auto">
+              <main
+                className={cn(
+                  'min-w-0 pt-6 pb-20 md:pb-6',
+                  inventoryFullBleed
+                    ? 'box-border w-full max-w-full px-3 sm:px-4 lg:px-6'
+                    : 'mx-auto box-border w-full max-w-[min(100%,1200px)] px-4 sm:px-6 xl:max-w-[1400px]'
+                )}
+              >
             <Routes>
               <Route
                 path="/"
@@ -327,9 +330,19 @@ export default function App() {
               />
               <Route path="/ui-diagnostics" element={<Navigate to="/dev/ui-diagnostics" replace />} />
               <Route path="/expand-collapse-lab" element={<Navigate to="/dev/expand-collapse-lab" replace />} />
+              <Route
+                path="/fleet"
+                element={
+                  <ProtectedRoute>
+                    <FleetPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </main>
+              </main>
+            </div>
+          </div>
           <Toaster />
         </div>
       </ErrorBoundary>

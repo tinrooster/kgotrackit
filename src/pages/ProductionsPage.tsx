@@ -471,7 +471,7 @@ export default function ProductionsPage() {
           )}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8 xl:grid-cols-4 xl:gap-8">
           {sorted.map((production) => (
             <ProductionCard
               key={production.id}

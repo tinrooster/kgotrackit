@@ -15,6 +15,7 @@ import {
   type ProductionProgressSegment,
 } from '@/components/dashboard/ProductionDashboardProgress';
 import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
+import { productionListingTileInteractiveClassName } from '@/lib/productionListingTileStyles';
 
 const STATUS_VARIANT: Record<ProductionStatus, string> = {
   planning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -57,11 +58,8 @@ export function ProductionCard({
   const progressSnapshot = getProductionProgressSnapshot(production);
 
   return (
-    <Card
-      className="cursor-pointer transition-shadow hover:shadow-md"
-      onClick={() => onClick(production)}
-    >
-      <CardHeader className="pb-2">
+    <Card className={productionListingTileInteractiveClassName} onClick={() => onClick(production)}>
+      <CardHeader className="border-b border-border/50 pb-3 dark:border-border/45">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="line-clamp-2 text-base leading-snug">{production.name}</CardTitle>
           <div className="flex items-center gap-1">
@@ -112,7 +110,7 @@ export function ProductionCard({
           <p className="text-sm text-muted-foreground">{production.client}</p>
         )}
       </CardHeader>
-      <CardContent className="space-y-1.5 pt-0">
+      <CardContent className="space-y-1.5 pt-3">
         {dateRange && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" />
