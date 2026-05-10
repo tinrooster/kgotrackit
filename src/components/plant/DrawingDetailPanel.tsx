@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, Download, ExternalLink, Loader2, Pencil, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -145,8 +145,34 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
   const [embedError, setEmbedError] = useState(false);
   const [uploadingJson, setUploadingJson] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const esBase = getEsBaseUrl();
+
+  // ---- postMessage bridge ----
+  useEffect(() => {
+    const handleMessage = async (e: MessageEvent) => {
+      if (e.data?.type === 'EASYSCHEMATIC_READY') {
+        // EasySchematic iframe is ready — push the stored JSON into it
+        if (drawing.schematicJson && iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage(
+            { type: 'TRACKIT_LOAD_SCHEMATIC', payload: drawing.schematicJson },
+            '*',
+          );
+        }
+      }
+      if (e.data?.type === 'EASYSCHEMATIC_SAVED' && e.data.payload) {
+        const json = e.data.payload as EsSchematicJson;
+        const updated = { ...drawing, schematicJson: json };
+        setDrawing(updated);
+        onUpdated(updated);
+        await saveDrawingSchematicJson(drawing.id, json);
+        toast.success('Schematic saved');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [drawing, onUpdated]);
   const shareUrl = drawing.easyschematicShareToken
     ? `${esBase}/s/${drawing.easyschematicShareToken}`
     : null;
@@ -401,6 +427,7 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
             </div>
           ) : (
             <iframe
+              ref={iframeRef}
               src={shareUrl}
               title={`EasySchematic — ${drawing.dwgNumber}`}
               className="w-full"
