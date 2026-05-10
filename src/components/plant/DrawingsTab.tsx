@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { listDrawings, getDrawingCableCounts } from '@/lib/plantService';
@@ -78,9 +78,8 @@ export function DrawingsTab() {
             const hasSchematic = !!d.easyschematicShareToken;
 
             return (
-              <>
+              <Fragment key={d.id}>
                 <tr
-                  key={d.id}
                   onClick={() => setExpandedId(isExpanded ? null : d.id)}
                   className="border-b hover:bg-muted/40 cursor-pointer transition-colors"
                 >
@@ -124,13 +123,13 @@ export function DrawingsTab() {
                 </tr>
 
                 {isExpanded && (
-                  <tr key={`${d.id}-detail`} className="border-b bg-muted/10">
+                  <tr className="border-b bg-muted/10">
                     <td colSpan={7} className="px-4 pb-4">
                       <DrawingDetailPanel drawing={d} onUpdated={handleUpdated} />
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </tbody>
