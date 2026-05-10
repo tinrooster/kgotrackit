@@ -6,15 +6,17 @@ import { CableRegisterTab } from '@/components/plant/CableRegisterTab';
 import { DrawingsTab } from '@/components/plant/DrawingsTab';
 import { CampaignsTab } from '@/components/plant/CampaignsTab';
 import { LocationsTab } from '@/components/plant/LocationsTab';
+import { SystemsTab } from '@/components/plant/SystemsTab';
 import { getCableStats, PLANT_CABLES_UPDATED_EVENT } from '@/lib/plantService';
 import type { PlantCableStats } from '@/lib/plantService';
 
-type PlantTab = 'register' | 'drawings' | 'locations' | 'campaigns';
+type PlantTab = 'register' | 'drawings' | 'locations' | 'systems' | 'campaigns';
 
 const TABS: { id: PlantTab; label: string }[] = [
   { id: 'register',  label: 'Cable Register' },
   { id: 'drawings',  label: 'Drawings' },
   { id: 'locations', label: 'Locations' },
+  { id: 'systems',   label: 'Systems' },
   { id: 'campaigns', label: 'Campaigns' },
 ];
 
@@ -105,6 +107,7 @@ export default function PlantPage() {
       {activeTab === 'register'  && <CableRegisterTab />}
       {activeTab === 'drawings'  && <DrawingsTab />}
       {activeTab === 'locations' && <LocationsTab />}
+      {activeTab === 'systems'   && <SystemsTab />}
       {activeTab === 'campaigns' && <CampaignsTab />}
     </div>
   );
