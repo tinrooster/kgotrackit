@@ -35,6 +35,7 @@ function useDebounce<T>(value: T, delay: number): T {
 export function CableRegisterTab() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialLoc = searchParams.get('loc') ?? undefined;
+  const initialDwg = searchParams.get('dwg') ?? undefined;
 
   const [cables, setCables] = useState<PlantCableSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -47,6 +48,7 @@ export function CableRegisterTab() {
   const [statusFilters, setStatusFilters] = useState<PlantCableStatus[]>([]);
   const [signalFilters, setSignalFilters] = useState<PlantSignalType[]>([]);
   const [locationCode, setLocationCode] = useState<string | undefined>(initialLoc);
+  const [drawingId, setDrawingId] = useState<string | undefined>(initialDwg);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -59,6 +61,11 @@ export function CableRegisterTab() {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('loc'); return n; });
   };
 
+  const clearDrawingFilter = () => {
+    setDrawingId(undefined);
+    setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('dwg'); return n; });
+  };
+
   const load = useCallback(async (p: number) => {
     setLoading(true);
     const token = ++loadRef.current;
@@ -68,16 +75,17 @@ export function CableRegisterTab() {
       status: statusFilters,
       signalType: signalFilters,
       locationCode,
+      drawingId,
     });
     if (token !== loadRef.current) return;
     setCables(result.cables);
     setTotal(result.total);
     setLoading(false);
-  }, [debouncedSearch, statusFilters, signalFilters, locationCode]);
+  }, [debouncedSearch, statusFilters, signalFilters, locationCode, drawingId]);
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, statusFilters, signalFilters, locationCode]);
+  }, [debouncedSearch, statusFilters, signalFilters, locationCode, drawingId]);
 
   useEffect(() => {
     void load(page);
@@ -96,6 +104,7 @@ export function CableRegisterTab() {
       status: statusFilters,
       signalType: signalFilters,
       locationCode,
+      drawingId,
     });
     if (csv) {
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -164,6 +173,16 @@ export function CableRegisterTab() {
               <MapPin className="h-3 w-3" /> {locationCode}
             </span>
             <button onClick={clearLocationFilter} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+        {drawingId && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs bg-primary/10 text-primary border border-primary/20 rounded-full px-2.5 py-0.5 font-medium">
+              Drawing filter active
+            </span>
+            <button onClick={clearDrawingFilter} className="text-muted-foreground hover:text-foreground">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>

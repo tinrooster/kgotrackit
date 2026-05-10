@@ -94,6 +94,62 @@ export async function listCables(
   return { cables, total: count ?? 0, page, pageSize };
 }
 
+export interface PlantCableStats {
+  total: number;
+  unknown: number;
+  active: number;
+  review: number;
+  decommissioning: number;
+  decommissioned: number;
+  activeCampaigns: number;
+}
+
+export async function getCableStats(): Promise<PlantCableStats> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) {
+    return { total: 0, unknown: 0, active: 0, review: 0, decommissioning: 0, decommissioned: 0, activeCampaigns: 0 };
+  }
+
+  const countStatus = async (status: string) => {
+    const { count } = await client
+      .from('plant_cables')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', status);
+    return count ?? 0;
+  };
+
+  const countCampaigns = async () => {
+    const { count } = await client
+      .from('plant_cleanup_campaigns')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'active');
+    return count ?? 0;
+  };
+
+  const [unknown, active, review, decommissioning, decommissioned, activeCampaigns] =
+    await Promise.all([
+      countStatus('unknown'),
+      countStatus('active'),
+      countStatus('review'),
+      countStatus('decommissioning'),
+      countStatus('decommissioned'),
+      countCampaigns(),
+    ]);
+
+  return {
+    total: unknown + active + review + decommissioning + decommissioned,
+    unknown,
+    active,
+    review,
+    decommissioning,
+    decommissioned,
+    activeCampaigns,
+  };
+}
+
 export async function exportCablesCSV(
   filters: Omit<PlantCableFilters, 'organizationId' | 'page' | 'pageSize'> = {}
 ): Promise<string> {

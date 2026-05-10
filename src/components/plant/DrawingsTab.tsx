@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, ExternalLink } from 'lucide-react';
 import { listDrawings, getDrawingCableCounts } from '@/lib/plantService';
 import type { PlantDrawing } from '@/types/plant';
@@ -13,9 +14,14 @@ const STATUS_COLOURS: Record<string, string> = {
 };
 
 export function DrawingsTab() {
+  const [, setSearchParams] = useSearchParams();
   const [drawings, setDrawings] = useState<PlantDrawing[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+
+  const goToRegister = (drawingId: string) => {
+    setSearchParams({ pt: 'register', dwg: drawingId });
+  };
 
   useEffect(() => {
     const orgId = getActiveOrganizationId();
@@ -58,7 +64,14 @@ export function DrawingsTab() {
         </thead>
         <tbody>
           {drawings.map((d) => (
-            <tr key={d.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+            <tr
+              key={d.id}
+              onClick={() => counts[d.id] > 0 && goToRegister(d.id)}
+              className={cn(
+                'border-b last:border-0 transition-colors',
+                counts[d.id] > 0 ? 'hover:bg-muted/40 cursor-pointer' : 'opacity-60'
+              )}
+            >
               <td className="px-3 py-2 font-mono text-xs font-medium">{d.dwgNumber}</td>
               <td className="px-3 py-2 max-w-[240px]">
                 <span className="block truncate">{d.title ?? <span className="text-muted-foreground">—</span>}</span>
