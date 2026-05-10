@@ -6,6 +6,8 @@ import type {
   PlantCableStatus,
   PlantSignalType,
   PlantDrawing,
+  PlantDrawingSignalCategory,
+  PlantDrawingStatus,
   PlantLocation,
   PlantSystem,
   PlantCableFilters,
@@ -356,6 +358,30 @@ export async function updateDrawing(id: string, updates: Partial<Pick<PlantDrawi
   if (updates.status !== undefined)                   payload.status = updates.status;
   const { error } = await client.from('plant_drawings').update(payload).eq('id', id);
   return !error;
+}
+
+export async function createDrawing(data: {
+  dwgNumber: string;
+  title?: string;
+  signalCategory?: PlantDrawingSignalCategory;
+  status?: PlantDrawingStatus;
+}): Promise<PlantDrawing | null> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return null;
+  const { data: row, error } = await client
+    .from('plant_drawings')
+    .insert({
+      organization_id: orgId,
+      dwg_number: data.dwgNumber.trim(),
+      title: data.title?.trim() || null,
+      signal_category: data.signalCategory ?? null,
+      status: data.status ?? 'active',
+    })
+    .select()
+    .single();
+  if (error || !row) return null;
+  return rowToDrawing(row);
 }
 
 export async function saveDrawingSchematicJson(
