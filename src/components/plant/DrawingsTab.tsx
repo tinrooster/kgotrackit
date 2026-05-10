@@ -18,6 +18,17 @@ const STATUS_COLOURS: Record<string, string> = {
   superseded:     'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
 };
 
+function compareDwgNumbers(a: string, b: string): number {
+  const partsA = a.split('.').map((s) => parseInt(s, 10));
+  const partsB = b.split('.').map((s) => parseInt(s, 10));
+  for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+    const va = partsA[i] ?? 0;
+    const vb = partsB[i] ?? 0;
+    if (va !== vb) return va - vb;
+  }
+  return 0;
+}
+
 export function DrawingsTab() {
   const [, setSearchParams] = useSearchParams();
   const [drawings, setDrawings] = useState<PlantDrawing[]>([]);
@@ -32,7 +43,7 @@ export function DrawingsTab() {
       listDrawings(),
       orgId ? getDrawingCableCounts(orgId) : Promise.resolve({}),
     ]).then(([dwgs, c]) => {
-      setDrawings(dwgs);
+      setDrawings([...dwgs].sort((a, b) => compareDwgNumbers(a.dwgNumber, b.dwgNumber)));
       setCounts(c);
       setLoading(false);
     });
@@ -46,8 +57,15 @@ export function DrawingsTab() {
     setDrawings((prev) => prev.map((d) => d.id === updated.id ? updated : d));
   };
 
+  const handleDeleted = (id: string) => {
+    setDrawings((prev) => prev.filter((d) => d.id !== id));
+    setExpandedId(null);
+  };
+
   const handleCreated = (drawing: PlantDrawing) => {
-    setDrawings((prev) => [...prev, drawing]);
+    setDrawings((prev) =>
+      [...prev, drawing].sort((a, b) => compareDwgNumbers(a.dwgNumber, b.dwgNumber))
+    );
     setExpandedId(drawing.id);
   };
 
@@ -101,7 +119,7 @@ export function DrawingsTab() {
                           : <ChevronRight className="h-3.5 w-3.5" />}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs font-medium">{d.dwgNumber}</td>
-                      <td className="px-3 py-2 max-w-[200px]">
+                      <td className="px-3 py-2 w-full max-w-0">
                         <span className="block truncate">{d.title ?? <span className="text-muted-foreground italic">—</span>}</span>
                       </td>
                       <td className="px-3 py-2 hidden md:table-cell text-xs text-muted-foreground">
@@ -136,8 +154,12 @@ export function DrawingsTab() {
 
                     {isExpanded && (
                       <tr className="border-b bg-muted/10">
-                        <td colSpan={7} className="px-4 pb-4">
-                          <DrawingDetailPanel drawing={d} onUpdated={handleUpdated} />
+                        <td colSpan={7} className="px-4 pb-4 sticky left-0">
+                          <DrawingDetailPanel
+                            drawing={d}
+                            onUpdated={handleUpdated}
+                            onDeleted={handleDeleted}
+                          />
                         </td>
                       </tr>
                     )}

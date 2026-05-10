@@ -111,13 +111,21 @@ def main() -> None:
     def should_run(step: str) -> bool:
         return only is None or step in only
 
+    org_id = args.org_id
+
+    def remap(rows: list[dict]) -> list[dict]:
+        """Stamp every row with the target org_id, overriding whatever normalize.py baked in."""
+        for r in rows:
+            r['organization_id'] = org_id
+        return rows
+
     # 1. Locations
     if should_run('locations'):
         loc_path = OUT_DIR / 'plant_locations.json'
         if not loc_path.exists():
             print(f'WARNING: {loc_path} not found — skipping locations.')
         else:
-            rows = json.loads(loc_path.read_text(encoding='utf-8'))
+            rows = remap(json.loads(loc_path.read_text(encoding='utf-8')))
             upload_table(client, base_url, 'plant_locations', rows,
                          args.batch_size, args.dry_run, 'locations')
 
@@ -127,7 +135,7 @@ def main() -> None:
         if not sys_path.exists():
             print(f'WARNING: {sys_path} not found — skipping systems.')
         else:
-            rows = json.loads(sys_path.read_text(encoding='utf-8'))
+            rows = remap(json.loads(sys_path.read_text(encoding='utf-8')))
             upload_table(client, base_url, 'plant_systems', rows,
                          args.batch_size, args.dry_run, 'systems')
 
@@ -137,7 +145,7 @@ def main() -> None:
         if not drw_path.exists():
             print(f'WARNING: {drw_path} not found — skipping drawings.')
         else:
-            rows = json.loads(drw_path.read_text(encoding='utf-8'))
+            rows = remap(json.loads(drw_path.read_text(encoding='utf-8')))
             upload_table(client, base_url, 'plant_drawings', rows,
                          args.batch_size, args.dry_run, 'drawings')
 
@@ -150,7 +158,7 @@ def main() -> None:
             all_cables: list[dict] = []
             for cf in chunk_files:
                 all_cables.extend(json.loads(cf.read_text(encoding='utf-8')))
-            upload_table(client, base_url, 'plant_cables', all_cables,
+            upload_table(client, base_url, 'plant_cables', remap(all_cables),
                          args.batch_size, args.dry_run, 'cables')
 
     client.close()

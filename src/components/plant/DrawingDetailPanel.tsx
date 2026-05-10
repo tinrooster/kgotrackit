@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Download, ExternalLink, Loader2, Pencil, Upload, X } from 'lucide-react';
+import { Check, Download, ExternalLink, Loader2, Pencil, PenLine, Trash2, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { EsSchematicJson, PlantDrawing } from '@/types/plant';
 import {
+  deleteDrawing,
   exportDrawingEasySchematicCSV,
   saveDrawingSchematicJson,
   updateDrawing,
@@ -14,18 +15,18 @@ import { SchematicConnectionsPanel } from './SchematicConnectionsPanel';
 
 // ---------------------------------------------------------------------------
 // EasySchematic base URL — stored in localStorage, configurable per-browser
-// Defaults to cloud; change to local instance (e.g. http://localhost:5173)
 // ---------------------------------------------------------------------------
 const ES_URL_KEY = 'trackit:easyschematic-base-url';
 const ES_URL_DEFAULT = 'https://easyschematic.live';
-// When running locally, use the Vite proxy → same-origin, no CORS, postMessage works.
-const ES_URL_LOCAL = `${window.location.origin}/schematic`;
+// On localhost, EasySchematic runs on port 5174 (direct, not proxied).
+// The Vite proxy at /schematic can't serve the full SPA correctly because
+// EasySchematic's JS uses absolute paths that resolve back to trackIT's server.
+const ES_URL_LOCAL = 'http://localhost:5174';
 
 function getEsBaseUrl(): string {
   try {
     const stored = localStorage.getItem(ES_URL_KEY);
     if (stored) return stored;
-    // Auto-detect local dev: if on localhost and no override, use the proxy
     if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
       return ES_URL_LOCAL;
     }
@@ -136,26 +137,32 @@ function LinkEditorForm({
 interface DrawingDetailPanelProps {
   drawing: PlantDrawing;
   onUpdated: (updated: PlantDrawing) => void;
+  onDeleted: (id: string) => void;
 }
 
-export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: DrawingDetailPanelProps) {
+export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated, onDeleted }: DrawingDetailPanelProps) {
   const [drawing, setDrawing] = useState(initialDrawing);
   const [editingLink, setEditingLink] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [embedError, setEmbedError] = useState(false);
   const [uploadingJson, setUploadingJson] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const popupRef = useRef<Window | null>(null);
 
   const esBase = getEsBaseUrl();
+  const shareUrl = drawing.easyschematicShareToken
+    ? `${esBase}/s/${drawing.easyschematicShareToken}`
+    : null;
+  const embedUrl = shareUrl ?? esBase;
 
   // ---- postMessage bridge ----
   useEffect(() => {
     const handleMessage = async (e: MessageEvent) => {
       if (e.data?.type === 'EASYSCHEMATIC_READY') {
-        // EasySchematic iframe is ready — push the stored JSON into it
-        if (drawing.schematicJson && iframeRef.current?.contentWindow) {
-          iframeRef.current.contentWindow.postMessage(
+        // EasySchematic popup is ready — push the stored JSON into it
+        if (drawing.schematicJson && popupRef.current && !popupRef.current.closed) {
+          popupRef.current.postMessage(
             { type: 'TRACKIT_LOAD_SCHEMATIC', payload: drawing.schematicJson },
             '*',
           );
@@ -173,10 +180,18 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [drawing, onUpdated]);
-  const shareUrl = drawing.easyschematicShareToken
-    ? `${esBase}/s/${drawing.easyschematicShareToken}`
-    : null;
 
+  const openEasySchematic = () => {
+    if (popupRef.current && !popupRef.current.closed) {
+      popupRef.current.focus();
+      return;
+    }
+    popupRef.current = window.open(
+      embedUrl,
+      'easyschematic',
+      'width=1400,height=900,resizable=yes,scrollbars=yes',
+    );
+  };
   // ---- CSV export ----
   const handleExportCSV = async () => {
     setExporting(true);
@@ -247,22 +262,31 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
     }
   };
 
-  // ---- Annotated JSON export ----
+  // ---- Annotated JSON → EasySchematic ----
   const handleAnnotatedExport = (annotatedJson: EsSchematicJson) => {
-    const blob = new Blob([JSON.stringify(annotatedJson, null, 2)], {
-      type: 'application/json;charset=utf-8;',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `easyschematic_annotated_${drawing.dwgNumber.replace(/[^a-z0-9]/gi, '_')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Annotated JSON downloaded — reimport into EasySchematic');
+    // Persist annotated version as the current schematic so READY handler uses it
+    const updated = { ...drawing, schematicJson: annotatedJson };
+    setDrawing(updated);
+    onUpdated(updated);
+    saveDrawingSchematicJson(drawing.id, annotatedJson);
+
+    const popupOpen = popupRef.current && !popupRef.current.closed;
+    if (popupOpen) {
+      popupRef.current!.postMessage(
+        { type: 'TRACKIT_LOAD_SCHEMATIC', payload: annotatedJson },
+        '*',
+      );
+      toast.success('Cable numbers sent to EasySchematic');
+    } else {
+      // Open popup — EASYSCHEMATIC_READY will load the annotated version automatically
+      openEasySchematic();
+      toast.success('Opening EasySchematic with cable numbers applied');
+    }
   };
 
   // ---- Link save ----
   const handleLinkSave = (id: string, token: string, baseUrl: string) => {
+    setEsBaseUrl(baseUrl);
     const updated = {
       ...drawing,
       easyschematicId: id || undefined,
@@ -271,9 +295,18 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
     setDrawing(updated);
     onUpdated(updated);
     setEditingLink(false);
-    setEmbedError(false);
-    // Force re-evaluation of embed URL with new base
-    void baseUrl;
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    const ok = await deleteDrawing(drawing.id);
+    if (ok) {
+      onDeleted(drawing.id);
+    } else {
+      toast.error('Failed to delete drawing');
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   };
 
   const hasJson = !!drawing.schematicJson;
@@ -314,6 +347,15 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
           {hasJson ? 'Replace JSON' : 'Upload schematic JSON'}
         </Button>
 
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={openEasySchematic}
+        >
+          <PenLine className="h-3.5 w-3.5 mr-1.5" />
+          Open EasySchematic
+        </Button>
+
         {shareUrl && (
           <a
             href={shareUrl}
@@ -321,7 +363,7 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
           >
-            <ExternalLink className="h-3.5 w-3.5" /> Open in EasySchematic
+            <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
           </a>
         )}
 
@@ -336,6 +378,33 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
             : <><Pencil className="h-3 w-3 mr-1" />
                 {drawing.easyschematicShareToken ? 'Edit link / URL' : 'Configure EasySchematic'}</>}
         </Button>
+
+        {confirmDelete ? (
+          <div className="flex items-center gap-1.5 ml-2">
+            <span className="text-xs text-destructive">Delete drawing?</span>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-7 text-xs"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Confirm'}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-xs text-muted-foreground hover:text-destructive"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="h-3 w-3 mr-1" /> Delete
+          </Button>
+        )}
       </div>
 
       {/* ── Link / URL editor ───────────────────────────────────────────────── */}
@@ -372,8 +441,8 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
         </div>
       )}
 
-      {/* ── No-schematic hint (no JSON, no share token) ─────────────────────── */}
-      {!hasJson && !shareUrl && !editingLink && (
+      {/* ── No-schematic hint ───────────────────────────────────────────────── */}
+      {!hasJson && !editingLink && (
         <div
           className="rounded-md border border-dashed p-4 text-center flex flex-col gap-2 cursor-pointer hover:bg-muted/20 transition-colors"
           onDrop={handleDrop}
@@ -384,59 +453,9 @@ export function DrawingDetailPanel({ drawing: initialDrawing, onUpdated }: Drawi
           <p className="text-sm text-muted-foreground font-medium">
             Drop EasySchematic JSON here or click to upload
           </p>
-          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-            Alternatively, export cables above → import CSV into EasySchematic →
-            export the schematic JSON and upload it here to assign cable numbers.
+          <p className="text-xs text-muted-foreground">
+            Or use <span className="font-medium">Open EasySchematic</span> above to draw directly — Ctrl+S saves back here automatically.
           </p>
-          <ol className="text-xs text-muted-foreground text-left max-w-sm mx-auto list-decimal list-inside space-y-1 mt-1">
-            <li>Export cables CSV above</li>
-            <li>
-              Import CSV at{' '}
-              <a
-                href={esBase}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                your EasySchematic instance
-              </a>
-            </li>
-            <li>Draw or verify connections</li>
-            <li>Export schematic as JSON → upload here</li>
-            <li>Assign cable numbers → export annotated JSON</li>
-            <li>Reimport annotated JSON into EasySchematic</li>
-          </ol>
-        </div>
-      )}
-
-      {/* ── Embedded schematic (share token only) ───────────────────────────── */}
-      {shareUrl && !editingLink && (
-        <div className="rounded-md border overflow-hidden">
-          {embedError ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 bg-muted/20">
-              <p className="text-sm text-muted-foreground">Schematic could not be embedded.</p>
-              <a
-                href={shareUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
-              >
-                <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
-              </a>
-            </div>
-          ) : (
-            <iframe
-              ref={iframeRef}
-              src={shareUrl}
-              title={`EasySchematic — ${drawing.dwgNumber}`}
-              className="w-full"
-              style={{ height: '520px', border: 'none' }}
-              onError={() => setEmbedError(true)}
-              allow="clipboard-read; clipboard-write"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-            />
-          )}
         </div>
       )}
 

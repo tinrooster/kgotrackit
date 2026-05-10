@@ -380,8 +380,65 @@ export async function createDrawing(data: {
     })
     .select()
     .single();
-  if (error || !row) return null;
+  if (error || !row) {
+    console.error('[createDrawing] error:', error?.message, error?.code, error?.details);
+    return null;
+  }
   return rowToDrawing(row);
+}
+
+export async function deleteDrawing(id: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+  const { error } = await client.from('plant_drawings').delete().eq('id', id);
+  return !error;
+}
+
+export async function checkCableNumbersExist(numbers: string[]): Promise<Set<string>> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId || numbers.length === 0) return new Set();
+  const { data } = await client
+    .from('plant_cables')
+    .select('cable_number')
+    .eq('organization_id', orgId)
+    .in('cable_number', numbers);
+  return new Set((data ?? []).map((r) => r.cable_number as string));
+}
+
+export async function findOpenCableNumberBlocks(opts: {
+  minStart: number;
+  maxEnd: number;
+  minBlockSize: number;
+}): Promise<Array<{ start: number; end: number; size: number }>> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return [];
+
+  const { data } = await client
+    .from('plant_cables')
+    .select('cable_number')
+    .eq('organization_id', orgId)
+    .not('cable_number', 'is', null);
+
+  const used = new Set<number>();
+  for (const row of (data ?? [])) {
+    const n = parseInt(row.cable_number as string, 10);
+    if (!isNaN(n) && n >= opts.minStart && n <= opts.maxEnd) used.add(n);
+  }
+
+  // Sort used numbers, then find gaps between them
+  const sorted = [...used].sort((a, b) => a - b);
+  const checkpoints = [opts.minStart - 1, ...sorted, opts.maxEnd + 1];
+
+  const blocks: Array<{ start: number; end: number; size: number }> = [];
+  for (let i = 0; i < checkpoints.length - 1; i++) {
+    const gapStart = checkpoints[i] + 1;
+    const gapEnd   = checkpoints[i + 1] - 1;
+    const size     = gapEnd - gapStart + 1;
+    if (size >= opts.minBlockSize) blocks.push({ start: gapStart, end: gapEnd, size });
+  }
+  return blocks;
 }
 
 export async function saveDrawingSchematicJson(
