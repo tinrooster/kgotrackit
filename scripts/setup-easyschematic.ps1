@@ -16,5 +16,8 @@ if (Test-Path $target) {
     npm install
 }
 
+Write-Host "Generating device library fallback..." -ForegroundColor Cyan
+npm run generate-fallback
+
 Write-Host ""
 Write-Host "Done. Run 'npm run dev:all' from the repo root to start both servers." -ForegroundColor Green

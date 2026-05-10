@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:schematic": "npm --prefix easyschematic run dev -- --port 5174",
-    "dev:all": "concurrently -n trackIT,EasySchematic -c blue,green \"npm run dev\" \"npm run dev:schematic\"",
+    "dev:schematic": "npm --prefix easyschematic run dev",
+    "dev:all": "concurrently -n trackIT,EasySchematic -c blue,green --kill-others-on-fail \"npm run dev\" \"npm run dev:schematic\"",
     "build": "tsc --noEmit && vite build",
     "clean": "rimraf dist dist-web out .vite",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
