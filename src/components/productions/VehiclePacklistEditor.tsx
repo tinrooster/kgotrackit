@@ -93,6 +93,8 @@ export function VehiclePacklistEditor({
   const [sortMode, setSortMode] = useState<'manual' | 'name_asc' | 'name_desc' | 'qty_asc' | 'qty_desc'>('manual');
   const [expandedPacklistIds, setExpandedPacklistIds] = useState<string[]>([]);
   const [addItemRowVisibleByPacklistId, setAddItemRowVisibleByPacklistId] = useState<Record<string, boolean>>({});
+  const [editingPacklistId, setEditingPacklistId] = useState<string | null>(null);
+  const [editingPacklistName, setEditingPacklistName] = useState('');
 
   const allPacklistIds = useMemo(() => packlists.map((packlist) => packlist.id), [packlists]);
 
@@ -129,6 +131,26 @@ export function VehiclePacklistEditor({
       }
       return { ...previous, [packlistId]: willShow };
     });
+  };
+
+  const startPacklistNameEdit = (packlistId: string, currentName: string) => {
+    setEditingPacklistId(packlistId);
+    setEditingPacklistName(currentName);
+  };
+
+  const commitPacklistNameEdit = () => {
+    if (!editingPacklistId) return;
+    const nextName = editingPacklistName.trim();
+    if (nextName) {
+      updatePacklist(editingPacklistId, { vehicleName: nextName });
+    }
+    setEditingPacklistId(null);
+    setEditingPacklistName('');
+  };
+
+  const cancelPacklistNameEdit = () => {
+    setEditingPacklistId(null);
+    setEditingPacklistName('');
   };
 
   const runDeleteAction = (deleteKey: string, deleteAction: () => void) => {
@@ -479,7 +501,10 @@ export function VehiclePacklistEditor({
         const doneCount = allFlat.filter((i) => i.completed).length;
         return (
           <div key={packlist.id} className="rounded-lg border border-border/90 bg-card/95 p-2.5 shadow-sm">
-            <div className="mb-2 flex items-center gap-2 rounded-md border border-border/80 bg-muted/50 px-2 py-1.5">
+            <div
+              className="mb-2 flex items-center gap-2 rounded-md border border-border/80 bg-muted/50 px-2 py-1.5"
+              onDoubleClick={() => togglePacklistExpanded(packlist.id)}
+            >
               <Button
                 variant="ghost"
                 size="icon"
@@ -494,14 +519,26 @@ export function VehiclePacklistEditor({
                 )}
               </Button>
               <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
-              {readOnly ? (
-                <span className="flex-1 text-sm font-medium">{packlist.vehicleName}</span>
-              ) : (
+              {editingPacklistId === packlist.id && !readOnly ? (
                 <Input
                   className="h-7 flex-1 border-none bg-transparent p-0 text-sm font-medium shadow-none focus-visible:ring-0"
-                  value={packlist.vehicleName}
-                  onChange={(e) => updatePacklist(packlist.id, { vehicleName: e.target.value })}
+                  value={editingPacklistName}
+                  onChange={(event) => setEditingPacklistName(event.target.value)}
+                  onBlur={commitPacklistNameEdit}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      commitPacklistNameEdit();
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      cancelPacklistNameEdit();
+                    }
+                  }}
+                  autoFocus
                 />
+              ) : (
+                <span className="flex-1 text-sm font-medium">{packlist.vehicleName}</span>
               )}
               <span className="rounded bg-background/80 px-1.5 py-0.5 text-xs text-muted-foreground">
                 {doneCount}/{allFlat.length} packed
@@ -530,6 +567,14 @@ export function VehiclePacklistEditor({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        startPacklistNameEdit(packlist.id, packlist.vehicleName);
+                      }}
+                    >
+                      Edit vehicle / kit name
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
                         event.preventDefault();

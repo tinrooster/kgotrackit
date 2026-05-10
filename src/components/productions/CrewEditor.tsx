@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { Plus, Trash2, User, Database, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Flag } from 'lucide-react';
+import { Plus, Trash2, User, Database, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Flag, CalendarDays } from 'lucide-react';
 import { PositionTemplate, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +56,6 @@ const EMPTY_MEMBER: Omit<ProductionCrewMember, 'id'> = {
 
 const EMPTY_SHIFT_DRAFT = {
   date: '',
-  callTime: '',
   startTime: '',
   endTime: '',
   location: '',
@@ -86,6 +85,52 @@ function getDepartmentAccentHex(departmentName: string): string {
   }
   const hue = Math.abs(hash) % 360;
   return `hsl(${hue} 75% 58%)`;
+}
+
+function ShiftDateField({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (nextValue: string) => void;
+  ariaLabel: string;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const openDatePicker = () => {
+    const inputElement = inputRef.current;
+    if (!inputElement) return;
+    if (typeof inputElement.showPicker === 'function') {
+      inputElement.showPicker();
+      return;
+    }
+    inputElement.focus();
+    inputElement.click();
+  };
+
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-center gap-1">
+      <Input
+        ref={inputRef}
+        className="h-7 text-xs"
+        type="date"
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(event) => onChange(normalizeDateInputValue(event.target.value))}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="h-7 w-7 shrink-0"
+        onClick={openDatePicker}
+        title="Open date picker"
+      >
+        <CalendarDays className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
 }
 
 export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConfirm = false }: CrewEditorProps) {
@@ -126,7 +171,6 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
       string,
       {
         date: string;
-        callTime: string;
         startTime: string;
         endTime: string;
         location: string;
@@ -234,7 +278,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
 
   const updateShiftDraft = (
     memberId: string,
-    updates: Partial<{ date: string; callTime: string; startTime: string; endTime: string; location: string; notes: string }>
+    updates: Partial<{ date: string; startTime: string; endTime: string; location: string; notes: string }>
   ) => {
     setShiftDraftsByMemberId((previous) => ({ ...previous, [memberId]: { ...getShiftDraft(memberId), ...updates } }));
   };
@@ -300,7 +344,6 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     const shift = {
       id: crypto.randomUUID(),
       date: draftForMember.date,
-      callTime: draftForMember.callTime ? normalizeQuarterHourTime(draftForMember.callTime) : undefined,
       startTime: draftForMember.startTime ? normalizeQuarterHourTime(draftForMember.startTime) : undefined,
       endTime: draftForMember.endTime ? normalizeQuarterHourTime(draftForMember.endTime) : undefined,
       location: draftForMember.location.trim() || undefined,
@@ -310,7 +353,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     setShiftDraftsByMemberId((previous) => ({ ...previous, [memberId]: EMPTY_SHIFT_DRAFT }));
   };
 
-  const updateShiftForMember = (memberId: string, shiftId: string, updates: Partial<{ date: string; callTime?: string; startTime?: string; endTime?: string; location?: string; notes?: string }>) => {
+  const updateShiftForMember = (memberId: string, shiftId: string, updates: Partial<{ date: string; startTime?: string; endTime?: string; location?: string; notes?: string }>) => {
     onChange(
       crew.map((member) =>
         member.id === memberId
@@ -932,59 +975,65 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                   </div>
                                   <OptionalFormCollapsible title="Assignment shifts">
                                     <div className="space-y-2">
+                                      <p className="text-[11px] text-muted-foreground">
+                                        Shift fields are <span className="font-medium text-foreground">Date</span>,
+                                        <span className="font-medium text-foreground"> Start</span>,
+                                        <span className="font-medium text-foreground"> End</span>, and
+                                        <span className="font-medium text-foreground"> Location</span>.
+                                      </p>
                                       {(member.shifts ?? []).map((shift) => (
-                                        <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 lg:grid-cols-6">
-                                          <Input className="h-7 text-xs" type="date" value={shift.date} onChange={(event) => updateShiftForMember(member.id, shift.id, { date: normalizeDateInputValue(event.target.value) })} />
-                                          <TimeInput
-                                            className="h-7 text-xs"
-                                            value={shift.callTime ?? ''}
-                                            onChange={(event) => updateShiftForMember(member.id, shift.id, { callTime: event.target.value || undefined })}
-                                            onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { callTime: value })}
+                                        <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                                          <ShiftDateField
+                                            ariaLabel="Shift date"
+                                            value={shift.date}
+                                            onChange={(nextValue) => updateShiftForMember(member.id, shift.id, { date: nextValue })}
                                           />
                                           <TimeInput
                                             className="h-7 text-xs"
+                                            aria-label="Start time"
                                             value={shift.startTime ?? ''}
                                             onChange={(event) => updateShiftForMember(member.id, shift.id, { startTime: event.target.value || undefined })}
                                             onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { startTime: value })}
                                           />
                                           <TimeInput
                                             className="h-7 text-xs"
+                                            aria-label="End time"
                                             value={shift.endTime ?? ''}
                                             onChange={(event) => updateShiftForMember(member.id, shift.id, { endTime: event.target.value || undefined })}
                                             onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { endTime: value })}
                                           />
-                                          <Input className="h-7 text-xs" placeholder="Location" value={shift.location ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { location: event.target.value || undefined })} />
+                                          <Input className="h-7 text-xs" placeholder="Location" aria-label="Shift location" value={shift.location ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { location: event.target.value || undefined })} />
                                           <div className="flex items-center justify-end">
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShiftForMember(member.id, shift.id)}>
                                               <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                             </Button>
                                           </div>
-                                          <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
+                                          <Input className="col-span-full h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
                                         </div>
                                       ))}
-                                      <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 lg:grid-cols-6">
-                                        <Input className="h-7 text-xs" type="date" value={getShiftDraft(member.id).date} onChange={(event) => updateShiftDraft(member.id, { date: normalizeDateInputValue(event.target.value) })} />
-                                        <TimeInput
-                                          className="h-7 text-xs"
-                                          value={getShiftDraft(member.id).callTime}
-                                          onChange={(event) => updateShiftDraft(member.id, { callTime: event.target.value })}
-                                          onBlurCommit={(value) => updateShiftDraft(member.id, { callTime: value ?? '' })}
+                                      <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                                        <ShiftDateField
+                                          ariaLabel="New shift date"
+                                          value={getShiftDraft(member.id).date}
+                                          onChange={(nextValue) => updateShiftDraft(member.id, { date: nextValue })}
                                         />
                                         <TimeInput
                                           className="h-7 text-xs"
+                                          aria-label="New shift start time"
                                           value={getShiftDraft(member.id).startTime}
                                           onChange={(event) => updateShiftDraft(member.id, { startTime: event.target.value })}
                                           onBlurCommit={(value) => updateShiftDraft(member.id, { startTime: value ?? '' })}
                                         />
                                         <TimeInput
                                           className="h-7 text-xs"
+                                          aria-label="New shift end time"
                                           value={getShiftDraft(member.id).endTime}
                                           onChange={(event) => updateShiftDraft(member.id, { endTime: event.target.value })}
                                           onBlurCommit={(value) => updateShiftDraft(member.id, { endTime: value ?? '' })}
                                         />
-                                        <Input className="h-7 text-xs" placeholder="Location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
+                                        <Input className="h-7 text-xs" placeholder="Location" aria-label="New shift location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
                                         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift row</Button>
-                                        <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
+                                        <Input className="col-span-full h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
                                       </div>
                                     </div>
                                   </OptionalFormCollapsible>
@@ -1039,59 +1088,65 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                               </div>
                               <OptionalFormCollapsible title="Assignment shifts">
                                 <div className="space-y-2">
+                                  <p className="text-[11px] text-muted-foreground">
+                                    Shift fields are <span className="font-medium text-foreground">Date</span>,
+                                    <span className="font-medium text-foreground"> Start</span>,
+                                    <span className="font-medium text-foreground"> End</span>, and
+                                    <span className="font-medium text-foreground"> Location</span>.
+                                  </p>
                                   {(member.shifts ?? []).map((shift) => (
-                                    <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 lg:grid-cols-6">
-                                      <Input className="h-7 text-xs" type="date" value={shift.date} onChange={(event) => updateShiftForMember(member.id, shift.id, { date: normalizeDateInputValue(event.target.value) })} />
-                                      <TimeInput
-                                        className="h-7 text-xs"
-                                        value={shift.callTime ?? ''}
-                                        onChange={(event) => updateShiftForMember(member.id, shift.id, { callTime: event.target.value || undefined })}
-                                        onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { callTime: value })}
+                                    <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                                      <ShiftDateField
+                                        ariaLabel="Shift date"
+                                        value={shift.date}
+                                        onChange={(nextValue) => updateShiftForMember(member.id, shift.id, { date: nextValue })}
                                       />
                                       <TimeInput
                                         className="h-7 text-xs"
+                                        aria-label="Start time"
                                         value={shift.startTime ?? ''}
                                         onChange={(event) => updateShiftForMember(member.id, shift.id, { startTime: event.target.value || undefined })}
                                         onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { startTime: value })}
                                       />
                                       <TimeInput
                                         className="h-7 text-xs"
+                                        aria-label="End time"
                                         value={shift.endTime ?? ''}
                                         onChange={(event) => updateShiftForMember(member.id, shift.id, { endTime: event.target.value || undefined })}
                                         onBlurCommit={(value) => updateShiftForMember(member.id, shift.id, { endTime: value })}
                                       />
-                                      <Input className="h-7 text-xs" placeholder="Location" value={shift.location ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { location: event.target.value || undefined })} />
+                                      <Input className="h-7 text-xs" placeholder="Location" aria-label="Shift location" value={shift.location ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { location: event.target.value || undefined })} />
                                       <div className="flex items-center justify-end">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShiftForMember(member.id, shift.id)}>
                                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                         </Button>
                                       </div>
-                                      <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
+                                      <Input className="col-span-full h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
                                     </div>
                                   ))}
-                                  <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 lg:grid-cols-6">
-                                    <Input className="h-7 text-xs" type="date" value={getShiftDraft(member.id).date} onChange={(event) => updateShiftDraft(member.id, { date: normalizeDateInputValue(event.target.value) })} />
-                                    <TimeInput
-                                      className="h-7 text-xs"
-                                      value={getShiftDraft(member.id).callTime}
-                                      onChange={(event) => updateShiftDraft(member.id, { callTime: event.target.value })}
-                                      onBlurCommit={(value) => updateShiftDraft(member.id, { callTime: value ?? '' })}
+                                  <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                                    <ShiftDateField
+                                      ariaLabel="New shift date"
+                                      value={getShiftDraft(member.id).date}
+                                      onChange={(nextValue) => updateShiftDraft(member.id, { date: nextValue })}
                                     />
                                     <TimeInput
                                       className="h-7 text-xs"
+                                      aria-label="New shift start time"
                                       value={getShiftDraft(member.id).startTime}
                                       onChange={(event) => updateShiftDraft(member.id, { startTime: event.target.value })}
                                       onBlurCommit={(value) => updateShiftDraft(member.id, { startTime: value ?? '' })}
                                     />
                                     <TimeInput
                                       className="h-7 text-xs"
+                                      aria-label="New shift end time"
                                       value={getShiftDraft(member.id).endTime}
                                       onChange={(event) => updateShiftDraft(member.id, { endTime: event.target.value })}
                                       onBlurCommit={(value) => updateShiftDraft(member.id, { endTime: value ?? '' })}
                                     />
-                                    <Input className="h-7 text-xs" placeholder="Location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
+                                    <Input className="h-7 text-xs" placeholder="Location" aria-label="New shift location" value={getShiftDraft(member.id).location} onChange={(event) => updateShiftDraft(member.id, { location: event.target.value })} />
                                     <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addShiftForMember(member.id)} disabled={!getShiftDraft(member.id).date}>Add shift row</Button>
-                                    <Input className="col-span-6 h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
+                                    <Input className="col-span-full h-7 text-xs" placeholder="Shift notes" value={getShiftDraft(member.id).notes} onChange={(event) => updateShiftDraft(member.id, { notes: event.target.value })} />
                                   </div>
                                 </div>
                               </OptionalFormCollapsible>
