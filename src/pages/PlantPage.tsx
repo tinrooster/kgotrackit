@@ -4,12 +4,14 @@ import { cn } from '@/lib/utils';
 import { CableRegisterTab } from '@/components/plant/CableRegisterTab';
 import { DrawingsTab } from '@/components/plant/DrawingsTab';
 import { CampaignsTab } from '@/components/plant/CampaignsTab';
+import { LocationsTab } from '@/components/plant/LocationsTab';
 
-type PlantTab = 'register' | 'drawings' | 'campaigns';
+type PlantTab = 'register' | 'drawings' | 'locations' | 'campaigns';
 
 const TABS: { id: PlantTab; label: string }[] = [
-  { id: 'register', label: 'Cable Register' },
-  { id: 'drawings', label: 'Drawings' },
+  { id: 'register',  label: 'Cable Register' },
+  { id: 'drawings',  label: 'Drawings' },
+  { id: 'locations', label: 'Locations' },
   { id: 'campaigns', label: 'Campaigns' },
 ];
 
@@ -55,8 +57,9 @@ export default function PlantPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'register' && <CableRegisterTab />}
-      {activeTab === 'drawings' && <DrawingsTab />}
+      {activeTab === 'register'  && <CableRegisterTab />}
+      {activeTab === 'drawings'  && <DrawingsTab />}
+      {activeTab === 'locations' && <LocationsTab />}
       {activeTab === 'campaigns' && <CampaignsTab />}
     </div>
   );

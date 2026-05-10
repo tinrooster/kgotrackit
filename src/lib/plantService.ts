@@ -234,6 +234,31 @@ export async function listSystems(): Promise<PlantSystem[]> {
 // Drawing cable-count helper (used in Drawings tab)
 // ---------------------------------------------------------------------------
 
+export async function getLocationCableCounts(orgId: string): Promise<Record<string, { origin: number; dest: number }>> {
+  const client = getSupabase();
+  if (!client) return {};
+  const { data, error } = await client
+    .from('plant_cables')
+    .select('origin_location_code,dest_location_code')
+    .eq('organization_id', orgId)
+    .neq('status', 'archived');
+  if (error || !data) return {};
+  const counts: Record<string, { origin: number; dest: number }> = {};
+  for (const row of data) {
+    if (row.origin_location_code) {
+      const c = counts[row.origin_location_code] ?? { origin: 0, dest: 0 };
+      c.origin++;
+      counts[row.origin_location_code] = c;
+    }
+    if (row.dest_location_code) {
+      const c = counts[row.dest_location_code] ?? { origin: 0, dest: 0 };
+      c.dest++;
+      counts[row.dest_location_code] = c;
+    }
+  }
+  return counts;
+}
+
 export async function getDrawingCableCounts(orgId: string): Promise<Record<string, number>> {
   const client = getSupabase();
   if (!client) return {};
