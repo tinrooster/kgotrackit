@@ -81,21 +81,40 @@ export function GeneralSettingsTab({
           <CardTitle>Display Preferences</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="theme-mode">Theme</Label>
-            <Select
-              value={settings.theme}
-              onValueChange={(value: 'light' | 'dark' | 'system') => onSettingsChange({ theme: value })}
-            >
-              <SelectTrigger id="theme-mode" className="w-full md:w-64">
-                <SelectValue placeholder="Select theme" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-                <SelectItem value="system">System</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-4 rounded-md border p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="theme-follow-system">Follow system appearance</Label>
+                <p className="text-xs text-muted-foreground">
+                  When off, use the light/dark switch below. When on, match this device’s light/dark mode.
+                </p>
+              </div>
+              <Switch
+                id="theme-follow-system"
+                checked={settings.theme === 'system'}
+                onCheckedChange={(on) => {
+                  if (on) {
+                    onSettingsChange({ theme: 'system' });
+                  } else {
+                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    onSettingsChange({ theme: prefersDark ? 'dark' : 'light' });
+                  }
+                }}
+              />
+            </div>
+            {settings.theme !== 'system' ? (
+              <div className="flex items-center justify-between gap-3 border-t pt-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="theme-dark-manual">Dark appearance</Label>
+                  <p className="text-xs text-muted-foreground">Fixed light or dark theme for this browser.</p>
+                </div>
+                <Switch
+                  id="theme-dark-manual"
+                  checked={settings.theme === 'dark'}
+                  onCheckedChange={(on) => onSettingsChange({ theme: on ? 'dark' : 'light' })}
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-md border p-4">

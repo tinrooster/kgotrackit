@@ -44,6 +44,7 @@ import { ProductionCard } from '@/components/productions/ProductionCard';
 import { ProductionDetail } from '@/components/productions/ProductionDetail';
 import { ProductionForm } from '@/components/productions/ProductionForm';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCanMutateAppData } from '@/hooks/useCanMutateAppData';
 import { toast } from 'sonner';
 import {
   applyProductionState,
@@ -60,6 +61,7 @@ export default function ProductionsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser } = useAuth();
+  const canMutateAppData = useCanMutateAppData();
   const [productions, setProductions] = useState<Production[]>(() => getProductions());
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() => getItems());
   const [searchQuery, setSearchQuery] = useState('');
@@ -169,6 +171,10 @@ export default function ProductionsPage() {
   }, [filtered]);
 
   const handleCreate = (data: Omit<Production, 'id' | 'createdAt' | 'updatedAt' | 'checklistGroups' | 'vehiclePacklists' | 'crew' | 'crewSchedule'>) => {
+    if (!canMutateAppData) {
+      toast.error('Viewers cannot create productions.');
+      return;
+    }
     recordProductionSnapshotBeforeChange(productions);
     createProduction(
       { ...data, checklistGroups: [], vehiclePacklists: [], crew: [], crewSchedule: [] },
@@ -229,6 +235,10 @@ export default function ProductionsPage() {
   );
 
   const confirmCloneSelected = () => {
+    if (!canMutateAppData) {
+      toast.error('Viewers cannot clone productions.');
+      return;
+    }
     if (!cloneSourceProduction) {
       setCloneDialogOpen(false);
       return;
@@ -342,6 +352,10 @@ export default function ProductionsPage() {
   };
 
   const continueCreate = () => {
+    if (!canMutateAppData) {
+      toast.error('Viewers cannot create or clone productions.');
+      return;
+    }
     if (createMode === 'blank') {
       setCreateOptionsOpen(false);
       setNewFormOpen(true);
@@ -360,6 +374,10 @@ export default function ProductionsPage() {
   };
 
   const handleCardClone = (production: Production) => {
+    if (!canMutateAppData) {
+      toast.error('Viewers cannot clone productions.');
+      return;
+    }
     setCloneSourceProductionId(production.id);
     setCloneDialogOpen(true);
   };
@@ -386,7 +404,7 @@ export default function ProductionsPage() {
             <Redo2 className="h-4 w-4" />
             Redo
           </Button>
-          <Button onClick={openCreateOptions} className="gap-1.5">
+          <Button onClick={openCreateOptions} disabled={!canMutateAppData} className="gap-1.5">
             <Plus className="h-4 w-4" />
             New Production
           </Button>
@@ -429,7 +447,7 @@ export default function ProductionsPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Create your first production to start planning equipment and crew.
               </p>
-              <Button className="mt-4 gap-1.5" onClick={openCreateOptions}>
+              <Button className="mt-4 gap-1.5" onClick={openCreateOptions} disabled={!canMutateAppData}>
                 <Plus className="h-4 w-4" />
                 New Production
               </Button>

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import {
   Plus,
   Trash2,
@@ -48,6 +48,20 @@ interface ChecklistEditorProps {
   /** When true, renders compact read-only checkboxes only (no edit controls). */
   readOnly?: boolean;
   requireDeleteConfirm?: boolean;
+  /**
+   * When set, checkbox toggles apply these patches instead of only `{ completed }`
+   * (e.g. field sign-off timestamps on Field checklist).
+   */
+  mergeOnCompletionToggle?: (item: ChecklistItem, completed: boolean) => Partial<ChecklistItem>;
+  /** Called after a checkbox toggle (e.g. audit logging). */
+  onCompletionToggle?: (args: {
+    groupId: string;
+    groupTitle: string;
+    item: ChecklistItem;
+    completed: boolean;
+  }) => void;
+  /** Extra content under the item label (e.g. field completed-by line). */
+  renderItemBelowLabel?: (item: ChecklistItem) => ReactNode;
 }
 
 function newItem(label: string): ChecklistItem {
@@ -64,6 +78,9 @@ export function ChecklistEditor({
   inventoryItems = [],
   readOnly = false,
   requireDeleteConfirm = false,
+  mergeOnCompletionToggle,
+  onCompletionToggle,
+  renderItemBelowLabel,
 }: ChecklistEditorProps) {
   const [newGroupTitle, setNewGroupTitle] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
@@ -473,9 +490,19 @@ export function ChecklistEditor({
                   <Checkbox
                     className="focus-visible:ring-1 focus-visible:ring-offset-1"
                     checked={item.completed}
-                    onCheckedChange={(checked) =>
-                      updateItem(group.id, item.id, { completed: Boolean(checked) })
-                    }
+                    onCheckedChange={(checked) => {
+                      const completed = Boolean(checked);
+                      const patches = mergeOnCompletionToggle
+                        ? mergeOnCompletionToggle(item, completed)
+                        : { completed };
+                      updateItem(group.id, item.id, patches);
+                      onCompletionToggle?.({
+                        groupId: group.id,
+                        groupTitle: group.title,
+                        item: { ...item, ...patches },
+                        completed,
+                      });
+                    }}
                     title={item.completed ? 'Mark as not completed' : 'Mark as completed'}
                   />
                   {isEditingItemLabel ? (
@@ -507,22 +534,25 @@ export function ChecklistEditor({
                       autoFocus
                     />
                   ) : (
-                    <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
-                      {item.label}
-                      {invName && item.inventoryItemId && item.label !== invName && (
-                        <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
-                      )}
-                      {item.inventoryItemId && (
-                        <Link2 className="ml-1 inline h-3 w-3 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
-                      )}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className={cn('text-sm', item.completed && 'text-muted-foreground')}>
+                        {item.label}
+                        {invName && item.inventoryItemId && item.label !== invName && (
+                          <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
+                        )}
+                        {item.inventoryItemId && (
+                          <Link2 className="ml-1 inline h-3 w-3 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
+                        )}
+                      </span>
+                      {renderItemBelowLabel?.(item)}
+                    </div>
                   )}
                   {item.completed && <LineCompletionBadge kind="completed" />}
                   {!readOnly ? (
                     <Input
                       type="number"
                       min={1}
-                      className="h-7 w-16 text-xs"
+                      className="h-7 w-16 min-w-[2.75rem] shrink-0 border-2 border-border bg-muted/50 text-center text-sm font-semibold tabular-nums text-foreground shadow-sm"
                       value={item.quantity ?? 1}
                       onChange={(e) =>
                         updateItem(group.id, item.id, {
@@ -531,7 +561,12 @@ export function ChecklistEditor({
                       }
                     />
                   ) : (
-                    <span className="text-xs text-muted-foreground">×{item.quantity ?? 1}</span>
+                    <span
+                      className="inline-flex h-7 min-w-[2.5rem] shrink-0 items-center justify-center rounded-md border border-border bg-muted/50 px-2 text-sm font-semibold tabular-nums text-foreground shadow-sm"
+                      title="Quantity"
+                    >
+                      ×{item.quantity ?? 1}
+                    </span>
                   )}
                   {item.reservedQuantity ? (
                     <span className="text-xs text-amber-700 dark:text-amber-300">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, MapPin } from 'lucide-react';
+import { CalendarDays, ChevronLeft, MapPin, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import { CrewScheduleCalendar } from '@/components/productions/CrewScheduleCalen
 import { ProductionFusedStripProgress } from '@/components/dashboard/ProductionDashboardProgress';
 import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
 import {
+  exportPlannerOfflineCrewPrintPack,
   getProductions,
   PRODUCTIONS_UPDATED_EVENT,
   updateProduction,
@@ -24,8 +25,7 @@ import {
 import { Production, PRODUCTION_STATUS_LABELS } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { usePlannerListDeleteConfirm } from '@/hooks/usePlannerListDeleteConfirm';
-
-const LAST_PLANNER_ROUTE_STORAGE_KEY = 'trackit:last-planner-route';
+import { LAST_PLANNER_ROUTE_STORAGE_KEY } from '@/lib/navigationReturn';
 const PLANNER_TABS = ['checklist', 'vehicles', 'schedule', 'crew', 'overview'] as const;
 type PlannerTab = (typeof PLANNER_TABS)[number];
 
@@ -198,6 +198,17 @@ export default function PlannerWorkspacePage() {
         <div className="space-y-4 rounded-lg border bg-card p-4">
           <div className="flex flex-wrap items-center gap-4">
             <p className="text-lg font-semibold">{selectedProduction.name}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              title="Print checklist, vehicle lines, and crew contacts for people without phones"
+              onClick={() => exportPlannerOfflineCrewPrintPack(selectedProduction)}
+            >
+              <Printer className="h-3.5 w-3.5" aria-hidden />
+              Print offline pack
+            </Button>
             <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
               {PRODUCTION_STATUS_LABELS[selectedProduction.status]}
             </span>

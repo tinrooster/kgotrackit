@@ -16,8 +16,7 @@ import { toast } from 'sonner';
 import { logger } from '@/utils/logger';
 import { useLocation } from 'react-router-dom';
 import { APP_BRANDING_UPDATED_EVENT, loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding';
-
-const LAST_ROUTE_STORAGE_KEY = 'trackit:last-route';
+import { LAST_ROUTE_STORAGE_KEY } from '@/lib/navigationReturn';
 
 function normalizeLoginResult(raw: LoginResult | boolean): LoginResult {
   if (typeof raw === 'boolean') {

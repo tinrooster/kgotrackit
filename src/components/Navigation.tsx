@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, List, FileText, Settings, ShoppingCart, Clapperboard, FlaskConical } from 'lucide-react'
+import { ClipboardList, LayoutDashboard, List, FileText, Settings, ShoppingCart, Clapperboard, FlaskConical } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { UserMenu } from '@/components/UserMenu'
 import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService'
@@ -10,6 +10,7 @@ import { useOrganization } from '@/contexts/OrganizationContext'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
 import { DEV_MENU_UPDATED_EVENT, getDevMenuPreference, isDevMenuEnabled, setDevMenuEnabled as persistDevMenuEnabled } from '@/lib/devMenu'
 import { APP_BRANDING_UPDATED_EVENT, loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding'
+import { getFieldChecklistNavPath, getProductionsNavPath } from '@/lib/navigationReturn'
 
 export function Navigation() {
   const location = useLocation()
@@ -89,6 +90,15 @@ export function Navigation() {
     setMobileMenuOpen(false)
   }, [location.pathname])
 
+  const productionsNavPath = useMemo(() => getProductionsNavPath(), [location.pathname])
+  const fieldChecklistNavPath = useMemo(() => getFieldChecklistNavPath(), [location.pathname])
+
+  const navLinkTarget = (path: string): string => {
+    if (path === '/productions') return productionsNavPath
+    if (path === '/field-checklist') return fieldChecklistNavPath
+    return path
+  }
+
   const showDataContextChip =
     isSupabaseConfigured() && authBackend === 'supabase'
   const activeWorkspaceRow = activeWorkspaceId
@@ -99,14 +109,18 @@ export function Navigation() {
     !!activeWorkspaceId &&
     !!currentUser?.id &&
     activeWorkspaceRow?.ownerUserId === currentUser.id
-  const navItems = [
-    { path: "/", label: "Dashboard", icon: LayoutDashboard },
-    { path: "/inventory", label: "Inventory", icon: List },
-    { path: '/productions', label: "Productions", icon: Clapperboard, activeBasePath: '/productions' },
-    { path: "/checkout", label: "Check-In/Out", icon: ShoppingCart },
-    { path: "/reports", label: "Reports", icon: FileText },
-    { path: "/settings", label: "Settings", icon: Settings }
-  ]
+  const navItems = useMemo(() => {
+    const base = [
+      { path: "/", label: "Dashboard", icon: LayoutDashboard },
+      { path: "/inventory", label: "Inventory", icon: List },
+      { path: '/productions', label: "Productions", icon: Clapperboard, activeBasePath: '/productions' },
+      { path: '/field-checklist', label: 'Field checklist', icon: ClipboardList },
+      { path: "/checkout", label: "Check-In/Out", icon: ShoppingCart },
+      { path: "/reports", label: "Reports", icon: FileText },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ]
+    return mobileTabletUi ? base : base.filter((item) => item.path !== '/field-checklist')
+  }, [mobileTabletUi])
   const isNavItemActive = (path: string, activeBasePath?: string): boolean => {
     const matchPath = activeBasePath ?? path
     if (matchPath === '/') return location.pathname === '/';
@@ -160,7 +174,7 @@ export function Navigation() {
             {navItems.map(item => (
               <Link
                 key={item.path}
-                to={item.path}
+                to={navLinkTarget(item.path)}
                 title={item.label}
                 className={cn(
                   'flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md text-sm font-medium transition-colors md:min-h-0 md:min-w-0',
@@ -231,7 +245,7 @@ export function Navigation() {
             {navItems.map(item => (
               <Link
                 key={item.path}
-                to={item.path}
+                to={navLinkTarget(item.path)}
                 className={cn(
                   'flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
                   isNavItemActive(item.path, item.activeBasePath)

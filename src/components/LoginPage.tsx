@@ -3,8 +3,7 @@ import { LoginForm } from '@/components/LoginForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-
-const LAST_ROUTE_STORAGE_KEY = 'trackit:last-route';
+import { LAST_ROUTE_STORAGE_KEY } from '@/lib/navigationReturn';
 
 export function LoginPage() {
   const { currentUser, loading } = useAuth();

@@ -41,15 +41,13 @@ export function useProductionSheetEdgeDrag({
       }
 
       if (totalOffset >= CLOSE_DRAG_PX) {
-        dragPxRef.current = 0;
-        setDragPx(0);
+        // Keep translate until sheet unmounts — avoids snap-back to x=0 right before close (same idea as schedule drag pending release).
         onRequestClose();
         return;
       }
 
       if (totalOffset <= -PLANNER_DRAG_PX) {
-        dragPxRef.current = 0;
-        setDragPx(0);
+        // Hold offset through settle delay so the panel does not jump to center before navigating.
         settleTimerRef.current = setTimeout(() => {
           settleTimerRef.current = null;
           onRequestOpenPlanner();

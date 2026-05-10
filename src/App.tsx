@@ -16,7 +16,7 @@ import { CLOUD_HYDRATED_EVENT } from './lib/cloudSyncEvents';
 import CheckoutPage from './pages/CheckoutPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppBreadcrumbs } from './components/AppBreadcrumbs';
-import { SettingsService } from './lib/settingsService';
+import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from './lib/settingsService';
 import { refreshRackLocationsFromServer } from './lib/rackLocationsConfig';
 import HelpPage from './pages/HelpPage';
 import AboutPage from './pages/AboutPage';
@@ -27,8 +27,11 @@ import UiDiagnosticsPage from './pages/UiDiagnosticsPage';
 import ExpandCollapseSegmentedLabPage from './pages/ExpandCollapseSegmentedLabPage';
 import DevMenuPage from './pages/DevMenuPage';
 import PlannerWorkspacePage from './pages/PlannerWorkspacePage';
-
-const LAST_ROUTE_STORAGE_KEY = 'trackit:last-route';
+import FieldChecklistPage from './pages/FieldChecklistPage';
+import {
+  LAST_ROUTE_STORAGE_KEY,
+  shouldPersistLastVisitedRoute,
+} from '@/lib/navigationReturn';
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -59,7 +62,8 @@ export default function App() {
 
   useEffect(() => {
     // Persist the most recent in-app route so refresh/login can restore the exact subpage.
-    if (location.pathname === '/login') return;
+    // Settings / inventory do not replace the stored path so returning keeps planner/production tab context.
+    if (!shouldPersistLastVisitedRoute(location.pathname)) return;
     try {
       const fullPath = `${location.pathname}${location.search}${location.hash}`;
       sessionStorage.setItem(LAST_ROUTE_STORAGE_KEY, fullPath);
@@ -87,12 +91,22 @@ export default function App() {
 
   useEffect(() => {
     void refreshRackLocationsFromServer();
-    const uiSettings = SettingsService.loadDefaultSettings();
-    const shouldUseDarkTheme = uiSettings.theme === 'dark'
-      || (uiSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.classList.toggle('dark', shouldUseDarkTheme);
-    document.body.classList.toggle('compact-ui', uiSettings.condensedView);
-    document.body.classList.toggle('mt-compact-ui', uiSettings.mobileTabletUi);
+    const applyAppUiFromSettings = () => {
+      const uiSettings = SettingsService.loadDefaultSettings();
+      const shouldUseDarkTheme = uiSettings.theme === 'dark'
+        || (uiSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', shouldUseDarkTheme);
+      document.body.classList.toggle('compact-ui', uiSettings.condensedView);
+      document.body.classList.toggle('mt-compact-ui', uiSettings.mobileTabletUi);
+    };
+    applyAppUiFromSettings();
+    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, applyAppUiFromSettings);
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', applyAppUiFromSettings);
+    return () => {
+      window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, applyAppUiFromSettings);
+      mq.removeEventListener('change', applyAppUiFromSettings);
+    };
   }, []);
 
   useEffect(() => {
@@ -229,6 +243,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <PlannerWorkspacePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/field-checklist"
+                element={
+                  <ProtectedRoute>
+                    <FieldChecklistPage />
                   </ProtectedRoute>
                 }
               />

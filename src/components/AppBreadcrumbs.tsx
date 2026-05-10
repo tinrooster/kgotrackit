@@ -18,6 +18,7 @@ const PATH_LABELS: Record<string, string> = {
   '/settings': 'Settings',
   '/productions': 'Productions',
   '/productions/planner': 'Planner Workspace',
+  '/field-checklist': 'Field checklist',
   '/help': 'Help',
   '/about': 'About',
   '/dev': 'Dev',

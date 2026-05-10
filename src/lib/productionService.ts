@@ -387,3 +387,145 @@ export function exportProductionPacklistsToPdf(production: Production): void {
   `);
   popup.document.close();
 }
+
+/** Printable checklist + vehicle packlists + crew roster for crews without phones / offline use. */
+export function exportPlannerOfflineCrewPrintPack(production: Production): void {
+  const popup = window.open('', '_blank', 'width=980,height=760');
+  if (!popup) return;
+  const escaped = (value: string) =>
+    value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const checklistMarkup =
+    production.checklistGroups.length === 0
+      ? '<p>No production checklist sections.</p>'
+      : production.checklistGroups
+          .map((group) => {
+            const rows = group.items
+              .map(
+                (item) => `
+            <tr>
+              <td class="check-col">☐</td>
+              <td>${escaped(item.label)}</td>
+              <td>${Number(item.quantity ?? 1) || 1}</td>
+            </tr>`,
+              )
+              .join('');
+            return `
+        <section class="packlist">
+          <h3>${escaped(group.title)}</h3>
+          <table>
+            <thead>
+              <tr><th class="check-col">Done</th><th>Item</th><th>Qty</th></tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="3">No lines</td></tr>'}
+            </tbody>
+          </table>
+        </section>`;
+          })
+          .join('');
+
+  const vehicleMarkup = production.vehiclePacklists
+    .map((packlist) => {
+      const normalized = normalizeVehiclePacklist(packlist);
+      const row = (item: ChecklistItem) => `
+            <tr>
+              <td class="check-col">☐</td>
+              <td>${escaped(item.label)}</td>
+              <td>${Number(item.quantity ?? 1) || 1}</td>
+              <td>${item.completed ? 'Yes' : 'No'}</td>
+            </tr>
+          `;
+      const bodyParts: string[] = [];
+      for (const section of normalized.sections ?? []) {
+        bodyParts.push(`
+            <tr><td colspan="4" class="subhead">${escaped(section.title)}</td></tr>`);
+        for (const item of section.items) {
+          bodyParts.push(row(item));
+        }
+      }
+      if (normalized.items.length > 0) {
+        if ((normalized.sections?.length ?? 0) > 0) {
+          bodyParts.push(`
+            <tr><td colspan="4" class="subhead">${escaped('Other items')}</td></tr>`);
+        }
+        for (const item of normalized.items) {
+          bodyParts.push(row(item));
+        }
+      }
+      const tbody = bodyParts.length > 0 ? bodyParts.join('\n') : '<tr><td colspan="4">No items</td></tr>';
+      return `
+        <section class="packlist">
+          <h3>${escaped(packlist.vehicleName)}</h3>
+          <table>
+            <thead>
+              <tr><th class="check-col">Packed</th><th>Item</th><th>Qty</th><th>Was done</th></tr>
+            </thead>
+            <tbody>
+            ${tbody}
+            </tbody>
+          </table>
+        </section>
+      `;
+    })
+    .join('');
+
+  const crewMarkup =
+    production.crew.length === 0
+      ? '<p>No crew listed on this production.</p>'
+      : `<table>
+          <thead>
+            <tr><th>Name</th><th>Role</th><th>Department</th><th>Phone / email</th></tr>
+          </thead>
+          <tbody>
+            ${production.crew
+              .map(
+                (m) => `
+              <tr>
+                <td>${escaped(m.name)}</td>
+                <td>${escaped(m.role || '—')}</td>
+                <td>${escaped(m.department || '—')}</td>
+                <td>${escaped(m.phone || m.email || m.contact || '—')}</td>
+              </tr>`,
+              )
+              .join('')}
+          </tbody>
+        </table>`;
+
+  popup.document.write(`
+    <html>
+      <head>
+        <title>${escaped(production.name)} — Offline field pack</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+          h1 { margin: 0 0 8px; }
+          h2 { margin: 24px 0 10px; font-size: 15px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+          .meta { color: #555; margin-bottom: 16px; font-size: 12px; }
+          .packlist { margin-bottom: 18px; page-break-inside: avoid; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; text-align: left; }
+          td.subhead { background: #e5e7eb; font-weight: 600; font-size: 11px; }
+          .check-col { width: 56px; text-align: center; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>${escaped(production.name)} — Field pack (print)</h1>
+        <div class="meta">
+          ${production.client ? `Client: ${escaped(production.client)} · ` : ''}
+          ${production.location ? `Location: ${escaped(production.location)} · ` : ''}
+          ${production.startDate ? `Start: ${escaped(production.startDate)} ` : ''}
+          ${production.endDate ? `End: ${escaped(production.endDate)}` : ''}
+        </div>
+        <h2>Production checklist</h2>
+        ${checklistMarkup}
+        <h2>Vehicle packlists</h2>
+        ${vehicleMarkup || '<p>No vehicle packlists.</p>'}
+        <h2>Crew contacts</h2>
+        ${crewMarkup}
+        <script>window.onload = () => window.print();</script>
+      </body>
+    </html>
+  `);
+  popup.document.close();
+}

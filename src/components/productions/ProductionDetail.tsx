@@ -194,14 +194,14 @@ export function ProductionDetail({
           onPointerDownOutside={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}
         >
-          <div className="flex h-full min-h-0 w-full" style={sheetEdgeDrag.contentStyle}>
+          <div className="flex h-full min-h-0 w-full">
             <ProductionSheetDragHandle
               onPointerDown={sheetEdgeDrag.handlePointerDown}
               onPointerMove={sheetEdgeDrag.handlePointerMove}
               onPointerUp={sheetEdgeDrag.handlePointerUp}
               onPointerCancel={sheetEdgeDrag.handlePointerCancel}
             />
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" style={sheetEdgeDrag.contentStyle}>
           <SheetHeader className="shrink-0 border-b px-6 py-4">
             <div className="flex items-start justify-between gap-3 pr-8">
               <div className="min-w-0 flex-1">

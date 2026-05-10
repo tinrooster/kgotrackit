@@ -12,6 +12,10 @@ export interface ChecklistItem {
   notes?: string;
   /** Optional link to an existing InventoryItem by its id. */
   inventoryItemId?: string;
+  /** ISO timestamp when completion was last toggled on the Field Checklist mobile page. */
+  fieldCompletedAt?: string;
+  /** Display name paired with fieldCompletedAt. */
+  fieldCompletedBy?: string;
 }
 
 export interface ChecklistGroup {

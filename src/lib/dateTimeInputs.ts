@@ -23,6 +23,18 @@ export function minutesToTime(minutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
+/** Compact shift length for labels (e.g. `6h 45m`, `5h`). Returns empty when duration is invalid or non-positive. */
+export function formatShiftDurationFromMinutes(totalMinutes: number): string {
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+  const rounded = Math.round(totalMinutes);
+  const hours = Math.floor(rounded / 60);
+  const mins = rounded % 60;
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  return parts.join(' ');
+}
+
 export function normalizeQuarterHourTime(value?: string): string {
   if (!value) return '';
   return minutesToTime(parseTimeToMinutes(value));

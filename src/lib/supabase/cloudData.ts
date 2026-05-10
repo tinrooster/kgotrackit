@@ -376,16 +376,17 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
   const wsId = getActiveWorkspaceId();
   if (wsId) {
     const role = await fetchWorkspaceMemberRole(wsId, userId);
-    if (!role || role === 'viewer') {
+    if (!role) {
       console.warn(
-        '[cloud sync] Skipping workspace push: need admin or editor membership in this workspace. Resolved role:',
-        role ?? 'none',
+        '[cloud sync] Skipping workspace push: no workspace membership resolved.',
         'workspace:',
         wsId,
       );
       clearPendingCloudPush();
       return;
     }
+    // Viewers may sync workspace snapshots so checklist / production progress updates reach Productions + Dashboard
+    // for the rest of the team. Destructive inventory/production UI remains gated by role in the app.
     const organizationId = await fetchWorkspaceOrganizationId(wsId);
     if (organizationId) {
       setActiveOrganizationId(organizationId);
@@ -560,6 +561,31 @@ let pushInFlight = false;
 
 const PUSH_RETRY_WHEN_BUSY_MS = 400;
 
+/** PostgREST / Postgres codes commonly returned when RLS or grants block workspace writes. */
+function isLikelyPermissionOrRlsDenied(error: unknown): boolean {
+  const msg = formatSupabaseOrUnknownError(error).toLowerCase();
+  const o = typeof error === 'object' && error != null ? (error as Record<string, unknown>) : null;
+  const code = typeof o?.code === 'string' ? o.code : '';
+  const statusRaw = o?.status;
+  const status =
+    typeof statusRaw === 'number'
+      ? statusRaw
+      : typeof statusRaw === 'string'
+        ? Number.parseInt(statusRaw, 10)
+        : NaN;
+  if (code === '42501' || code === 'PGRST301') return true;
+  if (status === 403 || status === 401) return true;
+  if (
+    msg.includes('permission denied') ||
+    msg.includes('row-level security') ||
+    msg.includes('new row violates row-level security') ||
+    (msg.includes('violates') && msg.includes('policy'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 async function runDebouncedPush(userId: string): Promise<void> {
   if (pushInFlight) {
     scheduleDebouncedPushToSupabase(userId, PUSH_RETRY_WHEN_BUSY_MS);
@@ -570,7 +596,19 @@ async function runDebouncedPush(userId: string): Promise<void> {
     await pushFullSnapshotToSupabase(userId);
   } catch (error) {
     console.error('Supabase sync push failed:', error);
-    toast.error('Could not save changes to the cloud. Check your connection and workspace permissions.');
+    const detail = formatSupabaseOrUnknownError(error);
+    if (isLikelyPermissionOrRlsDenied(error)) {
+      toast.warning('Workspace cloud sync blocked', {
+        id: 'workspace-cloud-sync-permission',
+        description:
+          'Your changes stay on this device. Ask an admin to allow your workspace role to update shared data (RLS policies), or wait for someone with editor access to sync.',
+      });
+    } else {
+      toast.error('Could not save changes to the cloud.', {
+        id: 'workspace-cloud-sync-error',
+        description: `${detail} Check your connection and try again.`,
+      });
+    }
   } finally {
     pushInFlight = false;
   }

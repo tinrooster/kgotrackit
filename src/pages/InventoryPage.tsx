@@ -4,6 +4,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useCanMutateAppData } from '@/hooks/useCanMutateAppData';
 import { canViewMaintenanceWindowCautions } from '@/lib/maintenanceCutoverCaution';
 import { InventoryItem, CategoryNode, ItemWithSubcategories, OrderStatus } from '@/types/inventory';
 import BatchOperations from '@/components/BatchOperations';
@@ -241,6 +242,7 @@ export default function InventoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser, authBackend } = useAuth();
   const { activeWorkspaceId, activeWorkspaceRole } = useWorkspace();
+  const canMutateAppData = useCanMutateAppData();
   const showMaintenanceCutoverCautions = canViewMaintenanceWindowCautions({
     authBackend,
     activeWorkspaceId,
@@ -1092,6 +1094,10 @@ export default function InventoryPage() {
       newItemData: Omit<InventoryItem, "id" | "lastUpdated">,
       options?: { toastMessage?: string }
     ) => {
+      if (!canMutateAppData) {
+        toast.error('Viewers cannot add inventory items.');
+        return;
+      }
       recordInventorySnapshotBeforeChange(items);
       const defaults = SettingsService.loadDefaultSettings();
       const trackingMode = (newItemData.assetTrackingMode || "line_item") as "line_item" | "per_unit";
@@ -1219,6 +1225,10 @@ export default function InventoryPage() {
 
   // Handle duplicating an item
   const handleDuplicateItem = async (newItemData: Partial<InventoryItem>) => {
+    if (!canMutateAppData) {
+      toast.error('Viewers cannot add inventory items.');
+      return;
+    }
     recordInventorySnapshotBeforeChange(items);
     const defaults = SettingsService.loadDefaultSettings();
     const trackingMode = (newItemData.assetTrackingMode || 'line_item') as 'line_item' | 'per_unit';
@@ -1318,10 +1328,15 @@ export default function InventoryPage() {
     if (!navTemplate) {
       return;
     }
+    if (!canMutateAppData) {
+      toast.error('Viewers cannot add inventory items.');
+      navigate(location.pathname, { replace: true });
+      return;
+    }
     setAddDialogTemplate(navTemplate);
     setIsAddDialogOpen(true);
     navigate(location.pathname, { replace: true });
-  }, [location.state, navigate, location.pathname]);
+  }, [location.state, navigate, location.pathname, canMutateAppData]);
 
   const [isDetailedView, setIsDetailedView] = useState(false);
   const [isTinyScreen, setIsTinyScreen] = useState(false);
@@ -1757,7 +1772,14 @@ export default function InventoryPage() {
           ) : null}
           {isTinyScreen ? (
             <div className="flex w-full items-center gap-2">
-              <Button type="button" size="icon" className="h-11 w-11" onClick={() => setIsAddDialogOpen(true)} title="Add item">
+              <Button
+                type="button"
+                size="icon"
+                className="h-11 w-11"
+                disabled={!canMutateAppData}
+                onClick={() => setIsAddDialogOpen(true)}
+                title="Add item"
+              >
                 <Plus className="h-4 w-4" />
               </Button>
               <Button
@@ -1765,6 +1787,7 @@ export default function InventoryPage() {
                 variant="secondary"
                 size="icon"
                 className={cn("h-11 w-11", mobileTabletUi ? "touch-manipulation" : "")}
+                disabled={!canMutateAppData}
                 onClick={() => setIsQuickAddOpen(true)}
                 title="Quick add"
               >
@@ -1775,6 +1798,7 @@ export default function InventoryPage() {
                 variant="outline"
                 size="icon"
                 className={cn("h-11 w-11", mobileTabletUi ? "touch-manipulation" : "")}
+                disabled={!canMutateAppData}
                 onClick={() => setIsBulkImportOpen(true)}
                 title="Bulk add from spreadsheet"
               >
@@ -1824,7 +1848,7 @@ export default function InventoryPage() {
                     <Download className="mr-2 h-4 w-4" />
                     Export current view
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setIsBulkImportOpen(true)}>
+                  <DropdownMenuItem disabled={!canMutateAppData} onClick={() => setIsBulkImportOpen(true)}>
                     <FileSpreadsheet className="mr-2 h-4 w-4" />
                     Bulk add from spreadsheet
                   </DropdownMenuItem>
@@ -1860,7 +1884,11 @@ export default function InventoryPage() {
                 </div>
               )}
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                <Button className="w-full sm:w-auto" onClick={() => setIsAddDialogOpen(true)}>
+                <Button
+                  className="w-full sm:w-auto"
+                  disabled={!canMutateAppData}
+                  onClick={() => setIsAddDialogOpen(true)}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Item
                 </Button>
@@ -1868,6 +1896,7 @@ export default function InventoryPage() {
                   type="button"
                   variant="secondary"
                   className={cn("w-full sm:w-auto", mobileTabletUi ? "h-11 touch-manipulation" : "h-10")}
+                  disabled={!canMutateAppData}
                   onClick={() => setIsQuickAddOpen(true)}
                 >
                   <Zap className="mr-2 h-4 w-4" />
@@ -1877,6 +1906,7 @@ export default function InventoryPage() {
                   type="button"
                   variant="outline"
                   className={cn("w-full sm:w-auto", mobileTabletUi ? "h-11 touch-manipulation" : "h-10")}
+                  disabled={!canMutateAppData}
                   onClick={() => setIsBulkImportOpen(true)}
                 >
                   <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -2077,6 +2107,7 @@ export default function InventoryPage() {
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem
+                        disabled={!canMutateAppData}
                         onClick={() => {
                           setSelectedItem(item);
                           setIsDuplicateDialogOpen(true);

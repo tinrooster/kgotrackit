@@ -165,6 +165,22 @@ export function SystemLogs() {
         return `${actor} invited ${String(details.invitedEmail ?? '')} to workspace "${workspaceName}"`;
       case 'WORKSPACE_MEMBER_REMOVED':
         return `${actor} removed ${String(details.removedUser ?? '')} from workspace "${workspaceName}"`;
+      case 'FIELD_CHECKLIST_TOGGLE': {
+        const prod = String(details.productionName ?? 'Production');
+        const verb = details.completed ? 'checked' : 'unchecked';
+        const line = String(details.itemLabel ?? 'item');
+        const scope =
+          details.scope === 'truck'
+            ? `Truck${details.vehicleName ? ` · ${String(details.vehicleName)}` : ''}`
+            : 'Checklist';
+        const section =
+          details.scope === 'truck' && details.sectionTitle
+            ? ` · ${String(details.sectionTitle)}`
+            : details.scope === 'checklist' && details.groupTitle
+              ? ` · ${String(details.groupTitle)}`
+              : '';
+        return `[Field checklist · ${prod}] ${scope}${section}: ${actor} ${verb} "${line}"`;
+      }
       default:
         return `${actor}: ${log.message}`;
     }

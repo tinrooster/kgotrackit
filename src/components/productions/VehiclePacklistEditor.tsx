@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import {
   Plus,
   Truck,
@@ -78,6 +78,18 @@ interface VehiclePacklistEditorProps {
   inventoryItems?: InventoryItem[];
   readOnly?: boolean;
   requireDeleteConfirm?: boolean;
+  /** Field checklist: merge field sign-off into pack item when toggling packed. */
+  mergeOnPackCompletionToggle?: (item: ChecklistItem, completed: boolean) => Partial<ChecklistItem>;
+  onPackCompletionToggle?: (args: {
+    packlistId: string;
+    vehicleName: string;
+    sectionTitle?: string;
+    item: ChecklistItem;
+    completed: boolean;
+  }) => void;
+  renderPackItemBelowLabel?: (item: ChecklistItem) => ReactNode;
+  /** Hide the default planner hint under the search bar (e.g. Field checklist page). */
+  suppressFooterHint?: boolean;
 }
 
 function newItem(label: string): ChecklistItem {
@@ -151,6 +163,10 @@ export function VehiclePacklistEditor({
   inventoryItems = [],
   readOnly = false,
   requireDeleteConfirm = false,
+  mergeOnPackCompletionToggle,
+  onPackCompletionToggle,
+  renderPackItemBelowLabel,
+  suppressFooterHint = false,
 }: VehiclePacklistEditorProps) {
   const [newVehicleName, setNewVehicleName] = useState('');
   const [newItemLabels, setNewItemLabels] = useState<Record<string, string>>({});
@@ -501,6 +517,13 @@ export function VehiclePacklistEditor({
     item: ChecklistItem,
     ctx: { scope: 'loose' } | { scope: 'section'; sectionId: string },
   ) => {
+    const packEntry = packlists.find((p) => p.id === packlistId);
+    const shapedForMeta = packEntry ? ensureVehiclePacklistShape(packEntry) : null;
+    const vehicleName = packEntry?.vehicleName ?? '';
+    const sectionTitle =
+      ctx.scope === 'section' && shapedForMeta
+        ? shapedForMeta.sections.find((s) => s.id === ctx.sectionId)?.title
+        : undefined;
     const invName = resolveInventoryName(item.inventoryItemId);
     const dragPayload =
       ctx.scope === 'loose'
@@ -542,24 +565,40 @@ export function VehiclePacklistEditor({
         <Checkbox
           className="focus-visible:ring-1 focus-visible:ring-offset-1"
           checked={item.completed}
-          onCheckedChange={(checked) => updateItemById(packlistId, item.id, { completed: Boolean(checked) })}
+          onCheckedChange={(checked) => {
+            const completed = Boolean(checked);
+            const patches = mergeOnPackCompletionToggle
+              ? mergeOnPackCompletionToggle(item, completed)
+              : { completed };
+            updateItemById(packlistId, item.id, patches);
+            onPackCompletionToggle?.({
+              packlistId,
+              vehicleName,
+              sectionTitle,
+              item: { ...item, ...patches },
+              completed,
+            });
+          }}
           title={item.completed ? 'Mark as not packed' : 'Mark as packed'}
         />
-        <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground')}>
-          {item.label}
-          {invName && item.inventoryItemId && item.label !== invName && (
-            <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
-          )}
-          {item.inventoryItemId && (
-            <Link2 className="ml-1 inline h-3 w-3 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
-          )}
-        </span>
+        <div className="min-w-0 flex-1">
+          <span className={cn('text-sm', item.completed && 'text-muted-foreground')}>
+            {item.label}
+            {invName && item.inventoryItemId && item.label !== invName && (
+              <span className="ml-1 text-xs text-muted-foreground">({invName})</span>
+            )}
+            {item.inventoryItemId && (
+              <Link2 className="ml-1 inline h-3 w-3 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
+            )}
+          </span>
+          {renderPackItemBelowLabel?.(item)}
+        </div>
         {item.completed && <LineCompletionBadge kind="packed" />}
         {!readOnly ? (
           <Input
             type="number"
             min={1}
-            className="h-7 w-16 text-xs"
+            className="h-7 w-16 min-w-[2.75rem] shrink-0 border-2 border-border bg-muted/50 text-center text-sm font-semibold tabular-nums text-foreground shadow-sm"
             value={item.quantity ?? 1}
             onChange={(event) =>
               updateItemById(packlistId, item.id, {
@@ -568,7 +607,12 @@ export function VehiclePacklistEditor({
             }
           />
         ) : (
-          <span className="text-xs text-muted-foreground">×{item.quantity ?? 1}</span>
+          <span
+            className="inline-flex h-7 min-w-[2.5rem] shrink-0 items-center justify-center rounded-md border border-border bg-muted/50 px-2 text-sm font-semibold tabular-nums text-foreground shadow-sm"
+            title="Quantity"
+          >
+            ×{item.quantity ?? 1}
+          </span>
         )}
         {!readOnly && inventoryItems.length > 0 && !item.inventoryItemId ? (
           <InventoryItemPicker
@@ -668,10 +712,12 @@ export function VehiclePacklistEditor({
           />
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Checkboxes mark packed items on the truck. A badge appears when the matching production checklist still has open
-        lines.
-      </p>
+      {!suppressFooterHint ? (
+        <p className="text-xs text-muted-foreground">
+          Checkboxes mark packed items on the truck. A badge appears when the matching production checklist still has open
+          lines.
+        </p>
+      ) : null}
       {packlists.map((packlistRaw) => {
         const packlist = ensureVehiclePacklistShape(packlistRaw);
         const allFlat = flattenVehiclePacklistItems(packlist);
