@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +29,15 @@ export function useProductionSheetEdgeDrag({
   const draggingRef = useRef(false);
   const dragPxRef = useRef(0);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (settleTimerRef.current) {
+        clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   const endDrag = useCallback(
     (totalOffset: number) => {
@@ -67,7 +76,11 @@ export function useProductionSheetEdgeDrag({
       clearTimeout(settleTimerRef.current);
       settleTimerRef.current = null;
     }
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
     startXRef.current = event.clientX;
     draggingRef.current = true;
     setIsDragging(true);
@@ -96,6 +109,11 @@ export function useProductionSheetEdgeDrag({
     endDrag(dragPxRef.current);
   };
 
+  const handleLostPointerCapture = () => {
+    if (!draggingRef.current) return;
+    endDrag(dragPxRef.current);
+  };
+
   const contentStyle: CSSProperties = {
     transform: dragPx !== 0 ? `translate3d(${dragPx}px,0,0)` : undefined,
     transition: isDragging
@@ -109,6 +127,7 @@ export function useProductionSheetEdgeDrag({
     handlePointerDown,
     handlePointerMove,
     handlePointerUp: finishPointer,
+    handleLostPointerCapture,
     handlePointerCancel: (event: PointerEvent<HTMLDivElement>) => {
       if (!draggingRef.current) return;
       try {
@@ -133,12 +152,14 @@ export function ProductionSheetDragHandle({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onLostPointerCapture,
   onPointerCancel,
 }: {
   className?: string;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
+  onLostPointerCapture: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerCancel: (event: PointerEvent<HTMLDivElement>) => void;
 }) {
   return (
@@ -153,6 +174,7 @@ export function ProductionSheetDragHandle({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onLostPointerCapture={onLostPointerCapture}
       onPointerCancel={onPointerCancel}
     >
       <div className="flex flex-col items-center gap-0.5 text-muted-foreground">

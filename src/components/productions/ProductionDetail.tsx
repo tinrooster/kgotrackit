@@ -22,6 +22,10 @@ import { VehiclePacklistEditor } from './VehiclePacklistEditor';
 import { CrewEditor } from './CrewEditor';
 import { ProductionForm } from './ProductionForm';
 import { CrewScheduleCalendar } from './CrewScheduleCalendar';
+import {
+  PlannerOverviewSiteMapCard,
+  shouldShowPrideMarketSiteMap,
+} from './PlannerOverviewSiteMap';
 import { ProductionFusedStripProgress } from '@/components/dashboard/ProductionDashboardProgress';
 import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
 import {
@@ -202,6 +206,7 @@ export function ProductionDetail({
               onPointerDown={sheetEdgeDrag.handlePointerDown}
               onPointerMove={sheetEdgeDrag.handlePointerMove}
               onPointerUp={sheetEdgeDrag.handlePointerUp}
+              onLostPointerCapture={sheetEdgeDrag.handleLostPointerCapture}
               onPointerCancel={sheetEdgeDrag.handlePointerCancel}
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" style={sheetEdgeDrag.contentStyle}>
@@ -308,6 +313,9 @@ export function ProductionDetail({
                   {!production.description && !production.notes && (
                     <p className="text-sm text-muted-foreground">No description or notes.</p>
                   )}
+                  {shouldShowPrideMarketSiteMap(production.name, production.location) ? (
+                    <PlannerOverviewSiteMapCard />
+                  ) : null}
                   <Separator />
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>

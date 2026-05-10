@@ -19,8 +19,19 @@ export default defineConfig({
     // Use IPv4 loopback so the dev URL works when `localhost` is broken (e.g. commented-out hosts entries).
     host: "127.0.0.1",
     port: 5173,
+    strictPort: true,
     fs: {
       strict: false,
+    },
+    proxy: {
+      // Forward /schematic/* to the local EasySchematic dev server (port 5174).
+      // This makes the iframe same-origin in dev so postMessage works without CORS.
+      "/schematic": {
+        target: "http://127.0.0.1:5174",
+        rewrite: (path) => path.replace(/^\/schematic/, ""),
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })
