@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, User, Database, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Flag, CalendarDays } from 'lucide-react';
 import { PositionTemplate, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
@@ -110,10 +110,10 @@ function ShiftDateField({
   };
 
   return (
-    <div className="grid grid-cols-[1fr_auto] items-center gap-1">
+    <div className="flex min-w-[220px] items-center gap-1">
       <Input
         ref={inputRef}
-        className="h-7 text-xs"
+        className="h-7 min-w-0 flex-1 text-xs"
         type="date"
         aria-label={ariaLabel}
         value={value}
@@ -836,24 +836,31 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                     <div
                       key={member.id}
                       className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-1.5 shadow-sm"
-                    draggable={!readOnly && memberSortMode === 'manual'}
-                    onDragStart={() => {
-                      setDraggingMemberId(member.id);
-                      setDraggingMemberSourceDepartment(departmentName);
-                    }}
-                    onDragEnd={clearDraggingMemberState}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => {
-                      if (!draggingMemberId || draggingMemberId === member.id || memberSortMode !== 'manual') return;
-                      if (draggingMemberSourceDepartment && draggingMemberSourceDepartment !== departmentName) {
-                        moveMemberToDepartment(draggingMemberId, departmentName);
+                      draggable={!readOnly && memberSortMode === 'manual'}
+                      onDragStart={() => {
+                        setDraggingMemberId(member.id);
+                        setDraggingMemberSourceDepartment(departmentName);
+                      }}
+                      onDragEnd={clearDraggingMemberState}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => {
+                        if (!draggingMemberId || draggingMemberId === member.id || memberSortMode !== 'manual') return;
+                        if (draggingMemberSourceDepartment && draggingMemberSourceDepartment !== departmentName) {
+                          moveMemberToDepartment(draggingMemberId, departmentName);
+                          clearDraggingMemberState();
+                          return;
+                        }
+                        moveMemberWithinDepartment(draggingMemberId, member.id, departmentName);
                         clearDraggingMemberState();
-                        return;
-                      }
-                      moveMemberWithinDepartment(draggingMemberId, member.id, departmentName);
-                      clearDraggingMemberState();
-                    }}
-                  >
+                      }}
+                      onDoubleClick={(event) => {
+                        if (readOnly) return;
+                        const targetElement = event.target as HTMLElement;
+                        if (targetElement.closest('input,button,textarea,[role="button"],[data-radix-select-trigger]')) return;
+                        toggleMemberExpanded(member.id);
+                      }}
+                      title="Double-click card body to toggle details"
+                    >
                     <button
                       type="button"
                       className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -906,28 +913,30 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                         <>
                           {cardDensityMode === 'compact' ? (
                             <>
-                              <div className="grid grid-cols-[1fr_1fr_auto] gap-1.5">
+                              <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
                                 <Input
                                   placeholder="Name *"
-                                  className="h-7 text-sm"
+                                  className="h-8 text-base sm:h-7 sm:text-sm"
                                   value={member.name}
                                   onChange={(event) => updateMember(member.id, { name: event.target.value })}
                                 />
-                                <Input
-                                  placeholder="Role"
-                                  className="h-7 text-sm"
-                                  value={member.role}
-                                  onChange={(event) => updateMember(member.id, { role: event.target.value })}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7"
-                                  onClick={() => toggleMemberExpanded(member.id)}
-                                >
-                                  {expandedMemberIds.includes(member.id) ? 'Less' : 'Details'}
-                                </Button>
+                                <div className="flex items-center gap-1.5 sm:contents">
+                                  <Input
+                                    placeholder="Role"
+                                    className="h-8 min-w-0 flex-1 text-base sm:h-7 sm:text-sm"
+                                    value={member.role}
+                                    onChange={(event) => updateMember(member.id, { role: event.target.value })}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 shrink-0 px-3 sm:h-7 sm:px-2"
+                                    onClick={() => toggleMemberExpanded(member.id)}
+                                  >
+                                    {expandedMemberIds.includes(member.id) ? 'Less' : 'Details'}
+                                  </Button>
+                                </div>
                               </div>
                               {expandedMemberIds.includes(member.id) ? (
                                 <>
@@ -982,7 +991,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                         <span className="font-medium text-foreground"> Location</span>.
                                       </p>
                                       {(member.shifts ?? []).map((shift) => (
-                                        <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                                        <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.8fr)_minmax(88px,1fr)_minmax(88px,1fr)_minmax(110px,1fr)_auto]">
                                           <ShiftDateField
                                             ariaLabel="Shift date"
                                             value={shift.date}
@@ -1011,7 +1020,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                           <Input className="col-span-full h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
                                         </div>
                                       ))}
-                                      <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                                      <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.8fr)_minmax(88px,1fr)_minmax(88px,1fr)_minmax(110px,1fr)_auto]">
                                         <ShiftDateField
                                           ariaLabel="New shift date"
                                           value={getShiftDraft(member.id).date}
@@ -1095,7 +1104,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                     <span className="font-medium text-foreground"> Location</span>.
                                   </p>
                                   {(member.shifts ?? []).map((shift) => (
-                                    <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                                    <div key={shift.id} className="grid grid-cols-1 gap-1 rounded border p-1.5 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.8fr)_minmax(88px,1fr)_minmax(88px,1fr)_minmax(110px,1fr)_auto]">
                                       <ShiftDateField
                                         ariaLabel="Shift date"
                                         value={shift.date}
@@ -1124,7 +1133,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                       <Input className="col-span-full h-7 text-xs" placeholder="Shift notes" value={shift.notes ?? ''} onChange={(event) => updateShiftForMember(member.id, shift.id, { notes: event.target.value || undefined })} />
                                     </div>
                                   ))}
-                                  <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                                  <div className="grid grid-cols-1 gap-1 rounded border border-dashed p-1.5 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.8fr)_minmax(88px,1fr)_minmax(88px,1fr)_minmax(110px,1fr)_auto]">
                                     <ShiftDateField
                                       ariaLabel="New shift date"
                                       value={getShiftDraft(member.id).date}

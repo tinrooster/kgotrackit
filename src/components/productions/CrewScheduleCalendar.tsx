@@ -3,9 +3,10 @@ import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { CrewScheduleEntry, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { TimeInput } from '@/components/ui/time-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsible';
@@ -72,6 +73,8 @@ interface CrewScheduleCalendarProps {
   scheduleScopeKey?: string;
   requireDeleteConfirm?: boolean;
   resources?: Array<{ id: string; label: string; quantity: number }>;
+  onTimelineGestureStart?: () => void;
+  onTimelineGestureEnd?: () => void;
   onChange: (schedule: CrewScheduleEntry[]) => void;
 }
 
@@ -261,6 +264,8 @@ export function CrewScheduleCalendar({
   scheduleScopeKey = 'global',
   requireDeleteConfirm = false,
   resources = [],
+  onTimelineGestureStart,
+  onTimelineGestureEnd,
   onChange
 }: CrewScheduleCalendarProps) {
   const projectedDate = useMemo(
@@ -1006,6 +1011,7 @@ export function CrewScheduleCalendar({
     startX: number;
     initialStartMinutes: number;
     initialEndMinutes: number;
+    entryOrder: string[];
   } | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<Omit<CrewScheduleEntry, 'id'> | null>(null);
@@ -1158,7 +1164,25 @@ export function CrewScheduleCalendar({
     return candidates[0] ?? null;
   }, [schedule]);
 
-  const timelineBlocks = dayEntries.map((entry) => {
+  const timelineEntries = useMemo(() => {
+    if (!dragState) {
+      return dayEntries;
+    }
+    const indexByEntryId = new Map<string, number>();
+    dragState.entryOrder.forEach((entryId, index) => {
+      indexByEntryId.set(entryId, index);
+    });
+    return [...dayEntries].sort((left, right) => {
+      const leftIndex = indexByEntryId.get(left.id);
+      const rightIndex = indexByEntryId.get(right.id);
+      if (leftIndex == null && rightIndex == null) return 0;
+      if (leftIndex == null) return 1;
+      if (rightIndex == null) return -1;
+      return leftIndex - rightIndex;
+    });
+  }, [dayEntries, dragState]);
+
+  const timelineBlocks = timelineEntries.map((entry) => {
     const defaultStartMinutes = parseTimeToMinutes(derivedWindowStart, 0);
     const defaultEndMinutes = parseTimeToMinutes(derivedWindowEnd, defaultStartMinutes + 15);
     const startMinutes = parseTimeToMinutes(entry.startTime, defaultStartMinutes);
@@ -1263,12 +1287,14 @@ export function CrewScheduleCalendar({
     mode: 'move' | 'resize'
   ) => {
     const startDrag = () => {
+      onTimelineGestureStart?.();
       setDragState({
         entryId: block.entry.id,
         mode,
         startX: event.clientX,
         initialStartMinutes: block.startMinutes,
         initialEndMinutes: block.endMinutes,
+        entryOrder: dayEntries.map((entry) => entry.id),
       });
     };
     if (!requestLockOverride(block.entry.date, 'dragging or resizing this schedule block', startDrag)) return;
@@ -1279,7 +1305,8 @@ export function CrewScheduleCalendar({
     if (!dragState || !timelineContainerRef.current) return;
     const width = timelineContainerRef.current.clientWidth || 1;
     const deltaPx = event.clientX - dragState.startX;
-    const deltaMinutes = (deltaPx / width) * 24 * 60;
+    const rawDeltaMinutes = (deltaPx / width) * 24 * 60;
+    const deltaMinutes = Math.round(rawDeltaMinutes / 15) * 15;
     if (dragState.mode === 'move') {
       const duration = dragState.initialEndMinutes - dragState.initialStartMinutes;
       const nextStart = dragState.initialStartMinutes + deltaMinutes;
@@ -1295,6 +1322,7 @@ export function CrewScheduleCalendar({
 
   const handlePointerUp = () => {
     if (!dragState) return;
+    onTimelineGestureEnd?.();
     setDragState(null);
   };
 
@@ -1527,29 +1555,13 @@ export function CrewScheduleCalendar({
             {isDetailedView ? <TabsTrigger value="project-span">Project Span</TabsTrigger> : null}
             {isDetailedView ? <TabsTrigger value="week-cards">Week Cards</TabsTrigger> : null}
           </TabsList>
-          <div
-            className="inline-flex h-8 rounded-md border bg-muted/30 p-0.5"
-            role="group"
-            aria-label="Schedule view density"
-          >
-            <Button
-              type="button"
-              variant={isDetailedView ? 'ghost' : 'secondary'}
-              size="sm"
-              className="h-7 rounded-sm px-3 text-xs"
-              onClick={() => setScheduleViewMode('simple')}
-            >
-              Simple
-            </Button>
-            <Button
-              type="button"
-              variant={isDetailedView ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 rounded-sm px-3 text-xs"
-              onClick={() => setScheduleViewMode('detailed')}
-            >
-              Detailed
-            </Button>
+          <div className="inline-flex items-center gap-2 rounded-md border bg-muted/30 px-2 py-1">
+            <Switch
+              checked={isDetailedView}
+              onCheckedChange={(checked) => setScheduleViewMode(checked ? 'detailed' : 'simple')}
+              aria-label="Toggle schedule view mode"
+            />
+            <span className="text-xs text-muted-foreground">Detailed</span>
           </div>
         </div>
 
@@ -1853,9 +1865,18 @@ export function CrewScheduleCalendar({
               {timelineBlocks.length === 0 ? (
                 <p className="p-3 text-xs text-muted-foreground">No shifts scheduled for this day.</p>
               ) : null}
-              {timelineBlocks.map((block) => (
-                <div key={block.entry.id} className="grid grid-cols-[180px_1fr] items-center gap-3">
-                  <div className="text-xs">
+              {timelineBlocks.map((block) => {
+                const assignedResourceLabels = (block.entry.resourceIds ?? [])
+                  .map((resourceId) => resources.find((resource) => resource.id === resourceId)?.label)
+                  .filter((label): label is string => Boolean(label));
+                const visibleResourceLabels = assignedResourceLabels.slice(0, 2);
+                const hiddenResourceCount = Math.max(assignedResourceLabels.length - visibleResourceLabels.length, 0);
+                const resourceSummary = hiddenResourceCount > 0
+                  ? `${visibleResourceLabels.join(' | ')} +${hiddenResourceCount} more`
+                  : visibleResourceLabels.join(' | ');
+                return (
+                <div key={block.entry.id} className="grid grid-cols-1 items-center gap-2 md:grid-cols-[180px_1fr] md:gap-3">
+                  <div className="text-xs md:text-xs">
                     <p className="truncate font-medium">{resolveCrewLabel(crewMembers, block.entry.crewMemberId)}</p>
                     <p className="text-muted-foreground">
                       {block.entry.startTime || '--:--'} - {block.entry.endTime || '--:--'}
@@ -1869,9 +1890,24 @@ export function CrewScheduleCalendar({
                       </p>
                     ))}
                   </div>
-                  <div className="relative h-12 rounded border bg-background/70">
+                  <div className="relative h-14 rounded border bg-background/70 md:h-12">
+                    <div className="pointer-events-none absolute inset-0 grid grid-cols-12">
+                      {TIMELINE_AXIS_HOURS.map((hour, index) => (
+                        <div
+                          key={`lane-guide-${block.entry.id}-${hour}`}
+                          className={index === 0 ? 'relative' : 'relative border-l border-border/35'}
+                        >
+                          <span className="absolute left-1/4 top-0 h-2 border-l border-border/25" />
+                          <span className="absolute left-1/4 bottom-0 h-2 border-l border-border/25" />
+                          <span className="absolute left-1/2 top-0 h-3 border-l border-border/40" />
+                          <span className="absolute left-1/2 bottom-0 h-3 border-l border-border/40" />
+                          <span className="absolute left-3/4 top-0 h-2 border-l border-border/25" />
+                          <span className="absolute left-3/4 bottom-0 h-2 border-l border-border/25" />
+                        </div>
+                      ))}
+                    </div>
                     <div
-                      className="absolute top-1 h-10 cursor-grab rounded border px-2 py-1 text-[11px] active:cursor-grabbing"
+                      className="absolute top-1 h-12 cursor-grab rounded border px-2 py-1 text-[11px] active:cursor-grabbing md:h-10"
                       style={{
                         left: `${block.leftPercent}%`,
                         width: `${Math.max(block.widthPercent, 4)}%`,
@@ -1879,55 +1915,30 @@ export function CrewScheduleCalendar({
                         borderColor: 'hsl(var(--primary) / 0.5)',
                       }}
                       onMouseDown={(event) => handleBlockPointerDown(event, block, 'move')}
+                      onDoubleClick={(event) => {
+                        event.stopPropagation();
+                        openEditEntry(block.entry);
+                      }}
                       title="Drag to move block"
                     >
-                      <div className="flex flex-wrap items-center gap-1 pr-14">
+                      <div className="flex flex-wrap items-center gap-1 pr-2 md:pr-14">
                         <span className="truncate rounded border border-background/50 bg-background/25 px-1.5 py-0 text-[10px] font-semibold">
                           {resolveCrewLabel(crewMembers, block.entry.crewMemberId)}
                         </span>
                       </div>
-                      <div className="truncate pr-14 text-[11px] font-medium">
+                      <div className="truncate pr-2 text-[11px] font-medium md:pr-14">
                         {block.entry.location || 'Scheduled block'}
                       </div>
-                      <div className="truncate pr-14 text-[10px] text-muted-foreground">
-                        {block.entry.notes || 'Drag to move'}
+                      <div className="hidden truncate pr-14 text-[10px] text-muted-foreground md:block">
+                        {block.entry.notes || ''}
                       </div>
-                      {(block.entry.resourceIds ?? []).length > 0 ? (
-                        <div className="mt-0.5 truncate text-[10px] text-blue-700 dark:text-blue-300">
-                          {(block.entry.resourceIds ?? [])
-                            .map((resourceId) => resources.find((resource) => resource.id === resourceId)?.label)
-                            .filter(Boolean)
-                            .join(' | ')}
+                      {assignedResourceLabels.length > 0 ? (
+                        <div className="mt-0.5 truncate rounded bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-700 dark:text-blue-300 md:max-w-[85%]">
+                          {resourceSummary}
                         </div>
                       ) : null}
-                      <div className="absolute right-1 top-1 flex items-center gap-0.5 rounded border bg-background/90 px-1 py-0.5 shadow-sm">
-                        <button
-                          type="button"
-                          className="rounded border bg-background/80 p-0.5 hover:bg-background"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openEditEntry(block.entry);
-                          }}
-                          title="Edit block"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          className={`rounded border p-0.5 ${
-                            'border-red-500/40 bg-red-500/10 hover:bg-red-500/20'
-                          }`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            runDeleteAction(block.entry.id);
-                          }}
-                          title="Delete block"
-                        >
-                          <Trash2 className="h-3 w-3 text-red-300" />
-                        </button>
-                      </div>
                       <div
-                        className="absolute right-0 top-0 h-full w-2 cursor-ew-resize rounded-r bg-primary/40"
+                        className="absolute right-0 top-0 hidden h-full w-2 cursor-ew-resize rounded-r bg-primary/40 md:block"
                         onMouseDown={(event) => {
                           event.stopPropagation();
                           handleBlockPointerDown(event, block, 'resize');
@@ -1937,7 +1948,7 @@ export function CrewScheduleCalendar({
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
           {isDetailedView ? <div className="rounded-md border p-3">
@@ -2048,26 +2059,7 @@ export function CrewScheduleCalendar({
                       <div key={entry.id} className="rounded border bg-muted/30 p-1.5 text-xs">
                         <div className="flex items-start justify-between gap-1">
                           <p className="font-medium">{resolveCrewLabel(crewMembers, entry.crewMemberId)}</p>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              className="text-muted-foreground hover:text-foreground"
-                              onClick={() => openEditEntry(entry)}
-                              title="Edit shift"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              className={`rounded border p-0.5 ${
-                                'border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20'
-                              }`}
-                              onClick={() => runDeleteAction(entry.id)}
-                              title="Delete shift"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
+                          <div className="flex items-center gap-1" />
                         </div>
                         <p>{entry.startTime || '--:--'} - {entry.endTime || '--:--'}</p>
                         {entry.location ? <p className="text-muted-foreground">{entry.location}</p> : null}
@@ -2208,6 +2200,19 @@ export function CrewScheduleCalendar({
             </div>
           ) : null}
           <DialogFooter>
+            {editingEntryId ? (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  const targetId = editingEntryId;
+                  setEditingEntryId(null);
+                  setEditingDraft(null);
+                  runDeleteAction(targetId);
+                }}
+              >
+                Delete Block
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               onClick={() => {

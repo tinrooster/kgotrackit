@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, MapPin, Printer } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, MapPin, Printer, Redo2, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,6 +17,14 @@ import {
   PRODUCTIONS_UPDATED_EVENT,
   updateProduction,
 } from '@/lib/productionService';
+import {
+  applyProductionState,
+  canRedoProduction,
+  canUndoProduction,
+  recordProductionSnapshotBeforeChange,
+  redoProductionMutation,
+  undoProductionMutation,
+} from '@/lib/productionUndo';
 import { getItems, STORAGE_KEYS } from '@/lib/storageService';
 import {
   flattenVehiclePacklistItems,
@@ -26,6 +34,8 @@ import { Production, PRODUCTION_STATUS_LABELS } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
 import { usePlannerListDeleteConfirm } from '@/hooks/usePlannerListDeleteConfirm';
 import { LAST_PLANNER_ROUTE_STORAGE_KEY } from '@/lib/navigationReturn';
+import { useHorizontalScrollHints } from '@/components/ui/useHorizontalScrollHints';
+import { toast } from 'sonner';
 const PLANNER_TABS = ['checklist', 'vehicles', 'schedule', 'crew', 'overview'] as const;
 type PlannerTab = (typeof PLANNER_TABS)[number];
 
@@ -59,13 +69,30 @@ export default function PlannerWorkspacePage() {
   const [productions, setProductions] = useState<Production[]>(() => getProductions());
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() => getItems());
   const [activeTab, setActiveTab] = useState<PlannerTab>(() => getPlannerTabFromSearchParams(searchParams));
+  const [undoAvailable, setUndoAvailable] = useState<boolean>(() => canUndoProduction());
+  const [redoAvailable, setRedoAvailable] = useState<boolean>(() => canRedoProduction());
+  const isScheduleGestureActiveRef = useRef(false);
+  const hasRecordedGestureSnapshotRef = useRef(false);
   const confirmListDeletes = usePlannerListDeleteConfirm();
+  const {
+    scrollRef: plannerTabsListRef,
+    isOverflowing: isPlannerTabsOverflowing,
+    canScrollLeft: canPlannerTabsScrollLeft,
+    canScrollRight: canPlannerTabsScrollRight,
+    shouldPulseRightHint: shouldPulsePlannerTabsHint,
+  } = useHorizontalScrollHints<HTMLDivElement>({
+    pulseStorageKey: 'planner-tabs-scroll-hint-pulsed',
+  });
 
   const productionIdFromQuery = searchParams.get('productionId') ?? '';
   const scheduleDayFilter = getScheduleDayFromSearchParams(searchParams);
 
   useEffect(() => {
-    const refresh = () => setProductions(getProductions());
+    const refresh = () => {
+      setProductions(getProductions());
+      setUndoAvailable(canUndoProduction());
+      setRedoAvailable(canRedoProduction());
+    };
     window.addEventListener(PRODUCTIONS_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(PRODUCTIONS_UPDATED_EVENT, refresh);
   }, []);
@@ -131,8 +158,72 @@ export default function PlannerWorkspacePage() {
 
   const handleUpdate = (updates: Partial<Production>) => {
     if (!selectedProduction) return;
+    if (isScheduleGestureActiveRef.current) {
+      if (!hasRecordedGestureSnapshotRef.current) {
+        recordProductionSnapshotBeforeChange(productions);
+        hasRecordedGestureSnapshotRef.current = true;
+      }
+    } else {
+      recordProductionSnapshotBeforeChange(productions);
+    }
     updateProduction(selectedProduction.id, updates);
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
   };
+
+  const handleUndo = () => {
+    const restored = undoProductionMutation(productions);
+    if (!restored) {
+      toast.info('Nothing to undo');
+      return;
+    }
+    applyProductionState(restored, setProductions);
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
+    toast.success('Undone');
+  };
+
+  const handleRedo = () => {
+    const restored = redoProductionMutation(productions);
+    if (!restored) {
+      toast.info('Nothing to redo');
+      return;
+    }
+    applyProductionState(restored, setProductions);
+    setUndoAvailable(canUndoProduction());
+    setRedoAvailable(canRedoProduction());
+    toast.success('Redone');
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        const isTypingTarget = tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+        if (isTypingTarget) return;
+      }
+      const isModifierPressed = event.ctrlKey || event.metaKey;
+      if (!isModifierPressed) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && event.shiftKey) {
+        event.preventDefault();
+        handleRedo();
+        return;
+      }
+      if (key === 'z') {
+        event.preventDefault();
+        handleUndo();
+        return;
+      }
+      if (key === 'y') {
+        event.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
 
   const scheduleResources = useMemo(() => {
     if (!selectedProduction) return [];
@@ -203,6 +294,28 @@ export default function PlannerWorkspacePage() {
               variant="outline"
               size="sm"
               className="gap-1.5"
+              onClick={handleUndo}
+              disabled={!undoAvailable}
+            >
+              <Undo2 className="h-3.5 w-3.5" aria-hidden />
+              Undo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleRedo}
+              disabled={!redoAvailable}
+            >
+              <Redo2 className="h-3.5 w-3.5" aria-hidden />
+              Redo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
               title="Print checklist, vehicle lines, and crew contacts for people without phones"
               onClick={() => exportPlannerOfflineCrewPrintPack(selectedProduction)}
             >
@@ -236,13 +349,34 @@ export default function PlannerWorkspacePage() {
             onValueChange={handleTabChange}
             className="flex min-h-0 flex-1 flex-col gap-3"
           >
-            <TabsList className="mb-1 shrink-0">
-              <TabsTrigger value="checklist">Checklist</TabsTrigger>
-              <TabsTrigger value="vehicles">Vehicle Packlists</TabsTrigger>
-              <TabsTrigger value="schedule">Schedule</TabsTrigger>
-              <TabsTrigger value="crew">Crew</TabsTrigger>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-            </TabsList>
+            <div
+              className="scroll-hints-shell relative"
+              data-overflowing={isPlannerTabsOverflowing ? 'true' : 'false'}
+              data-can-scroll-left={canPlannerTabsScrollLeft ? 'true' : 'false'}
+              data-can-scroll-right={canPlannerTabsScrollRight ? 'true' : 'false'}
+            >
+              <div
+                ref={plannerTabsListRef}
+                className="mb-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                <TabsList className="h-auto w-max shrink-0 justify-start gap-1">
+                  <TabsTrigger className="shrink-0" value="checklist">Checklist</TabsTrigger>
+                  <TabsTrigger className="shrink-0" value="vehicles">Vehicle Packlists</TabsTrigger>
+                  <TabsTrigger className="shrink-0" value="schedule">Schedule</TabsTrigger>
+                  <TabsTrigger className="shrink-0" value="crew">Crew</TabsTrigger>
+                  <TabsTrigger className="shrink-0" value="overview">Overview</TabsTrigger>
+                </TabsList>
+              </div>
+              <div className="scroll-hint scroll-hint-left" aria-hidden>
+                <ChevronLeft className="h-4 w-4" />
+              </div>
+              <div
+                className={`scroll-hint scroll-hint-right${shouldPulsePlannerTabsHint ? ' scroll-hint-pulse-once' : ''}`}
+                aria-hidden
+              >
+                <ChevronRight className="h-4 w-4" />
+              </div>
+            </div>
 
             <TabsContent value="checklist" className="space-y-3">
               <ChecklistEditor
@@ -292,6 +426,14 @@ export default function PlannerWorkspacePage() {
                   onDayBoardDateChange={handleScheduleDayFilterChange}
                   scheduleScopeKey={selectedProduction.id}
                   requireDeleteConfirm={confirmListDeletes}
+                  onTimelineGestureStart={() => {
+                    isScheduleGestureActiveRef.current = true;
+                    hasRecordedGestureSnapshotRef.current = false;
+                  }}
+                  onTimelineGestureEnd={() => {
+                    isScheduleGestureActiveRef.current = false;
+                    hasRecordedGestureSnapshotRef.current = false;
+                  }}
                   onChange={(crewSchedule) => handleUpdate({ crewSchedule })}
                 />
               </div>

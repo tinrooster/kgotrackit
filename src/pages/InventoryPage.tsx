@@ -1621,19 +1621,27 @@ export default function InventoryPage() {
   };
 
   return (
-    <div className="inventory-page w-full min-w-0 max-w-full space-y-4">
-      <div className="inventory-toolbar sticky top-16 z-30 space-y-4 bg-background/95 pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <div
+      className={cn(
+        "inventory-page w-full min-w-0 max-w-full space-y-1 sm:space-y-4",
+        isTinyScreen && "h-[calc(100dvh-3.5rem)] overflow-hidden flex flex-col"
+      )}
+    >
+      <div className={cn(
+        "inventory-toolbar sticky top-10 sm:top-16 z-30 space-y-1 sm:space-y-4 bg-background/95 pb-0 sm:pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 shrink-0",
+        isTinyScreen && "space-y-1 pb-0"
+      )}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
-            <h1 className="shrink-0 text-2xl font-bold">Inventory</h1>
+            <h1 className={cn("shrink-0 text-2xl font-bold", isTinyScreen && "text-xl")}>Inventory</h1>
             <div className="min-w-0 flex-1">
               {isTinyScreen ? (
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-1 flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-11 w-11 touch-manipulation"
+                    className="h-9 w-9 touch-manipulation"
                     onClick={() => setFiltersCollapsed((previousValue) => !previousValue)}
                     title={filtersCollapsed ? 'Show filters' : 'Hide filters'}
                     aria-label={filtersCollapsed ? 'Show filters' : 'Hide filters'}
@@ -1648,7 +1656,7 @@ export default function InventoryPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="ml-auto h-10 w-10"
+                    className="ml-auto h-9 w-9"
                     onClick={() => {
                       handleFilterChange('category', 'all');
                       handleFilterChange('location', 'all');
@@ -1753,7 +1761,12 @@ export default function InventoryPage() {
               </TooltipProvider>
             ) : null}
           </div>
-          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div
+            className={cn(
+              "flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4",
+              isTinyScreen && filtersCollapsed && "hidden"
+            )}
+          >
           <div className="flex items-center gap-2 sm:mr-2">
             <Switch
               id="view-mode"
@@ -1787,7 +1800,7 @@ export default function InventoryPage() {
               <Button
                 type="button"
                 size="icon"
-                className="h-11 w-11"
+                className="h-10 w-10"
                 disabled={!canMutateAppData}
                 onClick={() => setIsAddDialogOpen(true)}
                 title="Add item"
@@ -1798,7 +1811,7 @@ export default function InventoryPage() {
                 type="button"
                 variant="secondary"
                 size="icon"
-                className={cn("h-11 w-11", mobileTabletUi ? "touch-manipulation" : "")}
+                className={cn("h-10 w-10", mobileTabletUi ? "touch-manipulation" : "")}
                 disabled={!canMutateAppData}
                 onClick={() => setIsQuickAddOpen(true)}
                 title="Quick add"
@@ -1809,7 +1822,7 @@ export default function InventoryPage() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className={cn("h-11 w-11", mobileTabletUi ? "touch-manipulation" : "")}
+                className={cn("h-10 w-10", mobileTabletUi ? "touch-manipulation" : "")}
                 disabled={!canMutateAppData}
                 onClick={() => setIsBulkImportOpen(true)}
                 title="Bulk add from spreadsheet"
@@ -1820,7 +1833,7 @@ export default function InventoryPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 w-11 px-0"
+                  className="h-10 w-10 px-0"
                   disabled={!invUndoAvail}
                   onClick={handleInventoryUndo}
                   title="Undo"
@@ -1831,7 +1844,7 @@ export default function InventoryPage() {
               ) : null}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline" size="icon" className="h-11 w-11" title="More actions">
+                  <Button type="button" variant="outline" size="icon" className="h-10 w-10" title="More actions">
                     <MoreHorizontal className="h-4 w-4" />
                     <span className="sr-only">More actions</span>
                   </Button>
@@ -1930,7 +1943,7 @@ export default function InventoryPage() {
         </div>
         </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className={cn("hidden sm:flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between", isTinyScreen && "hidden")}>
         <div className="text-sm text-muted-foreground">
           {filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'} found
         </div>
@@ -1975,10 +1988,14 @@ export default function InventoryPage() {
         data-overflowing={isTableOverflowing ? 'true' : 'false'}
         data-can-scroll-left={canTableScrollLeft ? 'true' : 'false'}
         data-can-scroll-right={canTableScrollRight ? 'true' : 'false'}
+        style={isTinyScreen ? { flex: '1 1 auto', minHeight: 0 } : undefined}
       >
         <Table
           containerRef={tableScrollRef}
-          containerClassName="max-h-[calc(100vh-16rem)] w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x"
+          containerClassName={cn(
+            "w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x",
+            isTinyScreen ? "h-full" : "sm:h-auto sm:max-h-[calc(100vh-16rem)]"
+          )}
           className={cn(
             'w-full table-fixed border-collapse align-top text-sm',
             isDetailedView ? 'min-w-[1180px]' : 'min-w-[780px]'
