@@ -18,18 +18,29 @@ import { SchematicConnectionsPanel } from './SchematicConnectionsPanel';
 // ---------------------------------------------------------------------------
 const ES_URL_KEY = 'trackit:easyschematic-base-url';
 const ES_URL_DEFAULT = 'https://easyschematic.live';
+// When running locally, use the Vite proxy → same-origin, no CORS, postMessage works.
+const ES_URL_LOCAL = `${window.location.origin}/schematic`;
 
 function getEsBaseUrl(): string {
   try {
-    return localStorage.getItem(ES_URL_KEY) || ES_URL_DEFAULT;
+    const stored = localStorage.getItem(ES_URL_KEY);
+    if (stored) return stored;
+    // Auto-detect local dev: if on localhost and no override, use the proxy
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+      return ES_URL_LOCAL;
+    }
+    return ES_URL_DEFAULT;
   } catch {
     return ES_URL_DEFAULT;
   }
 }
 function setEsBaseUrl(url: string) {
   try {
-    if (url && url !== ES_URL_DEFAULT) localStorage.setItem(ES_URL_KEY, url);
-    else localStorage.removeItem(ES_URL_KEY);
+    if (url && url !== ES_URL_DEFAULT && url !== ES_URL_LOCAL) {
+      localStorage.setItem(ES_URL_KEY, url);
+    } else {
+      localStorage.removeItem(ES_URL_KEY);
+    }
   } catch { /* ignore */ }
 }
 
@@ -77,8 +88,8 @@ function LinkEditorForm({
           className="h-8 text-sm font-mono"
         />
         <p className="text-[11px] text-muted-foreground">
-          Cloud default: <code>{ES_URL_DEFAULT}</code> · For a local instance use your LAN address,
-          e.g. <code>http://192.168.1.50:5173</code>
+          On localhost this auto-resolves to <code>/schematic</code> (Vite proxy → port 5174).
+          On a deployed host use your LAN address, e.g. <code>http://192.168.1.50:5174</code>
         </p>
       </div>
       <div className="grid grid-cols-2 gap-3">

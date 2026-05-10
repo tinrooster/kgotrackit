@@ -22,5 +22,15 @@ export default defineConfig({
     fs: {
       strict: false,
     },
+    proxy: {
+      // Forward /schematic/* to the local EasySchematic dev server (port 5174).
+      // This makes the iframe same-origin in dev so postMessage works without CORS.
+      "/schematic": {
+        target: "http://127.0.0.1:5174",
+        rewrite: (path) => path.replace(/^\/schematic/, ""),
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
 })

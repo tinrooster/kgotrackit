@@ -42,3 +42,6 @@ supabase/.temp/
 # Local Supabase helper files
 scripts/.supabase-secrets.local
 scripts/*.local.sh
+
+# EasySchematic — cloned separately (run scripts/setup-easyschematic.ps1)
+easyschematic/

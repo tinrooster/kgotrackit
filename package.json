@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:schematic": "npm --prefix easyschematic run dev -- --port 5174",
+    "dev:all": "concurrently -n trackIT,EasySchematic -c blue,green \"npm run dev\" \"npm run dev:schematic\"",
     "build": "tsc --noEmit && vite build",
     "clean": "rimraf dist dist-web out .vite",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
@@ -89,6 +91,7 @@
     "@typescript-eslint/parser": "^8.31.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
+    "concurrently": "^9.2.1",
     "eslint": "^8.57.1",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
