@@ -23,6 +23,7 @@ export default function HelpPage() {
       { id: 'lookup-lists', label: 'Lookup lists' },
       { id: 'settings-saving', label: 'Settings & saving' },
       { id: 'team-workspace', label: 'Team workspace data' },
+      { id: 'org-vs-workspace', label: 'Organization vs. workspace' },
       { id: 'financial-codes', label: 'Financial codes' },
       { id: 'reconciliation', label: 'Reconciliation' },
       { id: 'planner-workspace', label: 'Planner workspace' },
@@ -141,6 +142,27 @@ export default function HelpPage() {
         </p>
       </section>
 
+      <section id="org-vs-workspace" className={cn(sectionClass('org-vs-workspace'), 'space-y-3')}>
+        <h2 className="text-lg font-semibold text-foreground">Organization vs. workspace</h2>
+        <p className="text-sm text-muted-foreground">
+          A <span className="font-medium text-foreground">workspace</span> is the team bucket for shared inventory, productions,
+          and planner data. Inviting someone under <span className="font-medium text-foreground">Settings → Users</span> (cloud) or{' '}
+          <span className="font-medium text-foreground">Settings → Workspaces → Manage workspaces</span> adds them to that
+          workspace only, with a workspace role (admin, editor, or viewer).
+        </p>
+        <p className="text-sm text-muted-foreground">
+          An <span className="font-medium text-foreground">organization</span> is the company-wide layer: directory contacts,
+          organization branding, master crew, and related org settings live under{' '}
+          <span className="font-medium text-foreground">Settings → Organization</span>. Workspace membership and organization
+          roster are separate in this app: workspace access does not automatically add someone to the organization directory or
+          grant organization admin by itself.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Workspaces can be linked to an organization; when they are, you may see the organization name next to your active
+          workspace. That link shares org-level configuration across teams; it does not merge the two invite flows.
+        </p>
+      </section>
+
       <section id="financial-codes" className={cn(sectionClass('financial-codes'), 'space-y-3')}>
         <h2 className="text-lg font-semibold text-foreground">Financial codes (expense types &amp; cost centers)</h2>
         <p className="text-sm text-muted-foreground">
@@ -171,6 +193,11 @@ export default function HelpPage() {
         </p>
         <p className="text-sm text-muted-foreground">
           Use the Simple/Detailed switch in Schedule tabs to reduce UI density for day-of operations.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          On Checklist and Vehicle Packlists, checkboxes record completion or packed state only. Section or vehicle rows use a
+          chevron control and also respond to double-click on the header row (outside inputs and buttons). Rename checklist
+          sections from their ⋯ menu.
         </p>
       </section>
 

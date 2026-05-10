@@ -782,7 +782,9 @@ export function DataBackupTab({
                 Backup & Restore
               </CardTitle>
               <CardDescription>
-                Full app file backup/restore vs settings-only JSON — use the scope labels below.
+                Full app file backup/restore vs settings-only JSON — use the scope labels below. If demo data,
+                imports, or workspace utilities change more than you intended, restore from a backup or a saved restore
+                point (below) before re-applying changes.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

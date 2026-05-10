@@ -1,4 +1,4 @@
-import type { VehiclePacklist, ChecklistItem } from '@/types/productions';
+import type { ChecklistGroup, ChecklistItem, VehiclePacklist } from '@/types/productions';
 
 function normalizeQtyItem(item: ChecklistItem): ChecklistItem {
   const parsed = Number(item.quantity ?? 1);
@@ -80,6 +80,43 @@ export function upsertVehiclePacklistItemById(
   });
   if (!changed) return shaped;
   return { ...shaped, sections, items };
+}
+
+function packlistLineLinkKey(item: Pick<ChecklistItem, 'label' | 'inventoryItemId'>): string {
+  return `${item.label.trim().toLowerCase()}::${item.inventoryItemId || ''}`;
+}
+
+/** When checklist completion changes, align linked vehicle-pack section rows (same matching rules as vehicle→checklist sync). */
+export function mirrorChecklistCompletionOntoVehiclePacklists(
+  packlists: VehiclePacklist[],
+  checklistGroups: ChecklistGroup[],
+): VehiclePacklist[] {
+  const groupById = new Map(checklistGroups.map((g) => [g.id, g]));
+  return packlists.map((packlist) => {
+    const shaped = ensureVehiclePacklistShape(packlist);
+    let changed = false;
+    const sections = shaped.sections.map((section) => {
+      if (!section.checklistGroupId) return section;
+      const cg = groupById.get(section.checklistGroupId);
+      if (!cg) return section;
+      let sectionChanged = false;
+      const items = section.items.map((line) => {
+        const match = cg.items.find((c) =>
+          line.inventoryItemId
+            ? c.inventoryItemId === line.inventoryItemId
+            : packlistLineLinkKey(c) === packlistLineLinkKey(line),
+        );
+        if (!match || line.completed === match.completed) return line;
+        sectionChanged = true;
+        return { ...line, completed: match.completed };
+      });
+      if (!sectionChanged) return section;
+      changed = true;
+      return { ...section, items };
+    });
+    if (!changed) return packlist;
+    return { ...shaped, sections };
+  });
 }
 
 export function removeVehiclePacklistItemById(packlist: VehiclePacklist, itemId: string): VehiclePacklist | null {

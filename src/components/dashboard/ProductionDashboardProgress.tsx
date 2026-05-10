@@ -108,21 +108,26 @@ const FUSED_SEGMENTS = [
   },
 ] as const;
 
-/** Matches input placeholder weight: `placeholder:text-muted-foreground/70` */
+/** Stronger foreground in light mode so fused-strip labels stay readable without hover */
 const LABEL_PILL =
-  'rounded-sm bg-muted/55 px-1.5 py-0.5 text-muted-foreground/70 backdrop-blur-[1px] dark:bg-muted/45';
+  'rounded-sm bg-muted/65 px-1.5 py-0.5 text-foreground/88 backdrop-blur-[1px] dark:bg-muted/45 dark:text-muted-foreground/88';
+
+export type ProductionProgressSegment = (typeof FUSED_SEGMENTS)[number]['key'];
 
 export function ProductionFusedStripProgress({
   metrics,
   className,
   density = 'comfortable',
   showLegend = true,
+  onSegmentClick,
 }: {
   metrics: ProductionProgressSnapshot;
   className?: string;
   density?: 'comfortable' | 'compact';
   /** When true, labels and counts are drawn on the bars (no separate legend block). */
   showLegend?: boolean;
+  /** When set, each segment is a button (e.g. navigate to planner tab). Caller should stopPropagation if inside another clickable surface. */
+  onSegmentClick?: (segment: ProductionProgressSegment) => void;
 }) {
   const percents = {
     checklist: metrics.checklist.percent,
@@ -186,32 +191,53 @@ export function ProductionFusedStripProgress({
         const fraction = rows[i].fraction;
         const label = density === 'compact' ? s.short : s.long;
         const title = `${label} — ${fraction} (${pct}%)`;
+        const segmentBody = (
+          <div className="flex flex-col overflow-hidden rounded-md bg-muted">
+            <div
+              className={cn(
+                'flex w-full flex-1 items-center justify-between gap-1.5 px-2 py-1',
+                contentMinHeight,
+                labelClass,
+              )}
+            >
+              <span className={cn('min-w-0 flex-1 truncate font-medium', LABEL_PILL)}>{label}</span>
+              <span className={cn('shrink-0 tabular-nums font-medium', LABEL_PILL)}>{fraction}</span>
+            </div>
+            <div
+              className={cn(
+                'w-full shrink-0 overflow-hidden bg-muted-foreground/20 dark:bg-muted-foreground/25',
+                underlineClass,
+              )}
+            >
+              <div
+                className={cn('h-full max-w-full transition-[width]', s.barClass)}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+
+        if (onSegmentClick) {
+          return (
+            <button
+              key={s.key}
+              type="button"
+              className="min-w-0 flex-1 cursor-pointer rounded-md text-left outline-none transition-opacity hover:opacity-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              title={title}
+              aria-label={`${title}. Open this area in the planner.`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSegmentClick(s.key);
+              }}
+            >
+              {segmentBody}
+            </button>
+          );
+        }
 
         return (
           <div key={s.key} className="min-w-0 flex-1" title={title}>
-            <div className="flex flex-col overflow-hidden rounded-md bg-muted">
-              <div
-                className={cn(
-                  'flex w-full flex-1 items-center justify-between gap-1.5 px-2 py-1',
-                  contentMinHeight,
-                  labelClass,
-                )}
-              >
-                <span className={cn('min-w-0 flex-1 truncate font-medium', LABEL_PILL)}>{label}</span>
-                <span className={cn('shrink-0 tabular-nums font-medium', LABEL_PILL)}>{fraction}</span>
-              </div>
-              <div
-                className={cn(
-                  'w-full shrink-0 overflow-hidden bg-muted-foreground/20 dark:bg-muted-foreground/25',
-                  underlineClass,
-                )}
-              >
-                <div
-                  className={cn('h-full max-w-full transition-[width]', s.barClass)}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
+            {segmentBody}
           </div>
         );
       })}
@@ -223,9 +249,18 @@ export function ProductionFusedStripProgress({
 export function ProductionDashboardProgress({
   metrics,
   className,
+  onSegmentClick,
 }: {
   metrics: ProductionProgressSnapshot;
   className?: string;
+  onSegmentClick?: (segment: ProductionProgressSegment) => void;
 }) {
-  return <ProductionFusedStripProgress metrics={metrics} density="comfortable" className={className} />;
+  return (
+    <ProductionFusedStripProgress
+      metrics={metrics}
+      density="comfortable"
+      className={className}
+      onSegmentClick={onSegmentClick}
+    />
+  );
 }

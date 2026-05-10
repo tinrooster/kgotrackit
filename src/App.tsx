@@ -24,6 +24,7 @@ import ProductionsPage from './pages/ProductionsPage';
 import TimePickerLabPage from './pages/TimePickerLabPage';
 import ProductionProgressLabPage from './pages/ProductionProgressLabPage';
 import UiDiagnosticsPage from './pages/UiDiagnosticsPage';
+import ExpandCollapseSegmentedLabPage from './pages/ExpandCollapseSegmentedLabPage';
 import DevMenuPage from './pages/DevMenuPage';
 import PlannerWorkspacePage from './pages/PlannerWorkspacePage';
 
@@ -280,12 +281,21 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/dev/expand-collapse-lab"
+                element={
+                  <ProtectedRoute>
+                    <ExpandCollapseSegmentedLabPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/time-picker-lab" element={<Navigate to="/dev/time-picker-lab" replace />} />
               <Route
                 path="/production-progress-lab"
                 element={<Navigate to="/dev/production-progress-lab" replace />}
               />
               <Route path="/ui-diagnostics" element={<Navigate to="/dev/ui-diagnostics" replace />} />
+              <Route path="/expand-collapse-lab" element={<Navigate to="/dev/expand-collapse-lab" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

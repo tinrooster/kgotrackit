@@ -16,6 +16,9 @@ export default defineConfig({
     },
   },
   server: {
+    // Use IPv4 loopback so the dev URL works when `localhost` is broken (e.g. commented-out hosts entries).
+    host: "127.0.0.1",
+    port: 5173,
     fs: {
       strict: false,
     },

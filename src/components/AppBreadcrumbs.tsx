@@ -1,7 +1,6 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
@@ -9,6 +8,7 @@ import {
   type OrganizationSettingsSubTabId,
 } from '@/components/settings/organizationSettingsSubTabs';
 import { getProductions } from '@/lib/productionService';
+import { normalizeProductionSheetTab } from '@/lib/productionSheetTab';
 
 const PATH_LABELS: Record<string, string> = {
   '/': 'Dashboard',
@@ -24,6 +24,7 @@ const PATH_LABELS: Record<string, string> = {
   '/dev/time-picker-lab': 'Time Picker Lab',
   '/dev/production-progress-lab': 'Production progress lab',
   '/dev/ui-diagnostics': 'UI Diagnostics',
+  '/dev/expand-collapse-lab': 'Expand all switch',
   '/time-picker-lab': 'Time Picker Lab',
   '/production-progress-lab': 'Production progress lab',
   '/ui-diagnostics': 'UI Diagnostics',
@@ -62,6 +63,7 @@ const LIBRARIES_PANEL_LABELS: Record<string, string> = {
   templates: 'Item templates',
   deviceLibrary: 'Device library',
   cabinets: 'Cab/Storage',
+  maintenanceCautions: 'Maintenance cautions',
 };
 const DATA_PANEL_LABELS: Record<string, string> = {
   'import-export': 'Import & Export',
@@ -71,6 +73,7 @@ const DATA_PANEL_LABELS: Record<string, string> = {
 const ORGANIZATION_SUBTAB_LABELS: Record<OrganizationSettingsSubTabId, string> = {
   overview: 'Overview',
   crew: 'Master crew',
+  directory: 'Directory',
   maintenance: 'Maintenance cautions',
 };
 const URL_SYNC_EVENT = 'trackit:url-sync';
@@ -95,8 +98,12 @@ export function AppBreadcrumbs() {
   const location = useLocation();
   const { currentUser } = useAuth();
   const { activeWorkspaceId, activeWorkspaceRole } = useWorkspace();
-  const [urlSearch, setUrlSearch] = useState(() => window.location.search);
-  const canManageSharedConfig = activeWorkspaceId ? activeWorkspaceRole === 'admin' : currentUser?.role === 'admin';
+  /** Mirrors query string: React Router updates + replaceState (Settings) via URL_SYNC_EVENT. */
+  const [urlSearch, setUrlSearch] = useState(location.search);
+
+  useEffect(() => {
+    setUrlSearch(location.search);
+  }, [location.search]);
 
   useEffect(() => {
     const syncFromWindowLocation = () => setUrlSearch(window.location.search);
@@ -107,6 +114,7 @@ export function AppBreadcrumbs() {
       window.removeEventListener(URL_SYNC_EVENT, syncFromWindowLocation);
     };
   }, []);
+  const canManageSharedConfig = activeWorkspaceId ? activeWorkspaceRole === 'admin' : currentUser?.role === 'admin';
 
   const crumbs = useMemo(() => {
     const segments = location.pathname.split('/').filter(Boolean);
@@ -201,7 +209,7 @@ export function AppBreadcrumbs() {
           getProductions().find((production) => production.id === productionId)?.name ?? null;
         if (productionName) {
           baseCrumbs.push({
-            href: `/productions/planner?productionId=${productionId}`,
+            href: `/productions/planner?productionId=${encodeURIComponent(productionId)}`,
             label: productionName,
           });
         }
@@ -209,10 +217,30 @@ export function AppBreadcrumbs() {
       const plannerTab = search.get('pt') ?? 'checklist';
       const plannerTabLabel = PLANNER_TAB_LABELS[plannerTab];
       if (plannerTabLabel) {
-        const productionSearchPrefix = productionId ? `productionId=${productionId}&` : '';
+        const productionSearchPrefix = productionId ? `productionId=${encodeURIComponent(productionId)}&` : '';
         baseCrumbs.push({
-          href: `/productions/planner?${productionSearchPrefix}pt=${plannerTab}`,
+          href: `/productions/planner?${productionSearchPrefix}pt=${encodeURIComponent(plannerTab)}`,
           label: plannerTabLabel,
+        });
+      }
+    }
+    if (location.pathname === '/productions') {
+      const search = new URLSearchParams(urlSearch);
+      const sheetProductionId = search.get('productionId');
+      if (sheetProductionId) {
+        const sheetName =
+          getProductions().find((production) => production.id === sheetProductionId)?.name ?? null;
+        if (sheetName) {
+          baseCrumbs.push({
+            href: `/productions?productionId=${encodeURIComponent(sheetProductionId)}`,
+            label: sheetName,
+          });
+        }
+        const sheetTab = normalizeProductionSheetTab(search.get('pt'));
+        const sheetTabLabel = PLANNER_TAB_LABELS[sheetTab] ?? 'Overview';
+        baseCrumbs.push({
+          href: `/productions?productionId=${encodeURIComponent(sheetProductionId)}&pt=${encodeURIComponent(sheetTab)}`,
+          label: sheetTabLabel,
         });
       }
     }

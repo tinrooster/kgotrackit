@@ -77,7 +77,8 @@ export function OrgMaintenanceBroadcastTemplateSection({
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <p>
           ON-AIR program start times (HH:mm, 15-minute grid) shared for this organization. In{' '}
-          <span className="text-foreground font-medium">General</span> → Maintenance Window Cautions,{' '}
+          <span className="text-foreground font-medium">Libraries</span> →{' '}
+          <span className="text-foreground font-medium">Maintenance cautions</span>,{' '}
           <span className="text-foreground font-medium">Apply org template</span> copies this (or the anonymous demo
           pattern if nothing is saved here).
         </p>

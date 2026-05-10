@@ -151,6 +151,8 @@ export const defaultSettingsSchema = z.object({
   maintenanceOnAirSchedule: maintenanceOnAirScheduleSchema.default(() => maintenanceOnAirScheduleSchema.parse({})),
   deleteConfirmationByUser: z.record(z.string(), z.boolean()).default({}),
   undoByUser: z.record(z.string(), z.boolean()).default({}),
+  /** Confirm checklist / packlist / crew / schedule line deletes in planner & production detail. */
+  confirmPlannerListDeletesByUser: z.record(z.string(), z.boolean()).default({}),
 });
 
 export type DefaultSettings = z.infer<typeof defaultSettingsSchema>;
@@ -221,6 +223,7 @@ export class SettingsService {
       maintenanceOnAirSchedule: { ...EMPTY_MAINTENANCE_ON_AIR_SCHEDULE },
       deleteConfirmationByUser: {},
       undoByUser: {},
+      confirmPlannerListDeletesByUser: {},
     };
   }
 

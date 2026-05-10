@@ -27,6 +27,7 @@ import {
 } from '@/lib/crewContactsService';
 import { canonicalNameKey, parseContactDisplayName } from '@/lib/contactName';
 import { reconcileDirectoryContactDuplicates } from '@/lib/contactReconciliation';
+import { isStandardUsPhoneStored, normalizeUsPhoneForStorage } from '@/lib/phoneNormalization';
 
 interface DirectoryContactEntry {
   id: string;
@@ -63,17 +64,6 @@ const EMPTY_ENTRY: Omit<DirectoryContactEntry, 'id'> = {
   sourceSheet: '',
   notes: '',
 };
-
-const normalizePhoneToStandardFormat = (value: string): string => {
-  const trimmedValue = value.trim();
-  if (!trimmedValue) return '';
-  const digits = trimmedValue.replace(/\D/g, '');
-  if (digits.length !== 10) return trimmedValue;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-};
-
-const isStandardPhoneFormat = (value: string): boolean =>
-  /^\(\d{3}\)\s\d{3}-\d{4}$/.test(value.trim());
 
 export function OrganizationDirectoryContactsSection({
   organizationId,
@@ -137,9 +127,7 @@ export function OrganizationDirectoryContactsSection({
           fullName:
             typeof entry.fullName === 'string' ? parseContactDisplayName(entry.fullName) : '',
           phone:
-            typeof entry.phone === 'string'
-              ? normalizePhoneToStandardFormat(entry.phone)
-              : undefined,
+            typeof entry.phone === 'string' ? normalizeUsPhoneForStorage(entry.phone) : undefined,
           email: typeof entry.email === 'string' ? entry.email : undefined,
           extension: typeof entry.extension === 'string' ? entry.extension : undefined,
           department: typeof entry.department === 'string' ? entry.department : undefined,
@@ -280,9 +268,9 @@ export function OrganizationDirectoryContactsSection({
       toast.error('Full name is required.');
       return;
     }
-    const normalizedPhone = draft.phone?.trim() ? normalizePhoneToStandardFormat(draft.phone) : '';
-    if (normalizedPhone && !isStandardPhoneFormat(normalizedPhone)) {
-      toast.error('Phone number is invalid. Use format (xxx) xxx-xxxx.');
+    const normalizedPhone = draft.phone?.trim() ? normalizeUsPhoneForStorage(draft.phone) : '';
+    if (normalizedPhone && !isStandardUsPhoneStored(normalizedPhone)) {
+      toast.error('Phone number is invalid. Use (xxx) xxx-xxxx or +1 (xxx) xxx-xxxx.');
       return;
     }
     const normalizedEmail = draft.email?.trim() || '';
@@ -722,6 +710,12 @@ export function OrganizationDirectoryContactsSection({
                 id="org-directory-phone"
                 value={draft.phone ?? ''}
                 onChange={(event) => setDraft((prev) => ({ ...prev, phone: event.target.value }))}
+                onBlur={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    phone: normalizeUsPhoneForStorage(event.target.value) || '',
+                  }))
+                }
                 disabled={!canEdit || saving}
               />
             </div>

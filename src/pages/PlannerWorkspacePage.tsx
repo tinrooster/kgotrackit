@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { ChecklistEditor } from '@/components/productions/ChecklistEditor';
 import { VehiclePacklistEditor } from '@/components/productions/VehiclePacklistEditor';
 import { CrewEditor } from '@/components/productions/CrewEditor';
@@ -18,9 +17,13 @@ import {
   updateProduction,
 } from '@/lib/productionService';
 import { getItems, STORAGE_KEYS } from '@/lib/storageService';
-import { flattenVehiclePacklistItems } from '@/lib/vehiclePacklistUtils';
+import {
+  flattenVehiclePacklistItems,
+  mirrorChecklistCompletionOntoVehiclePacklists,
+} from '@/lib/vehiclePacklistUtils';
 import { Production, PRODUCTION_STATUS_LABELS } from '@/types/productions';
 import { InventoryItem } from '@/types/inventory';
+import { usePlannerListDeleteConfirm } from '@/hooks/usePlannerListDeleteConfirm';
 
 const LAST_PLANNER_ROUTE_STORAGE_KEY = 'trackit:last-planner-route';
 const PLANNER_TABS = ['checklist', 'vehicles', 'schedule', 'crew', 'overview'] as const;
@@ -56,7 +59,7 @@ export default function PlannerWorkspacePage() {
   const [productions, setProductions] = useState<Production[]>(() => getProductions());
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() => getItems());
   const [activeTab, setActiveTab] = useState<PlannerTab>(() => getPlannerTabFromSearchParams(searchParams));
-  const [confirmListDeletes, setConfirmListDeletes] = useState(true);
+  const confirmListDeletes = usePlannerListDeleteConfirm();
 
   const productionIdFromQuery = searchParams.get('productionId') ?? '';
   const scheduleDayFilter = getScheduleDayFromSearchParams(searchParams);
@@ -169,7 +172,7 @@ export default function PlannerWorkspacePage() {
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-lg border bg-card p-3 sm:grid-cols-[1fr_auto]">
+      <div className="rounded-lg border bg-card p-3">
         <div className="space-y-1">
           <Label htmlFor="planner-production-select">Production</Label>
           <Select value={productionIdFromQuery || undefined} onValueChange={handleSelectProduction}>
@@ -184,18 +187,6 @@ export default function PlannerWorkspacePage() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex items-end">
-          <div className="inline-flex items-center gap-2 rounded border px-2 py-1">
-            <Switch
-              id="planner-confirm-list-delete-toggle"
-              checked={confirmListDeletes}
-              onCheckedChange={setConfirmListDeletes}
-            />
-            <Label htmlFor="planner-confirm-list-delete-toggle" className="text-xs text-muted-foreground">
-              Confirm list deletes
-            </Label>
-          </div>
         </div>
       </div>
 
@@ -245,7 +236,13 @@ export default function PlannerWorkspacePage() {
             <TabsContent value="checklist" className="space-y-3">
               <ChecklistEditor
                 groups={selectedProduction.checklistGroups}
-                onChange={(checklistGroups) => handleUpdate({ checklistGroups })}
+                onChange={(checklistGroups) => {
+                  const vehiclePacklists = mirrorChecklistCompletionOntoVehiclePacklists(
+                    selectedProduction.vehiclePacklists,
+                    checklistGroups,
+                  );
+                  handleUpdate({ checklistGroups, vehiclePacklists });
+                }}
                 inventoryItems={inventoryItems}
                 requireDeleteConfirm={confirmListDeletes}
               />
@@ -255,6 +252,7 @@ export default function PlannerWorkspacePage() {
                 packlists={selectedProduction.vehiclePacklists}
                 onChange={(vehiclePacklists) => handleUpdate({ vehiclePacklists })}
                 checklistGroups={selectedProduction.checklistGroups}
+                onChecklistGroupsChange={(checklistGroups) => handleUpdate({ checklistGroups })}
                 inventoryItems={inventoryItems}
                 requireDeleteConfirm={confirmListDeletes}
               />
@@ -286,7 +284,7 @@ export default function PlannerWorkspacePage() {
                 />
               </div>
             </TabsContent>
-            <TabsContent value="crew">
+            <TabsContent value="crew" forceMount className="data-[state=inactive]:hidden">
               <CrewEditor
                 crew={selectedProduction.crew}
                 onChange={(crew) => handleUpdate({ crew })}

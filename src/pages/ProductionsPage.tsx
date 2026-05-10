@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Undo2, Redo2 } from 'lucide-react';
 import { Production, ProductionStatus, PRODUCTION_STATUS_OPTIONS } from '@/types/productions';
 import {
@@ -53,8 +53,11 @@ import {
   redoProductionMutation,
   undoProductionMutation,
 } from '@/lib/productionUndo';
+import type { ProductionSheetTab } from '@/lib/productionSheetTab';
+import { normalizeProductionSheetTab } from '@/lib/productionSheetTab';
 
 export default function ProductionsPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser } = useAuth();
   const [productions, setProductions] = useState<Production[]>(() => getProductions());
@@ -75,6 +78,26 @@ export default function ProductionsPage() {
   const [cloneVehiclePacklists, setCloneVehiclePacklists] = useState(false);
   const [deleteTargetProduction, setDeleteTargetProduction] = useState<Production | null>(null);
   const productionIdFromQuery = searchParams.get('productionId');
+  const sheetTabFromQuery = normalizeProductionSheetTab(searchParams.get('pt'));
+
+  const pushProductionSheetUrl = (production: Production, tab: ProductionSheetTab) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('productionId', production.id);
+    next.set('pt', tab);
+    setSearchParams(next, { replace: true });
+  };
+
+  const clearProductionSheetUrl = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('productionId');
+    next.delete('pt');
+    setSearchParams(next, { replace: true });
+  };
+
+  const openProductionInSheet = (production: Production, tab: ProductionSheetTab = 'overview') => {
+    setSelectedProduction(production);
+    pushProductionSheetUrl(production, tab);
+  };
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -119,6 +142,7 @@ export default function ProductionsPage() {
     }
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('productionId');
+    nextParams.delete('pt');
     setSearchParams(nextParams, { replace: true });
   }, [productions, productionIdFromQuery, searchParams, setSearchParams]);
 
@@ -304,7 +328,7 @@ export default function ProductionsPage() {
     );
     setUndoAvailable(canUndoProduction());
     setRedoAvailable(canRedoProduction());
-    setSelectedProduction(clonedProduction);
+    openProductionInSheet(clonedProduction, 'overview');
     setCloneDialogOpen(false);
     setCreateOptionsOpen(false);
     setCloneSourceProductionId('');
@@ -332,7 +356,7 @@ export default function ProductionsPage() {
   };
 
   const handleCardEdit = (production: Production) => {
-    setSelectedProduction(production);
+    openProductionInSheet(production, 'overview');
   };
 
   const handleCardClone = (production: Production) => {
@@ -429,6 +453,12 @@ export default function ProductionsPage() {
               onEdit={handleCardEdit}
               onClone={handleCardClone}
               onDelete={handleCardDelete}
+              onPlannerSegmentClick={(prod, segment) => {
+                const id = encodeURIComponent(prod.id);
+                const pt =
+                  segment === 'checklist' ? 'checklist' : segment === 'packlists' ? 'vehicles' : 'crew';
+                navigate(`/productions/planner?productionId=${id}&pt=${pt}`);
+              }}
             />
           ))}
         </div>
@@ -440,12 +470,17 @@ export default function ProductionsPage() {
         currentUsername={currentUser?.username || currentUser?.displayName}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
+        activeSheetTab={selectedProduction ? sheetTabFromQuery : undefined}
+        onActiveSheetTabChange={
+          selectedProduction
+            ? (tab) => pushProductionSheetUrl(selectedProduction, tab)
+            : undefined
+        }
         onClose={() => {
           setSelectedProduction(null);
-          if (!productionIdFromQuery) return;
-          const nextParams = new URLSearchParams(searchParams);
-          nextParams.delete('productionId');
-          setSearchParams(nextParams, { replace: true });
+          if (searchParams.has('productionId') || searchParams.has('pt')) {
+            clearProductionSheetUrl();
+          }
         }}
       />
 

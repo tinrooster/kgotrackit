@@ -1,6 +1,6 @@
 # trackIT v2 — Documentation
 
-**Version:** 1.0.1 · **Last reviewed:** 2026-05-08
+**Version:** 1.0.1 · **Last reviewed:** 2026-05-09
 
 trackIT is a broadcast/AV inventory management system delivered as a **web app** (local Vite dev + static deploy targets such as Vercel/Netlify), with shared React/TypeScript source under `src/`.
 
@@ -14,6 +14,7 @@ trackIT is a broadcast/AV inventory management system delivered as a **web app**
 | [roadmap.md](./roadmap.md) | Shipped work, active priorities, upcoming items, and deferred features |
 | [supabase-auth-send-email-hook.md](./supabase-auth-send-email-hook.md) | Setup guide for Supabase Auth Send Email HTTP hook using Resend API |
 | [planner-workspace-and-branding.md](./planner-workspace-and-branding.md) | Planner scheduling, call sheet options, exports, and organization branding workflow |
+| [BUG_BACKLOG_AND_EDIT_PLANS.md](./BUG_BACKLOG_AND_EDIT_PLANS.md) | Bug backlog from product review: tiers, themes, dependencies, implementation phases |
 
 Archived legacy docs are stored in `docs_old/`.
 

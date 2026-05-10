@@ -41,7 +41,7 @@ export function OptionalFormCollapsible({ title, children, className, defaultOpe
           'marker:content-none [&::-webkit-details-marker]:hidden',
         )}
       >
-        <span>{title}</span>
+        <span className="min-w-0 flex-1">{title}</span>
         <ChevronDown
           className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
           aria-hidden

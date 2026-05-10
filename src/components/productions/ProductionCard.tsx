@@ -10,7 +10,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ProductionFusedStripProgress } from '@/components/dashboard/ProductionDashboardProgress';
+import {
+  ProductionFusedStripProgress,
+  type ProductionProgressSegment,
+} from '@/components/dashboard/ProductionDashboardProgress';
 import { getProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
 
 const STATUS_VARIANT: Record<ProductionStatus, string> = {
@@ -27,6 +30,8 @@ interface ProductionCardProps {
   onEdit?: (production: Production) => void;
   onClone?: (production: Production) => void;
   onDelete?: (production: Production) => void;
+  /** Opens planner workspace on checklist / packlists / crew when segment bars are used */
+  onPlannerSegmentClick?: (production: Production, segment: ProductionProgressSegment) => void;
 }
 
 function formatDateRange(startDate?: string, endDate?: string): string | null {
@@ -39,7 +44,14 @@ function formatDateRange(startDate?: string, endDate?: string): string | null {
   return null;
 }
 
-export function ProductionCard({ production, onClick, onEdit, onClone, onDelete }: ProductionCardProps) {
+export function ProductionCard({
+  production,
+  onClick,
+  onEdit,
+  onClone,
+  onDelete,
+  onPlannerSegmentClick,
+}: ProductionCardProps) {
   const dateRange = formatDateRange(production.startDate, production.endDate);
   const vehicleCount = production.vehiclePacklists.length;
   const progressSnapshot = getProductionProgressSnapshot(production);
@@ -114,7 +126,13 @@ export function ProductionCard({ production, onClick, onEdit, onClone, onDelete 
           </div>
         )}
         <div className="pt-2">
-          <ProductionFusedStripProgress metrics={progressSnapshot} density="compact" />
+          <ProductionFusedStripProgress
+            metrics={progressSnapshot}
+            density="compact"
+            onSegmentClick={
+              onPlannerSegmentClick ? (segment) => onPlannerSegmentClick(production, segment) : undefined
+            }
+          />
         </div>
         {vehicleCount > 0 && (
           <div className="flex flex-wrap gap-3 pt-1.5">

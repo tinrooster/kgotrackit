@@ -369,17 +369,17 @@ export default function AboutPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex rounded-full border border-transparent p-1 text-primary transition-colors hover:border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Toggle micro-table demo"
-            onClick={() => setMicroTableOpen((previousValue) => !previousValue)}
+            tabIndex={-1}
+            aria-hidden="true"
+            className="inline-flex cursor-default rounded-full border border-transparent p-1 text-muted-foreground/35 outline-none"
+            onDoubleClick={() => setMicroTableOpen((previousValue) => !previousValue)}
           >
             <Info className="h-6 w-6" />
           </button>
           About TEd_trackIT
         </h1>
         <p className="text-muted-foreground">
-          Inventory and asset operations for production teams, with personal/team workspaces, role-aware settings, and
-          operational reporting.
+          Scheduling, crew, vehicles, and inventory — personal and team workspaces with role-aware settings.
         </p>
         <p className="text-xs text-muted-foreground/70">
           Version {APP_VERSION} · {APP_REVISION}
@@ -392,9 +392,11 @@ export default function AboutPage() {
           <CardDescription>Purpose, scope, and operating focus.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>TEd_trackIT tracks technical inventory, consumables, and movement across production, engineering, and field operations.</p>
-          <p>Current core workflows include inventory + templates, secure cabinet check-in/out, workspace-aware settings, device profile reuse, reports, and durable logs.</p>
-          <p>The app is tuned for both daily transactions and periodic planning tasks such as cost review, reconciliation, and decommissioning windows.</p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>Production scheduling and planner workspace (checklists, vehicle packlists, crew).</li>
+            <li>Technical inventory, templates, cabinet check-in/out, reports, and logs.</li>
+            <li>Vehicle packlists and fleet-related lists tied to productions.</li>
+          </ul>
         </CardContent>
       </Card>
 
@@ -549,10 +551,10 @@ export default function AboutPage() {
                 </div>
                 <button
                   type="button"
-                  className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-950/55 text-emerald-100 hover:bg-emerald-900/65"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="absolute bottom-3 right-3 inline-flex h-8 w-8 cursor-default items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-950/55 text-emerald-100 outline-none"
                   onClick={() => setShowPokerCheatsheet((previousValue) => !previousValue)}
-                  aria-label="Toggle poker cheat sheet"
-                  title="Cheat sheet"
                 >
                   <Info className="h-4 w-4" />
                 </button>

@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { reconcileCrewContactDuplicates } from '@/lib/contactReconciliation';
+import { isStandardUsPhoneStored, normalizeUsPhoneForStorage } from '@/lib/phoneNormalization';
 
 const EMPTY_DRAFT: CrewContactDraft = {
   fullName: '',
@@ -44,17 +45,6 @@ const EMPTY_DRAFT: CrewContactDraft = {
   unionStatus: '',
   isActive: true,
 };
-
-const normalizePhoneToStandardFormat = (value: string): string => {
-  const trimmedValue = value.trim();
-  if (!trimmedValue) return '';
-  const digits = trimmedValue.replace(/\D/g, '');
-  if (digits.length !== 10) return trimmedValue;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-};
-
-const isStandardPhoneFormat = (value: string): boolean =>
-  /^\(\d{3}\)\s\d{3}-\d{4}$/.test(value.trim());
 
 type CrewSortMode = 'name_asc' | 'name_desc';
 
@@ -172,9 +162,9 @@ export default function CrewPage() {
     if (!draft.fullName.trim()) {
       return;
     }
-    const normalizedPhone = draft.phone.trim() ? normalizePhoneToStandardFormat(draft.phone) : '';
-    if (normalizedPhone && !isStandardPhoneFormat(normalizedPhone)) {
-      toast.error('Phone number is invalid. Use format (xxx) xxx-xxxx.');
+    const normalizedPhone = draft.phone.trim() ? normalizeUsPhoneForStorage(draft.phone) : '';
+    if (normalizedPhone && !isStandardUsPhoneStored(normalizedPhone)) {
+      toast.error('Phone number is invalid. Use (xxx) xxx-xxxx or +1 (xxx) xxx-xxxx.');
       return;
     }
     const draftToSave: CrewContactDraft = {
@@ -244,7 +234,7 @@ export default function CrewPage() {
         contact.contactType === 'vendor' ? 'Vendor' : 'Crew',
         (contact.roleTags ?? []).join('|'),
         contact.organizationName ?? '',
-        contact.phone ? normalizePhoneToStandardFormat(contact.phone) : '',
+        contact.phone ? normalizeUsPhoneForStorage(contact.phone) : '',
         contact.email ?? '',
         contact.baseLocation ?? '',
         contact.unionStatus ?? '',
@@ -450,6 +440,9 @@ export default function CrewPage() {
               placeholder="Phone"
               value={draft.phone}
               onChange={(event) => setDraft((prev) => ({ ...prev, phone: event.target.value }))}
+              onBlur={(event) =>
+                setDraft((prev) => ({ ...prev, phone: normalizeUsPhoneForStorage(event.target.value) }))
+              }
             />
             <Input
               placeholder="Email"

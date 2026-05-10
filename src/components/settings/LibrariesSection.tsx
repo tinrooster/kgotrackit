@@ -7,8 +7,16 @@ import { TemplatesPage } from '@/pages/TemplatesPage';
 import { DeviceLibraryTab } from '@/components/settings/DeviceLibraryTab';
 import { PositionTemplatesPanel } from '@/components/settings/PositionTemplatesPanel';
 import CabinetManagement from '@/pages/CabinetManagement';
+import { MaintenanceCautionsSettingsCard } from '@/components/settings/MaintenanceCautionsSettingsCard';
+import type { DefaultSettings } from '@/lib/settingsService';
 
-export type LibrariesPanel = 'suppliers' | 'positionTemplates' | 'templates' | 'deviceLibrary' | 'cabinets';
+export type LibrariesPanel =
+  | 'suppliers'
+  | 'positionTemplates'
+  | 'templates'
+  | 'deviceLibrary'
+  | 'cabinets'
+  | 'maintenanceCautions';
 
 interface SettingsListsState {
   categories: ItemWithSubcategories[];
@@ -28,6 +36,10 @@ export interface LibrariesSectionProps {
   updateSettingsList: (key: SettingsKey, newValue: ItemWithSubcategories[]) => void;
   onRequestDeleteReconcile: (payload: { type: string; value: string; affectedCount: number }) => void;
   canDeleteItems?: boolean;
+  workspaceDefaultSettings: DefaultSettings;
+  onWorkspaceDefaultSettingsChange: (updates: Partial<DefaultSettings>) => void;
+  organizationMaintenanceTemplate?: DefaultSettings['maintenanceOnAirSchedule'] | null;
+  activeOrganizationId?: string | null;
 }
 
 const LIB_NAV: { id: LibrariesPanel; label: string }[] = [
@@ -36,6 +48,7 @@ const LIB_NAV: { id: LibrariesPanel; label: string }[] = [
   { id: 'deviceLibrary', label: 'Device library' },
   { id: 'cabinets', label: 'Cab/Storage' },
   { id: 'positionTemplates', label: 'Crew position templates' },
+  { id: 'maintenanceCautions', label: 'Maintenance cautions' },
 ];
 
 export function LibrariesSection({
@@ -45,6 +58,10 @@ export function LibrariesSection({
   updateSettingsList,
   onRequestDeleteReconcile,
   canDeleteItems = true,
+  workspaceDefaultSettings,
+  onWorkspaceDefaultSettingsChange,
+  organizationMaintenanceTemplate = null,
+  activeOrganizationId = null,
 }: LibrariesSectionProps) {
   const requestReconcile = (type: string, value: string, affectedCount: number) => {
     onRequestDeleteReconcile({ type, value, affectedCount });
@@ -58,8 +75,9 @@ export function LibrariesSection({
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Vendor names, portal URLs, item templates, device catalog, and secure storage. Crew position templates are
-            stored per organization (Supabase team mode) and are also linked from Settings → Organization.
+            Vendor names, portal URLs, item templates, device catalog, secure storage, and planner maintenance caution
+            windows. Crew position templates are stored per organization (Supabase team mode) and are also linked from
+            Settings → Organization.
           </p>
           <nav className="flex flex-wrap gap-2" aria-label="Library section">
             {LIB_NAV.map(({ id, label }) => (
@@ -118,6 +136,15 @@ export function LibrariesSection({
                 <CabinetManagement locations={settings.locations.map((loc) => loc.name)} />
               </CardContent>
             </Card>
+          )}
+
+          {panel === 'maintenanceCautions' && (
+            <MaintenanceCautionsSettingsCard
+              settings={workspaceDefaultSettings}
+              onSettingsChange={onWorkspaceDefaultSettingsChange}
+              organizationMaintenanceTemplate={organizationMaintenanceTemplate}
+              activeOrganizationId={activeOrganizationId}
+            />
           )}
         </CardContent>
       </Card>

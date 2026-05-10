@@ -24,6 +24,7 @@ import { CheckCircle2, Key, Users } from 'lucide-react';
 import { logger as durableLogger } from '@/lib/logging';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreateWorkspaceDialog } from '@/components/settings/CreateWorkspaceDialog';
+import { OrganizationWorkspaceScopeHint } from '@/components/settings/OrganizationWorkspaceScopeHint';
 import {
   Dialog,
   DialogDescription,
@@ -43,10 +44,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+export interface WorkspaceTeamTabProps {
+  /** When false, only switching among existing memberships (editors/viewers). */
+  showWorkspaceAdministration?: boolean;
+}
+
 /**
- * Settings → Data management: switch between personal cloud row and shared workspace payload.
+ * Settings → Workspaces: switch active workspace; optional administration for admins/owners.
  */
-export function WorkspaceTeamTab() {
+export function WorkspaceTeamTab({ showWorkspaceAdministration = true }: WorkspaceTeamTabProps) {
   const { currentUser, authBackend } = useAuth();
   const { workspaces, activeWorkspaceId, activeWorkspaceRole, loading, lastWorkspaceError, refreshWorkspaces } =
     useWorkspace();
@@ -138,7 +144,11 @@ export function WorkspaceTeamTab() {
     () => new Set(manageableWorkspaces.map((w) => w.workspaceId)),
     [manageableWorkspaces],
   );
-  const managedWorkspaceName = manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId)?.name || '';
+  const managedWorkspaceRow = React.useMemo(
+    () => manageableWorkspaces.find((w) => w.workspaceId === manageWorkspaceId),
+    [manageWorkspaceId, manageableWorkspaces],
+  );
+  const managedWorkspaceName = managedWorkspaceRow?.name || '';
   const isDeleteNameConfirmed =
     confirmWorkspaceName.trim().toLowerCase() !== '' &&
     confirmWorkspaceName.trim().toLowerCase() === managedWorkspaceName.trim().toLowerCase();
@@ -181,7 +191,9 @@ export function WorkspaceTeamTab() {
           Workspace
         </CardTitle>
         <CardDescription>
-          Create and switch between workspaces. All workspaces are cloud-enabled.
+          {showWorkspaceAdministration
+            ? 'Create and switch between workspaces. All workspaces are cloud-enabled.'
+            : 'Switch your active workspace. Only workspaces you are a member of are listed.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -244,6 +256,13 @@ export function WorkspaceTeamTab() {
             </div>
           ) : null}
         </div>
+
+        {activeWorkspaceId && showWorkspaceAdministration ? (
+          <OrganizationWorkspaceScopeHint
+            workspaceName={activeWorkspaceRow?.name ?? null}
+            linkedOrganizationName={activeWorkspaceRow?.organizationName ?? null}
+          />
+        ) : null}
 
         <div className="rounded-md border border-border/60 bg-muted/20 p-3">
           <div className="flex items-center justify-between gap-2">
@@ -352,33 +371,43 @@ export function WorkspaceTeamTab() {
           </div>
         </div>
 
-        <div className="pt-2" />
+        {showWorkspaceAdministration ? (
+          <>
+            <div className="pt-2" />
 
-        <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-foreground">Workspace administration</p>
-            <div className="flex items-center gap-2">
-              <Button type="button" onClick={() => setCreateDialogOpen(true)} disabled={busy}>
-                New workspace…
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setManageDialogOpen(true)}
-                disabled={manageableWorkspaces.length === 0}
-              >
-                Manage workspaces
-              </Button>
+            <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-foreground">Workspace administration</p>
+                <div className="flex items-center gap-2">
+                  <Button type="button" onClick={() => setCreateDialogOpen(true)} disabled={busy}>
+                    New workspace…
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setManageDialogOpen(true)}
+                    disabled={manageableWorkspaces.length === 0}
+                  >
+                    Manage workspaces
+                  </Button>
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Administer network workspaces: members, roles, and deletion.
+              </p>
+              <p className="text-xs text-muted-foreground">Create a separate workspace with empty or starter defaults.</p>
             </div>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Administer network workspaces: members, roles, and deletion.
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            To create a workspace, invite others, or run workspace utilities, ask a workspace admin or owner.
           </p>
-          <p className="text-xs text-muted-foreground">Create a separate workspace with empty or starter defaults.</p>
-        </div>
+        )}
       </CardContent>
 
+      {showWorkspaceAdministration ? (
+        <>
       <CreateWorkspaceDialog
         open={createDialogOpen}
         existingWorkspaceNames={workspaces.map((w) => w.name)}
@@ -426,6 +455,13 @@ export function WorkspaceTeamTab() {
                 </SelectContent>
               </Select>
             </div>
+
+            {manageWorkspaceId ? (
+              <OrganizationWorkspaceScopeHint
+                workspaceName={managedWorkspaceName || null}
+                linkedOrganizationName={managedWorkspaceRow?.organizationName ?? null}
+              />
+            ) : null}
 
             <div className="rounded-md border border-border/60 bg-background/60 p-3">
               <div className="flex items-center justify-between gap-2">
@@ -739,6 +775,8 @@ export function WorkspaceTeamTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+        </>
+      ) : null}
     </Card>
   );
 }

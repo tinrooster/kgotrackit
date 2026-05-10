@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Plus, Trash2, User, Database, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Flag } from 'lucide-react';
 import { PositionTemplate, ProductionCrewMember } from '@/types/productions';
 import { Button } from '@/components/ui/button';
@@ -23,9 +23,11 @@ import {
   POSITION_TEMPLATES_UPDATED_EVENT,
 } from '@/lib/positionTemplatesService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ListExpandAllSwitch } from '@/components/ui/list-expand-all-switch';
 import { TimeInput } from '@/components/ui/time-input';
 import { OptionalFormCollapsible } from '@/components/forms/OptionalFormCollapsible';
 import { normalizeDateInputValue, normalizeQuarterHourTime } from '@/lib/dateTimeInputs';
+import { normalizeUsPhoneForStorage } from '@/lib/phoneNormalization';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,23 +71,6 @@ function parseLegacyContact(contact?: string): { phone?: string; email?: string 
     phone: phoneMatch?.[0]?.trim(),
     email: emailMatch?.[0]?.trim(),
   };
-}
-
-function toDigits(value: string): string {
-  return value.replace(/\D/g, '');
-}
-
-function formatPhoneNumber(value: string): string {
-  const raw = value.trim();
-  if (!raw) return '';
-  if (raw.startsWith('+')) return `+${toDigits(raw.slice(1))}`;
-  const digits = toDigits(raw);
-  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  if (digits.length === 11 && digits.startsWith('1')) {
-    const local = digits.slice(1);
-    return `+1 (${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-  }
-  return digits;
 }
 
 function normalizeDepartment(value?: string): string {
@@ -239,7 +224,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
       name: matchedContact.fullName,
       role: current.role || matchedContact.roleTags[0] || '',
       department: normalizeDepartment(current.department || matchedContact.functionalArea),
-      phone: current.phone || formatPhoneNumber(matchedContact.phone ?? '') || undefined,
+      phone: current.phone || normalizeUsPhoneForStorage(matchedContact.phone ?? '') || undefined,
       email: current.email || matchedContact.email || undefined,
       notes: current.notes || matchedContact.notes || undefined,
     }));
@@ -275,7 +260,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
         id: crypto.randomUUID(),
         name: draft.name.trim(),
         role: draft.role?.trim() || '',
-        phone: formatPhoneNumber(draft.phone ?? ''),
+        phone: normalizeUsPhoneForStorage(draft.phone ?? ''),
         email: draft.email?.trim() || undefined,
         department: nextDepartment,
       },
@@ -299,7 +284,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
         department: nextDepartment,
         contactId: contact.id,
         positionLabel: '',
-        phone: formatPhoneNumber(contact.phone ?? ''),
+        phone: normalizeUsPhoneForStorage(contact.phone ?? ''),
         email: contact.email,
         notes: contact.notes,
       },
@@ -584,6 +569,26 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
     return orderedDepartments.filter((departmentName) => (visibleMembersByDepartment.get(departmentName)?.length ?? 0) > 0);
   }, [orderedDepartments, normalizedMemberSearchTerm, visibleMembersByDepartment]);
 
+  const expandAllSwitchId = useId();
+
+  /** Trimmed keys so expanded state matches header labels even if legacy spacing differs. */
+  const expandedDepartmentKeySet = useMemo(
+    () => new Set(expandedDepartmentNames.map((name) => name.trim())),
+    [expandedDepartmentNames],
+  );
+
+  const allDepartmentsExpanded =
+    visibleDepartmentNames.length > 0 &&
+    visibleDepartmentNames.every((name) => expandedDepartmentKeySet.has(name.trim()));
+
+  const handleExpandAllDepartments = () => {
+    setExpandedDepartmentNames([...visibleDepartmentNames]);
+  };
+
+  const handleCollapseAllDepartments = () => {
+    setExpandedDepartmentNames([]);
+  };
+
   if (crew.length === 0 && readOnly) return <p className="text-sm text-muted-foreground">No crew members assigned.</p>;
 
   return (
@@ -612,47 +617,34 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
               </SelectContent>
             </Select>
           </div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <Input
               placeholder="Search assigned crew by name, role, phone, email..."
-              className="h-8 text-sm"
+              className="h-8 min-w-[min(100%,12rem)] flex-1 text-sm"
               value={memberSearchTerm}
               onChange={(event) => setMemberSearchTerm(event.target.value)}
             />
-            <div className="flex items-center gap-2">
-              <Select
-                value={cardDensityMode}
-                onValueChange={(value) => setCardDensityMode(value as CrewCardDensityMode)}
-              >
-                <SelectTrigger className="h-8 w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="detailed">Detailed cards</SelectItem>
-                  <SelectItem value="compact">Compact cards</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={() => setExpandedDepartmentNames(visibleDepartmentNames)}
-                disabled={visibleDepartmentNames.length === 0}
-              >
-                Expand all
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={() => setExpandedDepartmentNames([])}
-                disabled={expandedDepartmentNames.length === 0}
-              >
-                Collapse all
-              </Button>
-            </div>
+            <Select
+              value={cardDensityMode}
+              onValueChange={(value) => setCardDensityMode(value as CrewCardDensityMode)}
+            >
+              <SelectTrigger className="h-8 w-full min-w-[10rem] sm:w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="detailed">Detailed cards</SelectItem>
+                <SelectItem value="compact">Compact cards</SelectItem>
+              </SelectContent>
+            </Select>
+            <ListExpandAllSwitch
+              className="sm:ml-auto"
+              id={expandAllSwitchId}
+              label="Expand all"
+              allExpanded={allDepartmentsExpanded}
+              onExpandAll={handleExpandAllDepartments}
+              onCollapseAll={handleCollapseAllDepartments}
+              disabled={visibleDepartmentNames.length === 0}
+            />
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/80 bg-background/70 px-2 py-1.5">
             <span className="text-xs font-medium text-foreground/90">Legend:</span>
@@ -679,7 +671,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
         {visibleDepartmentNames.map((departmentName) => {
           const departmentMembers = visibleMembersByDepartment.get(departmentName) ?? [];
           const totalDepartmentMembers = membersByDepartment.get(departmentName) ?? [];
-          const isExpanded = expandedDepartmentNames.includes(departmentName);
+          const isExpanded = expandedDepartmentKeySet.has(departmentName.trim());
           return (
             <div
               key={departmentName}
@@ -887,7 +879,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                       className="h-7 text-sm"
                                       value={member.phone ?? ''}
                                       onChange={(event) => updateMember(member.id, { phone: event.target.value })}
-                                      onBlur={(event) => updateMember(member.id, { phone: formatPhoneNumber(event.target.value) || undefined })}
+                                      onBlur={(event) => updateMember(member.id, { phone: normalizeUsPhoneForStorage(event.target.value) || undefined })}
                                     />
                                     <Input
                                       placeholder="Email"
@@ -994,7 +986,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
                                   className="h-7 text-sm"
                                   value={member.phone ?? ''}
                                   onChange={(event) => updateMember(member.id, { phone: event.target.value })}
-                                  onBlur={(event) => updateMember(member.id, { phone: formatPhoneNumber(event.target.value) || undefined })}
+                                  onBlur={(event) => updateMember(member.id, { phone: normalizeUsPhoneForStorage(event.target.value) || undefined })}
                                 />
                                 <Input
                                   placeholder="Email"
@@ -1162,7 +1154,7 @@ export function CrewEditor({ crew, onChange, readOnly = false, requireDeleteConf
               onKeyDown={(event) => event.key === 'Enter' && addMember()}
             />
             <Input placeholder="Role" className="h-7 text-sm" value={draft.role} onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value }))} onKeyDown={(event) => event.key === 'Enter' && addMember()} />
-            <Input placeholder="Phone" className="h-7 text-sm" value={draft.phone ?? ''} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} onBlur={(event) => setDraft((current) => ({ ...current, phone: formatPhoneNumber(event.target.value) || undefined }))} />
+            <Input placeholder="Phone" className="h-7 text-sm" value={draft.phone ?? ''} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} onBlur={(event) => setDraft((current) => ({ ...current, phone: normalizeUsPhoneForStorage(event.target.value) || undefined }))} />
             <Input placeholder="Email" type="email" className="h-7 text-sm" value={draft.email ?? ''} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />
             <Select value={normalizeDepartment(draft.department)} onValueChange={(value) => setDraft((current) => ({ ...current, department: value }))}>
               <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>

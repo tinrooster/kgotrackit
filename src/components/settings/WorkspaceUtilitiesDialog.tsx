@@ -103,6 +103,9 @@ export function WorkspaceUtilitiesDialog({
   const [populateBusy, setPopulateBusy] = React.useState(false);
   const [stripBusy, setStripBusy] = React.useState(false);
   const [confirmStripAllOpen, setConfirmStripAllOpen] = React.useState(false);
+  const [confirmApplyDefaultsOpen, setConfirmApplyDefaultsOpen] = React.useState(false);
+  const [confirmPopulateDemoOpen, setConfirmPopulateDemoOpen] = React.useState(false);
+  const [confirmStripUnmodifiedOpen, setConfirmStripUnmodifiedOpen] = React.useState(false);
 
   const refreshDemoSummary = React.useCallback(() => {
     setDemoSummary(summarizeDemoPresence());
@@ -117,6 +120,9 @@ export function WorkspaceUtilitiesDialog({
     setPopulateBusy(false);
     setStripBusy(false);
     setConfirmStripAllOpen(false);
+    setConfirmApplyDefaultsOpen(false);
+    setConfirmPopulateDemoOpen(false);
+    setConfirmStripUnmodifiedOpen(false);
     refreshDemoSummary();
   }, [open, refreshDemoSummary]);
 
@@ -323,7 +329,7 @@ export function WorkspaceUtilitiesDialog({
             <Button variant="outline" onClick={onClose} disabled={busy}>
               Close
             </Button>
-            <Button onClick={() => void applyDefaults()} disabled={busy}>
+            <Button onClick={() => setConfirmApplyDefaultsOpen(true)} disabled={busy}>
               {busy ? 'Applying…' : 'Apply'}
             </Button>
           </DialogFooter>
@@ -411,7 +417,7 @@ export function WorkspaceUtilitiesDialog({
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() => void handlePopulateDemo()}
+                  onClick={() => setConfirmPopulateDemoOpen(true)}
                   disabled={populateBusy || stripBusy}
                 >
                   {populateBusy ? 'Populating…' : 'Populate demo data'}
@@ -444,7 +450,7 @@ export function WorkspaceUtilitiesDialog({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => void handleStripUnmodified()}
+                  onClick={() => setConfirmStripUnmodifiedOpen(true)}
                   disabled={populateBusy || stripBusy || !hasDemoContent}
                 >
                   {stripBusy ? 'Working…' : 'Strip unmodified demo data'}
@@ -462,6 +468,63 @@ export function WorkspaceUtilitiesDialog({
           </section>
         </DraggableDialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmApplyDefaultsOpen} onOpenChange={setConfirmApplyDefaultsOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace workspace data with these defaults?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This uploads a fresh snapshot for <span className="font-medium text-foreground">{workspaceName}</span>:
+              lookup lists and inventory follow your choice (empty or starter). Existing cloud workspace content for items,
+              templates, settings in this snapshot path will be overwritten. This cannot be undone from here—use backups if
+              you need to recover prior data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void applyDefaults()} disabled={busy}>
+              {busy ? 'Applying…' : 'Apply defaults'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmPopulateDemoOpen} onOpenChange={setConfirmPopulateDemoOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add demo data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Demo rows will be merged into this workspace with demo markers so they can be stripped later. If you
+              already have demo content, re-running may skip duplicates. Confirm the scopes you selected above before
+              continuing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={populateBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handlePopulateDemo()} disabled={populateBusy}>
+              {populateBusy ? 'Populating…' : 'Populate demo data'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmStripUnmodifiedOpen} onOpenChange={setConfirmStripUnmodifiedOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Strip unmodified demo data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Removes demo-marked rows that have not been edited. Modified demo rows and productions with checkout
+              activity are kept. This is safer than “strip all” but still permanently removes matching demo entities.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stripBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleStripUnmodified()} disabled={stripBusy}>
+              {stripBusy ? 'Working…' : 'Strip unmodified'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmStripAllOpen} onOpenChange={setConfirmStripAllOpen}>
         <AlertDialogContent>

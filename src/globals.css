@@ -7,7 +7,8 @@
     --background: 48 24% 90%;
     --foreground: 40 18% 22%;
 
-    --card: 50 24% 94%;
+    /* Lifted slightly from page background for clearer card separation in light mode */
+    --card: 48 22% 97%;
     --card-foreground: 40 18% 22%;
 
     --popover: 50 24% 94%;
@@ -20,7 +21,8 @@
     --secondary-foreground: 40 18% 24%;
 
     --muted: 48 20% 82%;
-    --muted-foreground: 42 14% 40%;
+    /* Darker than before so badges, secondary labels, and poker/flag chips stay readable in light mode */
+    --muted-foreground: 38 16% 30%;
 
     --accent: 44 21% 69%;
     --accent-foreground: 38 18% 22%;

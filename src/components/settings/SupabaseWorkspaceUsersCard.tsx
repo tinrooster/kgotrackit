@@ -15,10 +15,11 @@ import {
   updateWorkspaceMemberRole,
   type WorkspaceMemberView,
 } from '@/lib/supabase/workspaceMemberAdmin';
-
 interface SupabaseWorkspaceUsersCardProps {
   workspaceId: string;
   workspaceName?: string | null;
+  /** Supabase org name linked to this workspace (if any). */
+  linkedOrganizationName?: string | null;
   currentUserId: string;
   canManageUsers: boolean;
 }
@@ -26,6 +27,7 @@ interface SupabaseWorkspaceUsersCardProps {
 export function SupabaseWorkspaceUsersCard({
   workspaceId,
   workspaceName,
+  linkedOrganizationName: _linkedOrganizationName,
   currentUserId,
   canManageUsers,
 }: SupabaseWorkspaceUsersCardProps) {

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { format } from 'date-fns';
 import { InventoryItem, ItemWithSubcategories } from '@/types/inventory';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { getSettings } from '@/lib/storageService';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
 import { accentColorForLocation, accentColorForProject } from '@/lib/lookupAccentColors';
@@ -144,11 +144,12 @@ export function FormatCellValue({
   }
   if (column === 'name') {
     const showCheckInOutFlag = Boolean(item.cabinet || checkoutActivity);
+    const checkBadgeVariant = checkoutActivity?.type === 'check-in' ? ('lineDone' as const) : ('outline' as const);
     const checkFlagClassName = checkoutActivity
       ? checkoutActivity.type === 'check-out'
-        ? 'border-red-500/40 bg-red-500/10 text-red-300'
-        : 'border-green-500/40 bg-green-500/10 text-green-300'
-      : 'border-blue-500/40 bg-blue-500/10 text-blue-300';
+        ? 'border-red-500/45 bg-red-500/10 text-red-800 dark:text-red-300'
+        : ''
+      : 'border-blue-500/45 bg-blue-500/10 text-blue-800 dark:text-blue-300';
     const checkFlagLabel = checkoutActivity
       ? checkoutActivity.type === 'check-out'
         ? 'Checked out'
@@ -193,7 +194,7 @@ export function FormatCellValue({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="outline" className={`flex items-center gap-1 px-2 py-0 ${checkFlagClassName}`}>
+                  <Badge variant={checkBadgeVariant} className={cn('flex items-center gap-1 px-2 py-0', checkFlagClassName)}>
                     <Lock className="h-3 w-3" />
                     <span className="text-xs whitespace-nowrap">{checkFlagLabel}</span>
                   </Badge>

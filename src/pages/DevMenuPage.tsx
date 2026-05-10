@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FlaskConical, Gauge, Wrench } from 'lucide-react';
+import { FlaskConical, Gauge, Layers, Wrench } from 'lucide-react';
 
 const devItems = [
   {
@@ -20,6 +20,12 @@ const devItems = [
     description: 'Run visual and interaction diagnostics for UI behavior.',
     path: '/dev/ui-diagnostics',
     icon: Wrench,
+  },
+  {
+    title: 'Expand all switch',
+    description: 'Layouts for the toolbar expand-all control (same Switch pattern as Confirm deletes).',
+    path: '/dev/expand-collapse-lab',
+    icon: Layers,
   },
 ];
 

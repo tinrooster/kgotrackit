@@ -1799,11 +1799,19 @@ export function ImportDialog({ isOpen, onClose, onImport, onComplete, gridFieldS
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { resetState(); onClose(); }}>
-            Cancel
+        <DialogFooter className="gap-2 sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              resetState();
+              onClose();
+            }}
+          >
+            Close without importing
           </Button>
           <Button
+            type="button"
             onClick={handleImportClick}
             disabled={
               isLoading ||

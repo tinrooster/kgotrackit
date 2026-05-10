@@ -29,10 +29,13 @@ import {
   useProductionSheetEdgeDrag,
 } from '@/components/productions/ProductionSheetDragHandle';
 import { applyProductionInventoryAction, exportProductionPacklistsToPdf } from '@/lib/productionService';
-import { flattenVehiclePacklistItems } from '@/lib/vehiclePacklistUtils';
+import {
+  flattenVehiclePacklistItems,
+  mirrorChecklistCompletionOntoVehiclePacklists,
+} from '@/lib/vehiclePacklistUtils';
 import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { usePlannerListDeleteConfirm } from '@/hooks/usePlannerListDeleteConfirm';
+import { normalizeProductionSheetTab, type ProductionSheetTab } from '@/lib/productionSheetTab';
 
 const STATUS_CLASS: Record<ProductionStatus, string> = {
   planning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -59,6 +62,9 @@ interface ProductionDetailProps {
   onUpdate: (id: string, updates: Partial<Production>) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  /** URL-driven tab when used from Productions list (breadcrumb + deep link). */
+  activeSheetTab?: ProductionSheetTab;
+  onActiveSheetTabChange?: (tab: ProductionSheetTab) => void;
 }
 
 export function ProductionDetail({
@@ -68,10 +74,18 @@ export function ProductionDetail({
   onUpdate,
   onDelete,
   onClose,
+  activeSheetTab: activeSheetTabProp,
+  onActiveSheetTabChange,
 }: ProductionDetailProps) {
   const [editOpen, setEditOpen] = useState(false);
-  const [confirmListDeletes, setConfirmListDeletes] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'vehicles' | 'crew' | 'schedule'>('overview');
+  const confirmListDeletes = usePlannerListDeleteConfirm();
+  const [fallbackTab, setFallbackTab] = useState<ProductionSheetTab>('overview');
+  const sheetTabControlled = activeSheetTabProp != null && onActiveSheetTabChange != null;
+  const activeTab = sheetTabControlled ? activeSheetTabProp : fallbackTab;
+  const setActiveTab = (value: ProductionSheetTab) => {
+    if (sheetTabControlled) onActiveSheetTabChange(value);
+    else setFallbackTab(value);
+  };
   const navigate = useNavigate();
   const plannerProductionId = production?.id ?? '';
   const sheetEdgeDrag = useProductionSheetEdgeDrag({
@@ -109,7 +123,11 @@ export function ProductionDetail({
   const progressSnapshot = getProductionProgressSnapshot(production);
 
   const handleChecklistChange = (checklistGroups: ChecklistGroup[]) => {
-    onUpdate(production.id, { checklistGroups });
+    const vehiclePacklists = mirrorChecklistCompletionOntoVehiclePacklists(
+      production.vehiclePacklists,
+      checklistGroups,
+    );
+    onUpdate(production.id, { checklistGroups, vehiclePacklists });
   };
 
   const handleVehicleChange = (vehiclePacklists: VehiclePacklist[]) => {
@@ -246,7 +264,7 @@ export function ProductionDetail({
 
           <Tabs
             value={activeTab}
-            onValueChange={(value) => setActiveTab(value as typeof activeTab)}
+            onValueChange={(value) => setActiveTab(normalizeProductionSheetTab(value))}
             className="flex min-h-0 flex-1 flex-col"
           >
             <TabsList className="mx-6 mt-3 w-auto shrink-0 justify-start rounded-none border-b bg-transparent p-0">
@@ -342,16 +360,6 @@ export function ProductionDetail({
                     >
                       Check In Linked
                     </Button>
-                    <div className="ml-auto inline-flex items-center gap-2 rounded border px-2 py-1">
-                      <Switch
-                        id="confirm-list-delete-toggle"
-                        checked={confirmListDeletes}
-                        onCheckedChange={setConfirmListDeletes}
-                      />
-                      <Label htmlFor="confirm-list-delete-toggle" className="text-xs text-muted-foreground">
-                        Confirm list deletes
-                      </Label>
-                    </div>
                   </div>
                   <ChecklistEditor
                     groups={production.checklistGroups}
@@ -366,12 +374,13 @@ export function ProductionDetail({
                     packlists={production.vehiclePacklists}
                     onChange={handleVehicleChange}
                     checklistGroups={production.checklistGroups}
+                    onChecklistGroupsChange={handleChecklistChange}
                     inventoryItems={inventoryItems}
                     requireDeleteConfirm={confirmListDeletes}
                   />
                 </TabsContent>
 
-                <TabsContent value="crew" className="mt-0">
+                <TabsContent value="crew" forceMount className="mt-0 data-[state=inactive]:hidden">
                   <CrewEditor
                     crew={production.crew}
                     onChange={handleCrewChange}

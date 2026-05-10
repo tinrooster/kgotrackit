@@ -15,6 +15,9 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        /** Compact high-contrast success chip for checklist / packlist / inventory row flags (light + dark). */
+        lineDone:
+          "shrink-0 rounded-md border border-green-300 bg-green-100 px-1.5 py-0 text-[11px] font-medium text-green-800 dark:border-green-500/40 dark:bg-green-600/20 dark:text-green-200",
       },
     },
     defaultVariants: {

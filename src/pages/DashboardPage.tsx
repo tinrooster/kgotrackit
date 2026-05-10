@@ -551,32 +551,48 @@ export default function DashboardPage() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       {filteredProductions.map((production) => {
                         const progressSnapshot = getProductionProgressSnapshot(production);
+                        const productionQueryId = encodeURIComponent(production.id);
                         return (
-                        <button
+                        <div
                           key={production.id}
-                          type="button"
-                          onClick={() => navigate(`/productions?productionId=${encodeURIComponent(production.id)}`)}
-                          className="rounded-lg border border-border/70 bg-card p-3 text-left shadow-sm shadow-black/10 outline-none ring-offset-background transition-[box-shadow,background-color,border-color] hover:border-border hover:bg-card hover:shadow-md hover:shadow-black/15 focus-visible:ring-2 focus-visible:ring-ring dark:border-border/50 dark:bg-card/90 dark:shadow-black/35 dark:hover:shadow-black/45"
+                          className="overflow-hidden rounded-lg border border-border/70 bg-card text-left shadow-sm shadow-black/10 ring-offset-background dark:border-border/50 dark:bg-card/90 dark:shadow-black/35"
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="font-medium">{production.name}</p>
-                            <span
-                              className={cn(
-                                'rounded-full border px-2 py-0.5 text-xs',
-                                PRODUCTION_STATUS_BADGE_CLASSES[production.status],
-                              )}
-                            >
-                              {PRODUCTION_STATUS_LABELS[production.status]}
-                            </span>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/productions?productionId=${productionQueryId}`)}
+                            className="w-full rounded-t-lg p-3 text-left outline-none transition-[background-color,border-color] hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset dark:hover:bg-muted/25"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="font-medium">{production.name}</p>
+                              <span
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-xs',
+                                  PRODUCTION_STATUS_BADGE_CLASSES[production.status],
+                                )}
+                              >
+                                {PRODUCTION_STATUS_LABELS[production.status]}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {production.startDate ? `Start: ${production.startDate}` : 'Start date not set'}
+                              {production.location ? ` • ${production.location}` : ''}
+                            </p>
+                          </button>
+                          <div className="border-t border-border/60 px-3 pb-3 pt-2 dark:border-border/50">
+                            <ProductionDashboardProgress
+                              metrics={progressSnapshot}
+                              onSegmentClick={(segment) => {
+                                const pt =
+                                  segment === 'checklist'
+                                    ? 'checklist'
+                                    : segment === 'packlists'
+                                      ? 'vehicles'
+                                      : 'crew';
+                                navigate(`/productions/planner?productionId=${productionQueryId}&pt=${pt}`);
+                              }}
+                            />
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {production.startDate ? `Start: ${production.startDate}` : 'Start date not set'}
-                            {production.location ? ` • ${production.location}` : ''}
-                          </p>
-                          <div className="mt-3">
-                            <ProductionDashboardProgress metrics={progressSnapshot} />
-                          </div>
-                        </button>
+                        </div>
                         );
                       })}
                     </div>
