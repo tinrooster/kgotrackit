@@ -13,6 +13,7 @@ import {
   getCable,
   verifyCable,
   setCableStatus,
+  updateCableNotes,
   SIGNAL_TYPE_LABELS,
   STATUS_LABELS,
   STATUS_COLOURS,
@@ -27,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 interface CableDetailSheetProps {
@@ -60,6 +62,9 @@ export function CableDetailSheet({ cableId, onClose, onUpdated }: CableDetailShe
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   useEffect(() => {
     if (!cableId) {
@@ -67,8 +72,10 @@ export function CableDetailSheet({ cableId, onClose, onUpdated }: CableDetailShe
       return;
     }
     setLoading(true);
+    setEditingNotes(false);
     getCable(cableId).then((c) => {
       setCable(c);
+      setNotesValue(c?.notes ?? '');
       setLoading(false);
     });
   }, [cableId]);
@@ -86,6 +93,21 @@ export function CableDetailSheet({ cableId, onClose, onUpdated }: CableDetailShe
       toast.error('Failed to verify cable');
     }
     setVerifying(false);
+  };
+
+  const handleSaveNotes = async () => {
+    if (!cable) return;
+    setSavingNotes(true);
+    const ok = await updateCableNotes(cable.id, notesValue);
+    if (ok) {
+      toast.success('Notes saved');
+      setCable({ ...cable, notes: notesValue || undefined });
+      setEditingNotes(false);
+      onUpdated?.();
+    } else {
+      toast.error('Failed to save notes');
+    }
+    setSavingNotes(false);
   };
 
   const handleStatusChange = async (status: PlantCableStatus) => {
@@ -193,12 +215,43 @@ export function CableDetailSheet({ cableId, onClose, onUpdated }: CableDetailShe
               <Field label="Alt drawing" value={cable.altDwg} />
               <Field label="NUMC" value={cable.numc} />
               <Field label="Legacy project" value={cable.legacyProjectId} />
-              {cable.notes && (
-                <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Notes</span>
-                  <p className="text-sm whitespace-pre-wrap">{cable.notes}</p>
+                  {!editingNotes && (
+                    <button
+                      onClick={() => { setEditingNotes(true); setNotesValue(cable.notes ?? ''); }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {cable.notes ? 'Edit' : 'Add'}
+                    </button>
+                  )}
                 </div>
-              )}
+                {editingNotes ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Textarea
+                      value={notesValue}
+                      onChange={(e) => setNotesValue(e.target.value)}
+                      rows={3}
+                      className="text-sm resize-none"
+                      placeholder="Add notes…"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" className="h-7" onClick={handleSaveNotes} disabled={savingNotes}>
+                        {savingNotes ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}Save
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7"
+                        onClick={() => setEditingNotes(false)} disabled={savingNotes}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  cable.notes
+                    ? <p className="text-sm whitespace-pre-wrap">{cable.notes}</p>
+                    : <p className="text-xs text-muted-foreground italic">No notes</p>
+                )}
+              </div>
             </div>
 
             {(cable.verifiedAt) && (

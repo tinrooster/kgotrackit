@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, Loader2, Search, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Download, Loader2, MapPin, Search, X } from 'lucide-react';
 import {
   listCables,
   exportCablesCSV,
@@ -32,6 +33,9 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export function CableRegisterTab() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialLoc = searchParams.get('loc') ?? undefined;
+
   const [cables, setCables] = useState<PlantCableSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -42,12 +46,18 @@ export function CableRegisterTab() {
 
   const [statusFilters, setStatusFilters] = useState<PlantCableStatus[]>([]);
   const [signalFilters, setSignalFilters] = useState<PlantSignalType[]>([]);
+  const [locationCode, setLocationCode] = useState<string | undefined>(initialLoc);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const loadRef = useRef(0);
+
+  const clearLocationFilter = () => {
+    setLocationCode(undefined);
+    setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('loc'); return n; });
+  };
 
   const load = useCallback(async (p: number) => {
     setLoading(true);
@@ -57,16 +67,17 @@ export function CableRegisterTab() {
       search: debouncedSearch,
       status: statusFilters,
       signalType: signalFilters,
+      locationCode,
     });
     if (token !== loadRef.current) return;
     setCables(result.cables);
     setTotal(result.total);
     setLoading(false);
-  }, [debouncedSearch, statusFilters, signalFilters]);
+  }, [debouncedSearch, statusFilters, signalFilters, locationCode]);
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, statusFilters, signalFilters]);
+  }, [debouncedSearch, statusFilters, signalFilters, locationCode]);
 
   useEffect(() => {
     void load(page);
@@ -84,6 +95,7 @@ export function CableRegisterTab() {
       search: debouncedSearch,
       status: statusFilters,
       signalType: signalFilters,
+      locationCode,
     });
     if (csv) {
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -145,6 +157,17 @@ export function CableRegisterTab() {
           <span className="ml-1.5 hidden sm:inline">Export</span>
         </Button>
         </div>
+
+        {locationCode && (
+          <div className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1 text-xs bg-primary/10 text-primary border border-primary/20 rounded-full px-2.5 py-0.5 font-medium">
+              <MapPin className="h-3 w-3" /> {locationCode}
+            </span>
+            <button onClick={clearLocationFilter} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-1.5">
           {STATUS_FILTER_OPTIONS.map((s) => (

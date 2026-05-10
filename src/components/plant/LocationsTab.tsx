@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, Search, X } from 'lucide-react';
 import { listLocations, getLocationCableCounts } from '@/lib/plantService';
 import type { PlantLocation } from '@/types/plant';
@@ -31,9 +32,14 @@ interface LocationRow extends PlantLocation {
 }
 
 export function LocationsTab() {
+  const [, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState<LocationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+
+  const goToRegister = (code: string) => {
+    setSearchParams({ pt: 'register', loc: code });
+  };
 
   useEffect(() => {
     const orgId = getActiveOrganizationId();
@@ -111,9 +117,10 @@ export function LocationsTab() {
               return (
                 <tr
                   key={loc.id}
+                  onClick={() => total > 0 && goToRegister(loc.code)}
                   className={cn(
                     'border-b last:border-0 transition-colors',
-                    total === 0 ? 'opacity-50' : 'hover:bg-muted/40'
+                    total === 0 ? 'opacity-50' : 'hover:bg-muted/40 cursor-pointer'
                   )}
                 >
                   <td className="px-3 py-2 font-mono text-xs font-medium">{loc.code}</td>
