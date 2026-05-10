@@ -150,6 +150,75 @@ export async function getCableStats(): Promise<PlantCableStats> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// EasySchematic CSV export (per-port device format)
+// ---------------------------------------------------------------------------
+
+const SIGNAL_TYPE_TO_ES: Record<PlantSignalType, string> = {
+  hd_sdi:        'sdi',
+  sdi:           'sdi',
+  analog_video:  'composite-video',
+  audio_analog:  'analog',
+  audio_aes:     'aes',
+  audio_dante:   'dante',
+  data_ethernet: 'ethernet',
+  rf:            'rf',
+  control_serial:'rs232',
+  display:       'hdmi',
+  fiber:         'fiber',
+  power:         'power',
+  other:         '',
+};
+
+export async function exportDrawingEasySchematicCSV(drawingId: string): Promise<string> {
+  // Collect all cables for this drawing (page through all results)
+  const allCables: PlantCableSummary[] = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    const result = await listCables({ drawingId, page, pageSize });
+    allCables.push(...result.cables);
+    if (allCables.length >= result.total || result.cables.length < pageSize) break;
+    page++;
+  }
+
+  // Build device → port map
+  // Key: `device::port`, value: { device, port, signalType, asOrigin, asDest }
+  const portMap = new Map<string, { device: string; port: string; signalType: string; asOrigin: boolean; asDest: boolean }>();
+
+  const addPort = (device: string | undefined, port: string | undefined, signalType: PlantSignalType, isOrigin: boolean) => {
+    if (!device) return;
+    const portLabel = port || 'Port';
+    const key = `${device}::${portLabel}`;
+    const esSignal = SIGNAL_TYPE_TO_ES[signalType] ?? '';
+    const existing = portMap.get(key);
+    if (existing) {
+      if (isOrigin) existing.asOrigin = true;
+      else existing.asDest = true;
+    } else {
+      portMap.set(key, { device, port: portLabel, signalType: esSignal, asOrigin: isOrigin, asDest: !isOrigin });
+    }
+  };
+
+  for (const c of allCables) {
+    addPort(c.originDevice, c.originPort, c.signalType, true);
+    addPort(c.destDevice, c.destPort, c.signalType, false);
+  }
+
+  const esc = (v: string) => v.includes(',') || v.includes('"') || v.includes('\n')
+    ? `"${v.replace(/"/g, '""')}"` : v;
+
+  const header = 'model_number,label,device_type,port_label,port_signal_type,port_direction';
+  const rows = [...portMap.values()].map((p) => {
+    const dir = p.asOrigin && p.asDest ? 'bidirectional'
+              : p.asOrigin ? 'output'
+              : 'input';
+    return [esc(p.device), esc(p.device), '', esc(p.port), esc(p.signalType), dir].join(',');
+  });
+
+  return [header, ...rows].join('\r\n');
+}
+
 export async function exportCablesCSV(
   filters: Omit<PlantCableFilters, 'organizationId' | 'page' | 'pageSize'> = {}
 ): Promise<string> {
