@@ -44,6 +44,8 @@ import { toast } from 'sonner';
 import { getCrewContacts } from '@/lib/crewContactsService';
 import { getPositionTemplates, savePositionTemplates } from '@/lib/positionTemplatesService';
 import type { PositionTemplate } from '@/types/productions';
+import { getFleet, saveFleet } from '@/lib/fleetService';
+import type { FleetState } from '@/types/fleet';
 
 export type AuthBackend = 'local' | 'supabase';
 
@@ -402,6 +404,7 @@ export async function pushFullSnapshotToSupabase(userId: string): Promise<void> 
         await pushOrganizationSnapshot(organizationId, {
           contacts: snapshot.crew_contacts ?? [],
           position_templates: getPositionTemplates(),
+          fleet: getFleet(),
           inventory_baseline: Array.isArray(existingOrganizationRow?.inventory_baseline)
             ? existingOrganizationRow.inventory_baseline
             : [],
@@ -539,6 +542,9 @@ export async function bootstrapCloudData(userId: string): Promise<void> {
               ? organizationRow.position_templates
               : [];
             savePositionTemplates(positionTemplates as PositionTemplate[]);
+            if (organizationRow.fleet && typeof organizationRow.fleet === 'object' && !Array.isArray(organizationRow.fleet)) {
+              saveFleet(organizationRow.fleet as FleetState);
+            }
           }
         }
         await applySnapshotToLocal(remoteRow as CloudSnapshotPayload);

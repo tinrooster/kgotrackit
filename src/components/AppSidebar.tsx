@@ -180,11 +180,11 @@ export function AppSidebar() {
     },
   ], [mobileTabletUi, isAdmin, devMenuEnabled])
 
-  // Bottom tab bar items for mobile (max 5; Plant is desktop/engineering-only)
+  // Bottom tab bar items for mobile (max 5; Fleet stays in desktop sidebar only)
   const mobileItems: NavItem[] = [
     { path: '/', label: 'Home', icon: LayoutDashboard },
     { path: '/productions', label: 'Productions', icon: Clapperboard, activeBasePath: '/productions' },
-    { path: '/fleet', label: 'Fleet', icon: Truck, activeBasePath: '/fleet' },
+    { path: '/plant', label: 'Plant', icon: Cable, activeBasePath: '/plant' },
     { path: '/inventory', label: 'Inventory', icon: List },
     { path: '/settings', label: 'Settings', icon: Settings, activeBasePath: '/settings' },
   ]
