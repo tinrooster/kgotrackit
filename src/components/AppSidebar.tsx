@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UserMenu } from '@/components/UserMenu'
-import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useOrganization } from '@/contexts/OrganizationContext'
@@ -82,9 +81,6 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(COLLAPSED_KEY) === 'true' } catch { return false }
   })
-  const [mobileTabletUi, setMobileTabletUi] = useState(
-    () => SettingsService.loadDefaultSettings().mobileTabletUi,
-  )
   const [devMenuEnabled, setDevMenuEnabledState] = useState(() => isDevMenuEnabled())
   const [branding, setBranding] = useState(() => loadAppBranding())
   const [brandLogo, setBrandLogo] = useState(() => resolveBrandLogoForTheme(loadAppBranding()))
@@ -96,12 +92,6 @@ export function AppSidebar() {
       return next
     })
   }
-
-  useEffect(() => {
-    const sync = () => setMobileTabletUi(SettingsService.loadDefaultSettings().mobileTabletUi)
-    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, sync)
-    return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, sync)
-  }, [])
 
   useEffect(() => {
     const sync = () => setDevMenuEnabledState(isDevMenuEnabled())
@@ -164,7 +154,7 @@ export function AppSidebar() {
       items: [
         { path: '/productions', label: 'Productions', icon: Clapperboard, activeBasePath: '/productions' },
         { path: '/fleet', label: 'Fleet', icon: Truck, activeBasePath: '/fleet' },
-        ...(mobileTabletUi ? [{ path: '/field-checklist', label: 'Field Checklist', icon: ClipboardList }] : []),
+        { path: '/field-checklist', label: 'Field Checklist', icon: ClipboardList },
       ],
     },
     {
@@ -182,15 +172,15 @@ export function AppSidebar() {
         ...(isAdmin && devMenuEnabled ? [{ path: '/dev', label: 'Dev', icon: FlaskConical }] : []),
       ],
     },
-  ], [mobileTabletUi, isAdmin, devMenuEnabled])
+  ], [isAdmin, devMenuEnabled])
 
-  // Bottom tab bar items for mobile (max 5; Fleet stays in desktop sidebar only)
+  // Bottom tab bar items for mobile: keep the five phone-critical field workflows one tap away.
   const mobileItems: NavItem[] = [
     { path: '/', label: 'Home', icon: LayoutDashboard },
-    { path: '/productions', label: 'Productions', icon: Clapperboard, activeBasePath: '/productions' },
-    { path: '/plant', label: 'Plant', icon: Cable, activeBasePath: '/plant' },
     { path: '/inventory', label: 'Inventory', icon: List },
-    { path: '/settings', label: 'Settings', icon: Settings, activeBasePath: '/settings' },
+    { path: '/checkout', label: 'Checkout', icon: ShoppingCart },
+    { path: '/field-checklist', label: 'Field', icon: ClipboardList },
+    { path: '/fleet', label: 'Fleet', icon: Truck, activeBasePath: '/fleet' },
   ]
 
   return (

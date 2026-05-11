@@ -452,7 +452,7 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="checkout-page mx-auto w-full max-w-5xl min-w-0 space-y-5 px-2 py-2 sm:px-4">
+    <div className="checkout-page mx-auto w-full max-w-3xl min-w-0 space-y-5 px-2 py-2 sm:px-4">
       <PageHeader
         eyebrow="Cabinet workflow"
         title="Secure Cabinet Check-In/Out"
@@ -460,7 +460,7 @@ export default function CheckoutPage() {
         icon={<ScanLine className="h-6 w-6" aria-hidden />}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="grid gap-5">
         <Card>
           <CardHeader className="px-4 pb-3 sm:px-6">
             <CardTitle>Check In/Out Items</CardTitle>
