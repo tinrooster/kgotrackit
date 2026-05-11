@@ -61,6 +61,7 @@ export interface SubsystemLoan {
 export interface FleetVehicle {
   id: string;
   code: string;
+  designation?: string;
   kind: VehicleKind;
   displayOrder: number;
   status: VehicleStatus;

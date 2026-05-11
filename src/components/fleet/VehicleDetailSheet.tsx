@@ -15,9 +15,11 @@ import {
   SUBSYSTEM_KIND_LABELS,
 } from '@/types/fleet';
 import { FLEET_UPDATED_EVENT, getFleet, addSubsystem } from '@/lib/fleetService';
+import { getCrewContacts } from '@/lib/crewContactsService';
 import { SubsystemRow } from './SubsystemRow';
 import { ScheduledWorkRow, ScheduledWorkRowSkeleton } from './ScheduledWorkRow';
 import { SubsystemLoanDialog, closeActiveLoan } from './SubsystemLoanDialog';
+import { AssignmentRow, AssignmentRowSkeleton } from './AssignmentRow';
 import { LogTimeline } from './LogTimeline';
 
 interface VehicleDetailSheetProps {
@@ -38,7 +40,7 @@ function DetailRow({ label, value }: { label: string; value?: string | number })
   );
 }
 
-type TabId = 'overview' | 'subsystems' | 'scheduled' | 'log';
+type TabId = 'overview' | 'assignments' | 'subsystems' | 'scheduled' | 'log';
 
 export function VehicleDetailSheet({
   vehicle,
@@ -72,10 +74,19 @@ export function VehicleDetailSheet({
     return () => window.removeEventListener(FLEET_UPDATED_EVENT, sync);
   }, [vehicle?.id]);
 
+  const [contacts, setContacts] = useState(() => getCrewContacts());
+
+  useEffect(() => {
+    const sync = () => setContacts(getCrewContacts());
+    window.addEventListener('trackit:crew-contacts-updated', sync);
+    return () => window.removeEventListener('trackit:crew-contacts-updated', sync);
+  }, []);
+
   // Loan dialog state
   const [loanTarget, setLoanTarget] = useState<VehicleSubsystem | null>(null);
   const [addingSubsystem, setAddingSubsystem] = useState(false);
   const [addingScheduled, setAddingScheduled] = useState(false);
+  const [addingAssignment, setAddingAssignment] = useState(false);
 
   if (!localVehicle) return null;
 
@@ -132,16 +143,22 @@ export function VehicleDetailSheet({
             className="flex min-h-0 flex-1 flex-col"
           >
             <TabsList className="mx-6 mt-0 w-auto shrink-0 justify-start rounded-none border-b bg-transparent p-0">
-              {(['overview', 'subsystems', 'scheduled', 'log'] as const).map((t) => (
+              {(['overview', 'assignments', 'subsystems', 'scheduled', 'log'] as const).map((t) => (
                 <TabsTrigger
                   key={t}
                   value={t}
                   className="rounded-none border-b-2 border-transparent px-3 py-2.5 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
                 >
                   {t === 'overview' ? 'Overview'
+                    : t === 'assignments' ? 'Crew'
                     : t === 'subsystems' ? 'Subsystems'
                     : t === 'scheduled' ? 'Scheduled'
                     : 'Log'}
+                  {t === 'assignments' && v.assignments.length > 0 && (
+                    <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0 text-[10px] font-semibold tabular-nums text-muted-foreground">
+                      {v.assignments.length}
+                    </span>
+                  )}
                   {t === 'subsystems' && v.subsystems.length > 0 && (
                     <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0 text-[10px] font-semibold tabular-nums text-muted-foreground">
                       {v.subsystems.length}
@@ -161,6 +178,9 @@ export function VehicleDetailSheet({
 
                 {/* ── Overview ────────────────────────────────────────────── */}
                 <TabsContent value="overview" className="mt-0 space-y-5 p-6">
+                  {v.designation && (
+                    <p className="text-sm text-muted-foreground -mb-2">{v.designation}</p>
+                  )}
                   {/* Quick-glance row */}
                   <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                     {v.location && (
@@ -223,6 +243,47 @@ export function VehicleDetailSheet({
                       </h3>
                       <p className="whitespace-pre-wrap text-sm">{v.notes}</p>
                     </section>
+                  )}
+                </TabsContent>
+
+                {/* ── Crew assignments ────────────────────────────────────── */}
+                <TabsContent value="assignments" className="mt-0 p-4 space-y-1">
+                  {v.assignments.length === 0 && !addingAssignment && (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      No crew assigned yet.
+                    </p>
+                  )}
+
+                  {v.assignments.map((a) => (
+                    <AssignmentRow
+                      key={a.id}
+                      vehicleId={v.id}
+                      assignment={a}
+                      contacts={contacts}
+                      canMutate={canMutate}
+                    />
+                  ))}
+
+                  {addingAssignment && canMutate && (
+                    <AssignmentRowSkeleton
+                      vehicleId={v.id}
+                      contacts={contacts}
+                      onDone={() => setAddingAssignment(false)}
+                    />
+                  )}
+
+                  {canMutate && !addingAssignment && (
+                    <div className="pt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => setAddingAssignment(true)}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Assign crew
+                      </Button>
+                    </div>
                   )}
                 </TabsContent>
 

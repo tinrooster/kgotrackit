@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { InventoryItem } from '@/types/inventory';
-import { Plus, Filter, Clapperboard } from 'lucide-react';
+import { Plus, Filter, Clapperboard, Truck } from 'lucide-react';
+import { getFleet, FLEET_UPDATED_EVENT } from '@/lib/fleetService';
 import { SETTINGS_UPDATED_EVENT, STORAGE_KEYS } from '@/lib/storageService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getSettings } from '@/lib/storageService';
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [items, setItems] = useLocalStorage<InventoryItem[]>('inventoryItems', []);
   const [productions, setProductions] = useState<Production[]>(() => getProductions());
+  const [fleetVehicles, setFleetVehicles] = useState(() => getFleet().vehicles);
   const [activeView, setActiveView] = useState<'project' | 'location' | 'production'>('project');
   const [activeSegment, setActiveSegment] = useState<string | null>(null);
   const [productionStatusFilter, setProductionStatusFilter] = useState<ProductionStatus | 'all'>('all');
@@ -91,6 +93,29 @@ export default function DashboardPage() {
       window.removeEventListener('focus', refreshProductions);
     };
   }, []);
+
+  useEffect(() => {
+    const sync = () => setFleetVehicles(getFleet().vehicles);
+    window.addEventListener(FLEET_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(FLEET_UPDATED_EVENT, sync);
+  }, []);
+
+  const fleetStats = useMemo(() => {
+    const inShop = fleetVehicles.filter((v) => v.status === 'in_shop' || v.status === 'out_of_service').length;
+    const spare = fleetVehicles.filter((v) => v.status === 'spare').length;
+    const now = new Date();
+    const weekOut = new Date(now.getTime() + 7 * 86_400_000);
+    const returnsThisWeek = fleetVehicles.reduce((count, v) => {
+      const active = v.scheduledWork.filter(
+        (w) => (w.status === 'scheduled' || w.status === 'in_progress') && w.expectedReturn,
+      );
+      return count + active.filter((w) => {
+        const d = new Date(w.expectedReturn!);
+        return d >= now && d <= weekOut;
+      }).length;
+    }, 0);
+    return { inShop, spare, returnsThisWeek, total: fleetVehicles.length };
+  }, [fleetVehicles]);
 
   // Get project statistics
   const projectStats = useMemo(() => {
@@ -602,6 +627,49 @@ export default function DashboardPage() {
               </Card>
             </TabsContent>
           </Tabs>
+
+          {fleetStats.total > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      Fleet Today
+                    </CardTitle>
+                    <CardDescription>{fleetStats.total} vehicles total</CardDescription>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => navigate('/fleet')}>
+                    Open Fleet
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-col items-center rounded-lg border border-amber-500/30 bg-amber-500/10 px-5 py-3 min-w-[80px]">
+                    <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">
+                      {fleetStats.inShop}
+                    </span>
+                    <span className="text-xs text-amber-700/70 dark:text-amber-300/70 mt-0.5">In Shop</span>
+                  </div>
+                  <div className="flex flex-col items-center rounded-lg border border-blue-500/30 bg-blue-500/10 px-5 py-3 min-w-[80px]">
+                    <span className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums">
+                      {fleetStats.spare}
+                    </span>
+                    <span className="text-xs text-blue-700/70 dark:text-blue-300/70 mt-0.5">Spare</span>
+                  </div>
+                  {fleetStats.returnsThisWeek > 0 && (
+                    <div className="flex flex-col items-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 min-w-[80px]">
+                      <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                        {fleetStats.returnsThisWeek}
+                      </span>
+                      <span className="text-xs text-emerald-700/70 dark:text-emerald-300/70 mt-0.5 text-center">Returns this week</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

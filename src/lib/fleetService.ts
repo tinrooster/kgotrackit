@@ -1,6 +1,6 @@
 import { getActiveOrganizationId } from '@/lib/supabase/organizationData';
 import { requestCloudSync } from '@/lib/cloudSyncEvents';
-import type { FleetState, FleetVehicle, SubsystemLoan, VehicleSubsystem, ScheduledWorkEntry } from '@/types/fleet';
+import type { FleetState, FleetVehicle, SubsystemLoan, VehicleSubsystem, ScheduledWorkEntry, VehicleAssignment } from '@/types/fleet';
 import { SUBSYSTEM_KIND_LABELS, VEHICLE_STATUS_LABELS } from '@/types/fleet';
 import { appendLogEntry } from '@/lib/fleetLogService';
 
@@ -254,6 +254,123 @@ export function closeLoan(loanId: string): void {
     category: 'resolved',
     body: `${SUBSYSTEM_KIND_LABELS[loan.subsystemKind]} returned to ${donorCode} from ${recipientCode}`,
   }).catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Assignments
+// ---------------------------------------------------------------------------
+
+export function addAssignment(vehicleId: string, assignment: VehicleAssignment): void {
+  const state = getFleet();
+  const vehicle = state.vehicles.find((v) => v.id === vehicleId);
+  if (!vehicle) return;
+  saveFleet(patchVehicle(state, vehicleId, { assignments: [...vehicle.assignments, assignment] }));
+}
+
+export function updateAssignment(vehicleId: string, assignment: VehicleAssignment): void {
+  const state = getFleet();
+  const vehicle = state.vehicles.find((v) => v.id === vehicleId);
+  if (!vehicle) return;
+  saveFleet(patchVehicle(state, vehicleId, {
+    assignments: vehicle.assignments.map((a) => a.id === assignment.id ? assignment : a),
+  }));
+}
+
+export function removeAssignment(vehicleId: string, assignmentId: string): void {
+  const state = getFleet();
+  const vehicle = state.vehicles.find((v) => v.id === vehicleId);
+  if (!vehicle) return;
+  saveFleet(patchVehicle(state, vehicleId, {
+    assignments: vehicle.assignments.filter((a) => a.id !== assignmentId),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Roster import helpers
+// ---------------------------------------------------------------------------
+
+function normalizeVehicleCode(code: string): string {
+  return code.replace(/-/g, '').toLowerCase();
+}
+
+const TRUCK_PHONE_ROSTER: Record<string, string> = {
+  m2: '415-891-5502',
+  m3: '415-891-5503',
+  m4: '415-891-5504',
+  m5: '415-891-5505',
+  m6: '415-891-5506',
+  m10: '415-891-5510',
+  m11: '415-891-5511',
+  m12: '415-891-5512',
+  m14: '415-891-5514',
+  m16: '415-891-5516',
+  m17: '415-891-5517',
+  m18: '415-891-5518',
+  m19: '415-891-5519',
+  m20: '415-891-5520',
+  m22: '415-891-5522',
+  m23: '415-891-5523',
+  m24: '415-891-5524',
+  m25: '415-891-5525',
+  m26: '415-891-5526',
+};
+
+export function importRosterTruckPhones(): number {
+  const state = getFleet();
+  let changed = 0;
+  const updated = {
+    ...state,
+    vehicles: state.vehicles.map((v) => {
+      const norm = normalizeVehicleCode(v.code);
+      const phone = TRUCK_PHONE_ROSTER[norm];
+      if (phone && v.truckCellPhone !== phone) {
+        changed++;
+        return { ...v, truckCellPhone: phone, updatedAt: new Date().toISOString() };
+      }
+      return v;
+    }),
+  };
+  if (changed > 0) saveFleet(updated);
+  return changed;
+}
+
+export function importPhotographerAssignments(
+  contacts: { id: string; fullName: string; preferredVehicle?: string }[],
+): number {
+  const state = getFleet();
+  let changed = 0;
+  const now = new Date().toISOString();
+
+  const updatedVehicles = state.vehicles.map((v) => {
+    const norm = normalizeVehicleCode(v.code);
+    const contact = contacts.find(
+      (c) => c.preferredVehicle && normalizeVehicleCode(c.preferredVehicle) === norm,
+    );
+    if (!contact) return v;
+
+    const alreadyAssigned = v.assignments.some(
+      (a) => a.contactId === contact.id && a.role === 'photographer' && a.isDefault,
+    );
+    if (alreadyAssigned) return v;
+
+    changed++;
+    return {
+      ...v,
+      assignments: [
+        ...v.assignments.filter((a) => !(a.role === 'photographer' && a.isDefault)),
+        {
+          id: crypto.randomUUID(),
+          contactId: contact.id,
+          role: 'photographer' as const,
+          isDefault: true,
+        },
+      ],
+      updatedAt: now,
+    };
+  });
+
+  if (changed > 0) saveFleet({ ...state, vehicles: updatedVehicles });
+  return changed;
 }
 
 // ---------------------------------------------------------------------------

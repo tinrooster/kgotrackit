@@ -193,3 +193,63 @@ export function updateCrewContact(contactId: string, updates: Partial<CrewContac
 export function removeCrewContact(contactId: string): void {
   saveCrewContacts(getCrewContacts().filter((contact) => contact.id !== contactId));
 }
+
+// ---------------------------------------------------------------------------
+// Roster seed — 17 KPIX/KBCW photographers (idempotent by name)
+// ---------------------------------------------------------------------------
+
+interface RosterPhotographer {
+  fullName: string;
+  phone: string;
+  preferredVehicle: string;
+}
+
+const PHOTOGRAPHER_ROSTER: RosterPhotographer[] = [
+  { fullName: 'Scott Arthur',      phone: '415-559-7418', preferredVehicle: 'M18' },
+  { fullName: 'Dick Epting',       phone: '415-559-7402', preferredVehicle: 'M2'  },
+  { fullName: 'Abe Mendoza',       phone: '415-559-7423', preferredVehicle: 'M23' },
+  { fullName: 'Andrew Shepherd',   phone: '415-559-7411', preferredVehicle: 'M11' },
+  { fullName: 'Jackie Sissel',     phone: '415-559-7412', preferredVehicle: 'M12' },
+  { fullName: 'Dean Smith',        phone: '415-559-7404', preferredVehicle: 'M4'  },
+  { fullName: 'Steve Stifter',     phone: '415-559-7406', preferredVehicle: 'M6'  },
+  { fullName: 'Ted Case',          phone: '415-559-7420', preferredVehicle: 'M20' },
+  { fullName: 'Edward Gonzalez',   phone: '415-559-7417', preferredVehicle: 'M17' },
+  { fullName: 'Ric Dupont',        phone: '415-559-7416', preferredVehicle: 'M16' },
+  { fullName: 'Alex Gray',         phone: '415-559-7403', preferredVehicle: 'M3'  },
+  { fullName: 'Henry Jerkins',     phone: '415-559-7422', preferredVehicle: 'M22' },
+  { fullName: 'Chris Kievman',     phone: '415-559-7414', preferredVehicle: 'M14' },
+  { fullName: 'Mackenzie Stock',   phone: '415-559-7410', preferredVehicle: 'M10' },
+  { fullName: 'Edgar Teran',       phone: '415-559-7419', preferredVehicle: 'M19' },
+  { fullName: 'Bill Thompson',     phone: '415-559-7405', preferredVehicle: 'M5'  },
+  { fullName: 'Brian Yuen',        phone: '415-559-1864', preferredVehicle: 'M25' },
+];
+
+export function seedPhotographerContacts(): CrewContact[] {
+  const existing = getCrewContacts();
+  const existingNames = new Set(existing.map((c) => c.fullName.toLowerCase()));
+  const now = new Date().toISOString();
+
+  const toAdd: CrewContact[] = PHOTOGRAPHER_ROSTER
+    .filter((r) => !existingNames.has(r.fullName.toLowerCase()))
+    .map((r) => ({
+      id: crypto.randomUUID(),
+      fullName: r.fullName,
+      contactType: 'crew' as const,
+      roleTags: ['photographer'],
+      defaultEquipmentItemIds: [],
+      phone: r.phone,
+      preferredVehicle: r.preferredVehicle,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+  if (toAdd.length > 0) {
+    saveCrewContacts([...existing, ...toAdd]);
+  }
+
+  // Return the full photographer list (existing + newly added)
+  return getCrewContacts().filter((c) => c.roleTags.includes('photographer'));
+}
+
+export const PHOTOGRAPHER_ROSTER_DATA = PHOTOGRAPHER_ROSTER;

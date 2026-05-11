@@ -51,6 +51,9 @@ export function VehicleCard({
       <div className="flex items-start justify-between gap-2 p-3 pb-2">
         <div className="min-w-0">
           <p className="font-bold text-base leading-tight truncate">{vehicle.code}</p>
+          {vehicle.designation && (
+            <p className="text-[10px] text-muted-foreground/70 truncate leading-tight">{vehicle.designation}</p>
+          )}
           {defaultOperatorName ? (
             <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
               <User className="h-3 w-3 shrink-0" aria-hidden />

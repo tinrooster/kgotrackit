@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Truck, ScrollText } from 'lucide-react';
+import { Plus, Truck, ScrollText, Phone, FileText, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VehicleCard } from './VehicleCard';
 import { VehicleEditDialog } from './VehicleEditDialog';
 import { VehicleDetailSheet } from './VehicleDetailSheet';
 import { LogTimeline } from './LogTimeline';
+import { PhoneRoster } from './PhoneRoster';
+import { DailyDigestComposer } from './DailyDigestComposer';
 import {
   FLEET_UPDATED_EVENT,
   getFleet,
@@ -12,8 +14,14 @@ import {
   seedDefaultFleet,
   setVehicleStatus,
   upsertVehicle,
+  importRosterTruckPhones,
+  importPhotographerAssignments,
 } from '@/lib/fleetService';
-import { getCrewContacts } from '@/lib/crewContactsService';
+import {
+  getCrewContacts,
+  seedPhotographerContacts,
+  CREW_CONTACTS_UPDATED_EVENT,
+} from '@/lib/crewContactsService';
 import { useCanMutateAppData } from '@/hooks/useCanMutateAppData';
 import { FleetVehicle, VehicleStatus, VEHICLE_STATUS_LABELS } from '@/types/fleet';
 import { cn } from '@/lib/utils';
@@ -44,22 +52,31 @@ export function FleetBoard() {
   const canMutate = useCanMutateAppData();
   const [viewMode, setViewMode] = useState<ViewMode>('board');
   const [vehicles, setVehicles] = useState(() => getFleet().vehicles);
+  const [contacts, setContacts] = useState(() => getCrewContacts());
   const [statusFilter, setStatusFilter] = useState<VehicleStatus | 'all'>('all');
   const [selectedVehicle, setSelectedVehicle] = useState<FleetVehicle | null>(null);
-  const [editTarget, setEditTarget] = useState<FleetVehicle | null | 'new'>( null);
+  const [editTarget, setEditTarget] = useState<FleetVehicle | null | 'new'>(null);
   const [deleteTarget, setDeleteTarget] = useState<FleetVehicle | null>(null);
+  const [showSparePool, setShowSparePool] = useState(true);
+  const [showPhoneRoster, setShowPhoneRoster] = useState(false);
+  const [showDigest, setShowDigest] = useState(false);
 
   // Build a quick lookup from contactId → name for default operators
   const contactNames = useMemo(() => {
     const map = new Map<string, string>();
-    getCrewContacts().forEach((c) => map.set(c.id, c.fullName));
+    contacts.forEach((c) => map.set(c.id, c.fullName));
     return map;
-  }, [vehicles]);
+  }, [contacts]);
 
   useEffect(() => {
-    const sync = () => setVehicles(getFleet().vehicles);
-    window.addEventListener(FLEET_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(FLEET_UPDATED_EVENT, sync);
+    const syncFleet = () => setVehicles(getFleet().vehicles);
+    const syncContacts = () => setContacts(getCrewContacts());
+    window.addEventListener(FLEET_UPDATED_EVENT, syncFleet);
+    window.addEventListener(CREW_CONTACTS_UPDATED_EVENT, syncContacts);
+    return () => {
+      window.removeEventListener(FLEET_UPDATED_EVENT, syncFleet);
+      window.removeEventListener(CREW_CONTACTS_UPDATED_EVENT, syncContacts);
+    };
   }, []);
 
   const filtered = useMemo(
@@ -79,9 +96,25 @@ export function FleetBoard() {
     return contactNames.get(defaultAssignment.contactId);
   }
 
+  const spareVehicles = useMemo(
+    () => vehicles.filter((v) => v.status === 'spare'),
+    [vehicles],
+  );
+
   const handleSeed = () => {
     seedDefaultFleet();
     toast.success('Fleet roster seeded — M1–M25, Sat Truck, Expedition, M-26, M-33');
+  };
+
+  const handleImportRoster = () => {
+    const seededContacts = seedPhotographerContacts();
+    const phonesUpdated = importRosterTruckPhones();
+    const assignmentsCreated = importPhotographerAssignments(seededContacts);
+    const parts: string[] = [];
+    if (seededContacts.length > 0) parts.push(`${seededContacts.length} photographers`);
+    if (phonesUpdated > 0) parts.push(`${phonesUpdated} truck phones`);
+    if (assignmentsCreated > 0) parts.push(`${assignmentsCreated} assignments`);
+    toast.success(parts.length > 0 ? `Roster imported: ${parts.join(', ')}` : 'Roster already up to date');
   };
 
   const handleDelete = (v: FleetVehicle) => {
@@ -101,7 +134,7 @@ export function FleetBoard() {
             News vehicles, crew assignments, and equipment status.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Board / Log toggle */}
           <div className="flex rounded-md border border-border overflow-hidden">
             <button
@@ -131,8 +164,22 @@ export function FleetBoard() {
               Log
             </button>
           </div>
+          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setShowPhoneRoster(true)}>
+            <Phone className="h-3.5 w-3.5" />
+            Phone Roster
+          </Button>
+          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setShowDigest(true)}>
+            <FileText className="h-3.5 w-3.5" />
+            Daily Digest
+          </Button>
+          {canMutate && vehicles.length > 0 && (
+            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={handleImportRoster}>
+              <Download className="h-3.5 w-3.5" />
+              Import Roster
+            </Button>
+          )}
           {canMutate && viewMode === 'board' && (
-            <Button onClick={() => setEditTarget('new')} className="gap-1.5">
+            <Button onClick={() => setEditTarget('new')} className="gap-1.5 h-8 text-sm">
               <Plus className="h-4 w-4" />
               Add Vehicle
             </Button>
@@ -166,6 +213,44 @@ export function FleetBoard() {
               )}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Spare pool rail */}
+      {viewMode === 'board' && spareVehicles.length > 0 && statusFilter === 'all' && (
+        <div className="rounded-lg border border-border bg-muted/30">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setShowSparePool((v) => !v)}
+          >
+            {showSparePool ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            Spare Pool
+            <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] tabular-nums">{spareVehicles.length}</span>
+          </button>
+          {showSparePool && (
+            <div className="flex flex-wrap gap-2 px-3 pb-3">
+              {spareVehicles.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                  onClick={() => setSelectedVehicle(v)}
+                >
+                  <span className="font-bold">{v.code}</span>
+                  {v.designation && <span className="text-muted-foreground">· {v.designation}</span>}
+                  {canMutate && (
+                    <span
+                      className="ml-1 text-[10px] text-muted-foreground hover:text-foreground underline"
+                      onClick={(e) => { e.stopPropagation(); setVehicleStatus(v.id, 'in_service'); }}
+                    >
+                      claim
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -230,6 +315,21 @@ export function FleetBoard() {
           setEditTarget(null);
         }}
         onClose={() => setEditTarget(null)}
+      />
+
+      {/* Phone roster */}
+      <PhoneRoster
+        open={showPhoneRoster}
+        vehicles={vehicles}
+        contacts={contacts}
+        onClose={() => setShowPhoneRoster(false)}
+      />
+
+      {/* Daily digest */}
+      <DailyDigestComposer
+        open={showDigest}
+        vehicles={vehicles}
+        onClose={() => setShowDigest(false)}
       />
 
       {/* Delete confirmation */}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +27,7 @@ import {
   VEHICLE_STATUS_OPTIONS,
   CAPABILITY_LABELS,
 } from '@/types/fleet';
+import { getFleet } from '@/lib/fleetService';
 
 interface VehicleEditDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ const ALL_CAPABILITIES = Object.keys(CAPABILITY_LABELS) as CapabilityFlag[];
 
 const BLANK: Omit<FleetVehicle, 'id' | 'createdAt' | 'updatedAt' | 'subsystems' | 'assignments' | 'scheduledWork'> = {
   code: '',
+  designation: '',
   kind: 'truck',
   displayOrder: 99,
   status: 'in_service',
@@ -58,12 +60,22 @@ export function VehicleEditDialog({ open, vehicle, onSave, onClose }: VehicleEdi
   const isNew = vehicle === null;
   const [form, setForm] = useState({ ...BLANK });
   const [showDetails, setShowDetails] = useState(false);
+  const designationListId = useId();
+
+  const designationOptions = Array.from(
+    new Set(
+      getFleet().vehicles
+        .map((v) => v.designation)
+        .filter((d): d is string => Boolean(d)),
+    ),
+  );
 
   useEffect(() => {
     if (!open) return;
     if (vehicle) {
       setForm({
         code: vehicle.code,
+        designation: vehicle.designation ?? '',
         kind: vehicle.kind,
         displayOrder: vehicle.displayOrder,
         status: vehicle.status,
@@ -101,6 +113,7 @@ export function VehicleEditDialog({ open, vehicle, onSave, onClose }: VehicleEdi
     const saved: FleetVehicle = {
       id: vehicle?.id ?? crypto.randomUUID(),
       code,
+      designation: (form.designation ?? '').trim() || undefined,
       kind: form.kind as VehicleKind,
       displayOrder: Number(form.displayOrder) || 99,
       status: form.status as VehicleStatus,
@@ -152,6 +165,24 @@ export function VehicleEditDialog({ open, vehicle, onSave, onClose }: VehicleEdi
                 onChange={(e) => setForm((f) => ({ ...f, displayOrder: Number(e.target.value) }))}
               />
             </div>
+          </div>
+
+          {/* Designation */}
+          <div className="space-y-1.5">
+            <Label htmlFor="veh-designation">Designation</Label>
+            <Input
+              id="veh-designation"
+              list={designationListId}
+              placeholder="Grip Van, Lighting & Production…"
+              value={form.designation ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, designation: e.target.value }))}
+              autoComplete="off"
+            />
+            <datalist id={designationListId}>
+              {designationOptions.map((d) => (
+                <option key={d} value={d} />
+              ))}
+            </datalist>
           </div>
 
           {/* Kind + Status */}
