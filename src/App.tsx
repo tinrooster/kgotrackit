@@ -30,6 +30,7 @@ import PlannerWorkspacePage from './pages/PlannerWorkspacePage';
 import FieldChecklistPage from './pages/FieldChecklistPage';
 import PlantPage from './pages/PlantPage';
 import FleetPage from './pages/FleetPage';
+import CrewSchedulerPage from './pages/CrewSchedulerPage';
 import {
   LAST_ROUTE_STORAGE_KEY,
   shouldPersistLastVisitedRoute,
@@ -267,6 +268,14 @@ export default function App() {
                 }
               />
               <Route path="/crew" element={<Navigate to="/settings?st=organization" replace />} />
+              <Route
+                path="/crew-scheduler"
+                element={
+                  <ProtectedRoute>
+                    <CrewSchedulerPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/help"
                 element={

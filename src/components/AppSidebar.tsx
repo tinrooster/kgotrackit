@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
-  Cable, ChevronLeft, ChevronRight, ClipboardList, Clapperboard,
+  Cable, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Clapperboard,
   FileText, FlaskConical, LayoutDashboard, List, Settings, ShoppingCart, Truck,
   type LucideIcon,
 } from 'lucide-react'
@@ -183,6 +183,7 @@ export function AppSidebar() {
       items: [
         { path: '/productions', label: 'Productions', icon: Clapperboard, activeBasePath: '/productions' },
         { path: '/fleet', label: 'Fleet', icon: Truck, activeBasePath: '/fleet' },
+        { path: '/crew-scheduler', label: 'Crew Scheduler', icon: CalendarClock, activeBasePath: '/crew-scheduler' },
         { path: '/field-checklist', label: 'Field Checklist', icon: ClipboardList },
       ],
     },
@@ -217,7 +218,7 @@ export function AppSidebar() {
 
   return (
     <>
-      {/* ── Desktop / tablet sidebar ───────────────────────────────────────── */}
+      {/* ── Desktop / tablet sidebar ─────────────────────────────────────────────── */}
       <aside
         className={cn(
           'hidden md:flex flex-col h-screen bg-ti-sunken border-r shrink-0 transition-[width] duration-200 overflow-hidden',
@@ -308,7 +309,7 @@ export function AppSidebar() {
         </div>
       </aside>
 
-      {/* ── Mobile bottom tab bar ──────────────────────────────────────────── */}
+      {/* ── Mobile bottom tab bar ─────────────────────────────────────────────── */}
       <nav className="fixed inset-x-0 bottom-0 z-50 flex border-t bg-card/95 shadow-ti-lg backdrop-blur safe-area-inset-bottom md:hidden">
         {mobileItems.map((item) => {
           const active = isActive(item.path, item.activeBasePath)
