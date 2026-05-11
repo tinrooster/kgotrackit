@@ -31,17 +31,22 @@ const SIGNAL_CATEGORIES: { value: PlantDrawingSignalCategory; label: string }[] 
   { value: 'other',   label: 'Other' },
 ];
 
-/** Compute next sequential DWG number from the loaded drawings list.
- *  Ignores dotted numbers (7.x.x family) — only considers plain integers. */
+/** Suggest the next free DWG number in the 22000-22999 range.
+ *  Falls back to overall max+1 if the range is empty. */
 export function nextDwgNumber(drawings: PlantDrawing[]): string {
-  let max = 0;
+  const RANGE_MIN = 22000;
+  const RANGE_MAX = 22999;
+  let rangeMax = RANGE_MIN - 1;
+  let overallMax = 0;
   for (const d of drawings) {
     const n = parseInt(d.dwgNumber, 10);
-    if (!isNaN(n) && String(n) === d.dwgNumber.trim()) {
-      max = Math.max(max, n);
-    }
+    if (isNaN(n) || String(n) !== d.dwgNumber.trim()) continue;
+    overallMax = Math.max(overallMax, n);
+    if (n >= RANGE_MIN && n <= RANGE_MAX) rangeMax = Math.max(rangeMax, n);
   }
-  return max > 0 ? String(max + 1) : '';
+  if (rangeMax >= RANGE_MIN) return String(Math.min(rangeMax + 1, RANGE_MAX));
+  if (overallMax > 0) return String(overallMax + 1);
+  return '';
 }
 
 interface CreateDrawingDialogProps {
@@ -108,7 +113,7 @@ export function CreateDrawingDialog({
               autoFocus
             />
             <p className="text-xs text-muted-foreground">
-              Sequential integers auto-suggested · Use dotted notation for 7.x.x Master Control drawings
+              Next free 22000–22999 number auto-suggested · Use dotted notation (7.x.x) for Master Control drawings
             </p>
           </div>
 

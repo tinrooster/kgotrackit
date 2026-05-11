@@ -7,6 +7,7 @@ import { DrawingsTab } from '@/components/plant/DrawingsTab';
 import { CampaignsTab } from '@/components/plant/CampaignsTab';
 import { LocationsTab } from '@/components/plant/LocationsTab';
 import { SystemsTab } from '@/components/plant/SystemsTab';
+import { PlantAdminMenu } from '@/components/plant/PlantAdminMenu';
 import { getCableStats, PLANT_CABLES_UPDATED_EVENT } from '@/lib/plantService';
 import type { PlantCableStats } from '@/lib/plantService';
 
@@ -66,6 +67,7 @@ export default function PlantPage() {
             <h1 className="text-xl font-semibold leading-tight">Cable Plant</h1>
             <p className="text-sm text-muted-foreground">Wire infrastructure lifecycle management</p>
           </div>
+          <PlantAdminMenu />
         </div>
 
         {/* Stats bar */}

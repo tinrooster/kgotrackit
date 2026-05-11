@@ -245,6 +245,7 @@ export interface PlantCableSummary {
   status: PlantCableStatus;
   verifiedAt?: string;
   notes?: string;
+  legacyProjectId?: string;
 }
 
 
@@ -403,6 +404,16 @@ export interface PlantCampaignPreview {
 // Utility: cable filter params (for cable register queries)
 // ------------------------------------------------------------
 
+export type PlantCableSortColumn =
+  | 'cable_number'
+  | 'origin_location_code'
+  | 'dest_location_code'
+  | 'signal_type'
+  | 'length_ft'
+  | 'status'
+  | 'verified_at'
+  | 'legacy_project_id';
+
 export interface PlantCableFilters {
   organizationId: string;
   status?: PlantCableStatus[];
@@ -413,6 +424,9 @@ export interface PlantCableFilters {
   campaignId?: string;            // show cables in a specific campaign
   reviewStatus?: PlantCampaignItemReviewStatus[];
   search?: string;                // full-text (cable number, origin, dest, notes)
+  project?: string;               // legacy_project_id exact/prefix match
   page?: number;
   pageSize?: number;
+  sortBy?: PlantCableSortColumn;
+  sortDir?: 'asc' | 'desc';
 }

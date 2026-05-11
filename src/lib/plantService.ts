@@ -11,6 +11,7 @@ import type {
   PlantLocation,
   PlantSystem,
   PlantCableFilters,
+  PlantCableSortColumn,
   PlantCleanupCampaign,
   PlantCampaignStatus,
   PlantCampaignRule,
@@ -51,7 +52,7 @@ export async function listCables(
     .select(
       'id,cable_number,drawing_id,origin_location_code,origin_device,origin_port,' +
       'dest_location_code,dest_device,dest_port,cable_family,jacket_color,' +
-      'signal_type,length_ft,status,verified_at,notes',
+      'signal_type,length_ft,status,verified_at,notes,legacy_project_id',
       { count: 'exact' }
     )
     .eq('organization_id', orgId);
@@ -81,11 +82,26 @@ export async function listCables(
   if (filters.search && filters.search.trim()) {
     const term = `%${filters.search.trim()}%`;
     query = query.or(
-      `cable_number.ilike.${term},origin_raw.ilike.${term},dest_raw.ilike.${term},notes.ilike.${term}`
+      `cable_number.ilike.${term},origin_raw.ilike.${term},dest_raw.ilike.${term},notes.ilike.${term},legacy_project_id.ilike.${term}`
     );
   }
 
-  query = query.order('cable_number', { ascending: true, nullsFirst: false }).range(from, to);
+  if (filters.project && filters.project.trim()) {
+    query = query.ilike('legacy_project_id', `${filters.project.trim()}%`);
+  }
+
+  const col: PlantCableSortColumn = filters.sortBy ?? 'cable_number';
+  const asc = (filters.sortDir ?? 'asc') === 'asc';
+  // cable_number is TEXT — use the stored integer column for numeric sort,
+  // with cable_number as tiebreaker for non-numeric values.
+  if (col === 'cable_number') {
+    query = query
+      .order('cable_number_int', { ascending: asc, nullsFirst: !asc })
+      .order('cable_number',     { ascending: asc, nullsFirst: false });
+  } else {
+    query = query.order(col, { ascending: asc, nullsFirst: false });
+  }
+  query = query.range(from, to);
 
   const { data, error, count } = await query;
   if (error) {
@@ -151,6 +167,88 @@ export async function getCableStats(): Promise<PlantCableStats> {
     decommissioned,
     activeCampaigns,
   };
+}
+
+export interface DuplicateCableGroup {
+  cableNumber: string;
+  count: number;
+  ids: string[];
+}
+
+export async function findDuplicateCableNumbers(): Promise<DuplicateCableGroup[]> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return [];
+
+  // Fetch all cable_number values (non-null)
+  const allIds: Array<{ id: string; cable_number: string }> = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data, error } = await client
+      .from('plant_cables')
+      .select('id,cable_number')
+      .eq('organization_id', orgId)
+      .not('cable_number', 'is', null)
+      .neq('status', 'archived')
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    if (error || !data) break;
+    allIds.push(...(data as Array<{ id: string; cable_number: string }>));
+    if (data.length < pageSize) break;
+    page++;
+  }
+
+  const grouped = new Map<string, string[]>();
+  for (const row of allIds) {
+    const arr = grouped.get(row.cable_number) ?? [];
+    arr.push(row.id);
+    grouped.set(row.cable_number, arr);
+  }
+
+  return [...grouped.entries()]
+    .filter(([, ids]) => ids.length > 1)
+    .map(([cableNumber, ids]) => ({ cableNumber, count: ids.length, ids }))
+    .sort((a, b) => b.count - a.count || a.cableNumber.localeCompare(b.cableNumber));
+}
+
+export async function getNextFreeDrawingNumber(rangeMin = 22000, rangeMax = 22999): Promise<number> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return rangeMin;
+  const { data } = await client
+    .from('plant_drawings')
+    .select('dwg_number')
+    .eq('organization_id', orgId);
+  let max = rangeMin - 1;
+  for (const row of (data ?? [])) {
+    const n = parseInt(row.dwg_number as string, 10);
+    if (!isNaN(n) && n >= rangeMin && n <= rangeMax) max = Math.max(max, n);
+  }
+  return Math.min(max + 1, rangeMax);
+}
+
+export async function exportDrawingsCSV(): Promise<string> {
+  const client = getSupabase();
+  const orgId = getActiveOrganizationId();
+  if (!client || !orgId) return '';
+  const { data } = await client
+    .from('plant_drawings')
+    .select('dwg_number,title,signal_category,status,dwg_file_path,visio_file_path,easyschematic_id,notes,created_at')
+    .eq('organization_id', orgId)
+    .order('dwg_number', { ascending: true });
+  if (!data) return '';
+  const esc = (v: string | null | undefined) => {
+    if (v == null) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const headers = ['DWG #', 'Title', 'Signal Category', 'Status', 'DWG File', 'Visio File', 'EasySchematic ID', 'Notes', 'Created'];
+  const rows = (data as Array<Record<string, string | null>>).map(r => [
+    esc(r.dwg_number), esc(r.title), esc(r.signal_category), esc(r.status),
+    esc(r.dwg_file_path), esc(r.visio_file_path), esc(r.easyschematic_id),
+    esc(r.notes), esc(r.created_at ? r.created_at.slice(0, 10) : null),
+  ].join(','));
+  return [headers.join(','), ...rows].join('\r\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -345,11 +443,12 @@ export async function getDrawing(id: string): Promise<PlantDrawing | null> {
   return rowToDrawing(data);
 }
 
-export async function updateDrawing(id: string, updates: Partial<Pick<PlantDrawing, 'title' | 'dwgFilePath' | 'visioFilePath' | 'easyschematicId' | 'easyschematicShareToken' | 'notes' | 'status'>>): Promise<boolean> {
+export async function updateDrawing(id: string, updates: Partial<Pick<PlantDrawing, 'title' | 'signalCategory' | 'dwgFilePath' | 'visioFilePath' | 'easyschematicId' | 'easyschematicShareToken' | 'notes' | 'status'>>): Promise<boolean> {
   const client = getSupabase();
   if (!client) return false;
   const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (updates.title !== undefined)                    payload.title = updates.title;
+  if (updates.signalCategory !== undefined)           payload.signal_category = updates.signalCategory;
   if (updates.dwgFilePath !== undefined)              payload.dwg_file_path = updates.dwgFilePath;
   if (updates.visioFilePath !== undefined)            payload.visio_file_path = updates.visioFilePath;
   if (updates.easyschematicId !== undefined)          payload.easyschematic_id = updates.easyschematicId;
@@ -415,16 +514,33 @@ export async function findOpenCableNumberBlocks(opts: {
   const orgId = getActiveOrganizationId();
   if (!client || !orgId) return [];
 
-  const { data } = await client
+  // Step 1 — HEAD request for exact count of cables in range.
+  // This tells us how many pages to fetch without guessing at PostgREST's max_rows cap.
+  const { count: rangeCount } = await client
     .from('plant_cables')
-    .select('cable_number')
+    .select('*', { count: 'exact', head: true })
     .eq('organization_id', orgId)
-    .not('cable_number', 'is', null);
+    .not('cable_number_int', 'is', null)
+    .gte('cable_number_int', opts.minStart)
+    .lte('cable_number_int', opts.maxEnd);
 
   const used = new Set<number>();
-  for (const row of (data ?? [])) {
-    const n = parseInt(row.cable_number as string, 10);
-    if (!isNaN(n) && n >= opts.minStart && n <= opts.maxEnd) used.add(n);
+  const PAGE = 1000;
+  const pages = Math.ceil((rangeCount ?? 0) / PAGE);
+
+  // Step 2 — fetch each page of cable_number_int values
+  for (let p = 0; p < pages; p++) {
+    const { data } = await client
+      .from('plant_cables')
+      .select('cable_number_int')
+      .eq('organization_id', orgId)
+      .not('cable_number_int', 'is', null)
+      .gte('cable_number_int', opts.minStart)
+      .lte('cable_number_int', opts.maxEnd)
+      .order('cable_number_int')
+      .range(p * PAGE, (p + 1) * PAGE - 1);
+    if (!data) break;
+    for (const row of data) used.add(row.cable_number_int as number);
   }
 
   // Sort used numbers, then find gaps between them
@@ -569,6 +685,7 @@ function rowToSummary(r: any): PlantCableSummary {
     status: r.status,
     verifiedAt: r.verified_at ?? undefined,
     notes: r.notes ?? undefined,
+    legacyProjectId: r.legacy_project_id ?? undefined,
   };
 }
 
@@ -757,16 +874,33 @@ export async function updateCampaign(
   return !error;
 }
 
-export async function deleteCampaign(id: string): Promise<boolean> {
+export async function deleteCampaign(id: string, force = false): Promise<boolean> {
   const client = getSupabase();
   if (!client) return false;
-  // Only allow deleting drafts — enforce in UI, double-check here
-  const { error } = await client
-    .from('plant_cleanup_campaigns')
-    .delete()
-    .eq('id', id)
-    .eq('status', 'draft');
+  let q = client.from('plant_cleanup_campaigns').delete().eq('id', id);
+  if (!force) q = q.eq('status', 'draft');
+  const { error } = await q;
   return !error;
+}
+
+export async function batchUpdateDrawingStatus(
+  ids: string[],
+  status: PlantDrawingStatus,
+): Promise<{ updated: number }> {
+  const client = getSupabase();
+  if (!client || ids.length === 0) return { updated: 0 };
+  const CHUNK = 200;
+  let updated = 0;
+  const ts = new Date().toISOString();
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const { error } = await client
+      .from('plant_drawings')
+      .update({ status, updated_at: ts })
+      .in('id', chunk);
+    if (!error) updated += chunk.length;
+  }
+  return { updated };
 }
 
 // ---------------------------------------------------------------------------

@@ -439,15 +439,15 @@ def main() -> None:
 
         row = dict(zip(headers, raw_row))
 
-        origin_raw = col(row, 'ORIGIN') or ''
-        dest_raw   = col(row, 'DEST')   or ''
+        origin_raw = col(row, 'ORIGIN', 'SOURCE') or ''
+        dest_raw   = col(row, 'DEST')             or ''
 
         if not origin_raw and not dest_raw:
             stats['skipped_empty'] += 1
             continue
 
         # -- Wire type normalisation --
-        wire_type_raw = col(row, 'Wire Type')
+        wire_type_raw = col(row, 'Wire Type', 'WireType')
         cable_family, jacket_color = normalize_wire_type(wire_type_raw)
         if wire_type_raw and cable_family == 'other':
             stats['wire_type_unmatched'] += 1
@@ -499,8 +499,8 @@ def main() -> None:
             'legacy_id':           legacy_id,
             'cable_number':        col(row, 'NUMBER'),
             'numc':                col(row, 'NUMC'),
-            'legacy_project_id':   col(row, 'Project ID'),
-            'alt_dwg':             col(row, 'Alternate Dwg'),
+            'legacy_project_id':   col(row, 'Project ID', 'ProjectID'),
+            'alt_dwg':             col(row, 'Alternate Dwg', 'AltDwg'),
             'drawing_id':          drawing_id,
             'origin_raw':          origin_raw,
             'origin_location_code': o_loc,
@@ -517,7 +517,7 @@ def main() -> None:
             'length_raw':          length_raw,
             'length_ft':           length_ft,
             'status':              'unknown',
-            'notes':               col(row, 'Note'),
+            'notes':               col(row, 'Note', 'Notes'),
         })
         stats['cables_written'] += 1
 

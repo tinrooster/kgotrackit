@@ -143,10 +143,13 @@ function CampaignDetail({ campaign, onCampaignUpdated }: {
     setCompleting(false);
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Delete draft campaign "${campaign.name}"?`)) return;
+  const handleDelete = async (force = false) => {
+    const warn = force
+      ? `Force-delete "${campaign.name}"? This will remove the campaign record but cables it touched will keep their current status — you may need to reset them manually.`
+      : `Delete draft campaign "${campaign.name}"?`;
+    if (!confirm(warn)) return;
     setDeleting(true);
-    const ok = await deleteCampaign(campaign.id);
+    const ok = await deleteCampaign(campaign.id, force);
     if (ok) {
       toast.success('Campaign deleted');
       onCampaignUpdated();
@@ -179,16 +182,10 @@ function CampaignDetail({ campaign, onCampaignUpdated }: {
         )}
         <div className="ml-auto flex items-center gap-2">
           {campaign.status === 'draft' && (
-            <>
-              <Button size="sm" variant="outline" onClick={handleActivate} disabled={activating}>
-                {activating ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
-                Activate
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleDelete} disabled={deleting}
-                className="text-destructive hover:text-destructive">
-                Delete
-              </Button>
-            </>
+            <Button size="sm" variant="outline" onClick={handleActivate} disabled={activating}>
+              {activating ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+              Activate
+            </Button>
           )}
           {campaign.status === 'active' && (
             <Button size="sm" variant="outline" onClick={handleComplete} disabled={completing}>
@@ -196,6 +193,16 @@ function CampaignDetail({ campaign, onCampaignUpdated }: {
               <CheckCheck className="h-3.5 w-3.5 mr-1.5" /> Mark complete
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleDelete(campaign.status !== 'draft')}
+            disabled={deleting}
+            className="text-destructive hover:text-destructive"
+          >
+            {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+            Delete
+          </Button>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download, Loader2, MapPin, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown as ChevronDownSort, Download, Loader2, MapPin, Search, X } from 'lucide-react';
 import {
   listCables,
   exportCablesCSV,
@@ -10,7 +10,7 @@ import {
   PAGE_SIZE,
   PLANT_CABLES_UPDATED_EVENT,
 } from '@/lib/plantService';
-import type { PlantCableSummary, PlantCableStatus, PlantSignalType } from '@/types/plant';
+import type { PlantCableSummary, PlantCableStatus, PlantSignalType, PlantCableSortColumn } from '@/types/plant';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,34 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
+function SortTh({
+  col, current, dir, onSort, children, className,
+}: {
+  col: PlantCableSortColumn;
+  current: PlantCableSortColumn;
+  dir: 'asc' | 'desc';
+  onSort: (col: PlantCableSortColumn) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const active = current === col;
+  return (
+    <th
+      className={cn('px-3 py-2 font-medium cursor-pointer select-none hover:text-foreground group', className)}
+      onClick={() => onSort(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {active
+          ? (dir === 'asc'
+            ? <ChevronUp className="h-3 w-3 text-primary" />
+            : <ChevronDownSort className="h-3 w-3 text-primary" />)
+          : <ChevronUp className="h-3 w-3 opacity-0 group-hover:opacity-30" />}
+      </span>
+    </th>
+  );
+}
+
 export function CableRegisterTab() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialLoc = searchParams.get('loc') ?? undefined;
@@ -49,9 +77,13 @@ export function CableRegisterTab() {
   const [signalFilters, setSignalFilters] = useState<PlantSignalType[]>([]);
   const [locationCode, setLocationCode] = useState<string | undefined>(initialLoc);
   const [drawingId, setDrawingId] = useState<string | undefined>(initialDwg);
+  const [projectFilter, setProjectFilter] = useState('');
+  const debouncedProject = useDebounce(projectFilter, 300);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [sortBy, setSortBy] = useState<PlantCableSortColumn>('cable_number');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const loadRef = useRef(0);
@@ -76,16 +108,29 @@ export function CableRegisterTab() {
       signalType: signalFilters,
       locationCode,
       drawingId,
+      project: debouncedProject || undefined,
+      sortBy,
+      sortDir,
     });
     if (token !== loadRef.current) return;
     setCables(result.cables);
     setTotal(result.total);
     setLoading(false);
-  }, [debouncedSearch, statusFilters, signalFilters, locationCode, drawingId]);
+  }, [debouncedSearch, statusFilters, signalFilters, locationCode, drawingId, debouncedProject, sortBy, sortDir]);
+
+  const handleSort = (col: PlantCableSortColumn) => {
+    if (sortBy === col) {
+      setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortDir('asc');
+    }
+    setPage(0);
+  };
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, statusFilters, signalFilters, locationCode, drawingId]);
+  }, [debouncedSearch, statusFilters, signalFilters, locationCode, drawingId, debouncedProject]);
 
   useEffect(() => {
     void load(page);
@@ -205,7 +250,7 @@ export function CableRegisterTab() {
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 items-center">
           {SIGNAL_FILTER_OPTIONS.map((s) => (
             <button
               key={s}
@@ -220,6 +265,23 @@ export function CableRegisterTab() {
               {SIGNAL_TYPE_LABELS[s]}
             </button>
           ))}
+          <div className="relative ml-auto">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+            <Input
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              placeholder="Project ID…"
+              className="h-7 pl-6 pr-6 text-xs w-32 font-mono"
+            />
+            {projectFilter && (
+              <button
+                onClick={() => setProjectFilter('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -228,26 +290,27 @@ export function CableRegisterTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
-              <th className="px-3 py-2 font-medium">Cable #</th>
-              <th className="px-3 py-2 font-medium">Origin</th>
-              <th className="px-3 py-2 font-medium">Destination</th>
-              <th className="px-3 py-2 font-medium hidden md:table-cell">Signal</th>
+              <SortTh col="cable_number" current={sortBy} dir={sortDir} onSort={handleSort}>Cable #</SortTh>
+              <SortTh col="origin_location_code" current={sortBy} dir={sortDir} onSort={handleSort}>Origin</SortTh>
+              <SortTh col="dest_location_code" current={sortBy} dir={sortDir} onSort={handleSort}>Destination</SortTh>
+              <SortTh col="signal_type" current={sortBy} dir={sortDir} onSort={handleSort} className="hidden md:table-cell">Signal</SortTh>
               <th className="px-3 py-2 font-medium hidden lg:table-cell">Type</th>
-              <th className="px-3 py-2 font-medium hidden lg:table-cell">Length</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+              <SortTh col="length_ft" current={sortBy} dir={sortDir} onSort={handleSort} className="hidden lg:table-cell">Length</SortTh>
+              <SortTh col="legacy_project_id" current={sortBy} dir={sortDir} onSort={handleSort} className="hidden xl:table-cell">Project</SortTh>
+              <SortTh col="status" current={sortBy} dir={sortDir} onSort={handleSort}>Status</SortTh>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7} className="py-12 text-center">
+                <td colSpan={8} className="py-12 text-center">
                   <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
                 </td>
               </tr>
             )}
             {!loading && cables.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-muted-foreground text-sm">
+                <td colSpan={8} className="py-12 text-center text-muted-foreground text-sm">
                   No cables found.
                 </td>
               </tr>
@@ -287,6 +350,9 @@ export function CableRegisterTab() {
                 </td>
                 <td className="px-3 py-2 hidden lg:table-cell text-xs text-muted-foreground">
                   {c.lengthFt != null ? `${c.lengthFt} ft` : '—'}
+                </td>
+                <td className="px-3 py-2 hidden xl:table-cell text-xs font-mono text-muted-foreground">
+                  {c.legacyProjectId ?? '—'}
                 </td>
                 <td className="px-3 py-2">
                   <Badge className={cn('text-xs', STATUS_COLOURS[c.status])}>
