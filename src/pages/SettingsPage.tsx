@@ -92,6 +92,7 @@ import {
 import { parseContactWorkbookFile, type ParsedContactCandidate } from '@/lib/contactWorkbookImport'
 import { canonicalNameKey, parseContactDisplayName } from '@/lib/contactName'
 import { saveProductions, PRODUCTION_CHECKOUT_ACTIVITIES_STORAGE_KEY } from '@/lib/productionService'
+import { PageHeader } from '@/components/ui/page-shell'
 
 type ParsedContactDestination = 'production' | 'org_directory';
 
@@ -2759,9 +2760,12 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="settings-page mx-auto w-full max-w-6xl px-2 py-6 sm:px-4">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+    <div className="settings-page mx-auto w-full max-w-6xl space-y-5 px-2 py-2 sm:px-4">
+      <PageHeader
+        eyebrow="Manage"
+        title="Settings"
+        description="Preferences, shared libraries, organization data, users, workspaces, and backups."
+        actions={
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             type="button"
@@ -2786,7 +2790,8 @@ export default function SettingsPage() {
             Redo
           </Button>
         </div>
-      </div>
+        }
+      />
 
       <Tabs value={settingsTab} onValueChange={(value) => setSettingsTab(value as SettingsPrimaryTabId)} className="w-full">
         <div

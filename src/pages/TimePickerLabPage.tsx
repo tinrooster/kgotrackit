@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { TimeInput } from '@/components/ui/time-input';
+import { PageHeader } from '@/components/ui/page-shell';
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -66,10 +67,15 @@ export default function TimePickerLabPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <h1 className="text-2xl font-bold">Time Selection Lab</h1>
-      <p className="text-sm text-muted-foreground">
-        Test alternatives without changing production screens. Shared value preview: <span className="font-medium text-foreground">{value}</span> ({formatAmPm(value)})
-      </p>
+      <PageHeader
+        eyebrow="Lab"
+        title="Time Selection Lab"
+        description={
+          <>
+            Test alternatives without changing production screens. Shared value preview: <span className="font-medium text-foreground">{value}</span> ({formatAmPm(value)})
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>

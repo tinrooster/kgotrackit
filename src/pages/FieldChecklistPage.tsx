@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ActionRail, type ActionRailItem } from '@/components/ui/action-rail';
 import { useHorizontalScrollHints } from '@/components/ui/useHorizontalScrollHints';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { PageHeader } from '@/components/ui/page-shell';
 import { ChecklistEditor } from '@/components/productions/ChecklistEditor';
 import { VehiclePacklistEditor } from '@/components/productions/VehiclePacklistEditor';
 import { cn } from '@/lib/utils';
@@ -566,26 +567,24 @@ export default function FieldChecklistPage() {
           : 'max-w-[min(100%,1200px)] px-4 py-6 sm:px-6'
       )}
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <ClipboardList
-          className={cn('shrink-0 text-primary', touch ? 'h-6 w-6' : 'h-5 w-5')}
-          aria-hidden
-        />
-        <h1 className={cn('font-semibold tracking-tight', touch ? 'text-xl sm:text-2xl' : 'text-2xl')}>
-          Field checklist
-        </h1>
-        {selectedProduction && concurrentRemoteHint ? (
+      <PageHeader
+        className="mb-4"
+        eyebrow="Field workflow"
+        title="Field checklist"
+        description={selectedProduction ? selectedProduction.name : 'Select a confirmed or in-progress production.'}
+        icon={<ClipboardList className={cn('shrink-0 text-primary', touch ? 'h-6 w-6' : 'h-5 w-5')} aria-hidden />}
+        actions={selectedProduction && concurrentRemoteHint ? (
           <span
-            className="inline-flex items-center gap-1 rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-950 dark:text-amber-100"
+            className="inline-flex items-center gap-1 rounded-full border border-ti-warning bg-ti-warning-soft px-2 py-1 text-xs font-medium text-ti-warning"
             title="Production data changed outside this session"
           >
             <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Concurrent update
           </span>
         ) : null}
-      </div>
+      />
 
-      <Card className="mb-4 border shadow-sm">
+      <Card className="mb-4">
         <CardHeader className="px-4 pb-2 pt-4 sm:px-6">
           <CardTitle className={touch ? 'text-base' : 'text-sm font-semibold'}>Production</CardTitle>
         </CardHeader>
@@ -649,7 +648,7 @@ export default function FieldChecklistPage() {
               selectedProduction.checklistGroups.map((group) => (
                 <details
                   key={group.id}
-                  className="group overflow-hidden rounded-lg border border-border/90 bg-card shadow-sm"
+                  className="group overflow-hidden rounded-lg border border-border/90 bg-card shadow-ti-sm"
                   style={{
                     borderLeftWidth: 4,
                     borderLeftColor: getStableGroupAccentHex(group.title),
@@ -667,7 +666,7 @@ export default function FieldChecklistPage() {
                     </span>
                     <ChevronDown className="h-4 w-4 shrink-0 opacity-60 transition-transform duration-200 group-open:rotate-180" />
                   </summary>
-                  <div className="bg-muted/15 px-2 py-2">
+                    <div className="bg-muted/35 px-2 py-2">
                     <div className="ml-1 border-l-2 border-border/60 pl-3 sm:ml-2 sm:pl-4">
                       <ul className="divide-y divide-border/50 rounded-md border border-border/40 bg-background/80">
                         {group.items.map((item) => (
@@ -803,7 +802,7 @@ export default function FieldChecklistPage() {
         </Tabs>
       )}
 
-      <Card className="mt-6 border shadow-sm">
+      <Card className="mt-6">
         <CardHeader className="px-4 pb-2 pt-4 sm:px-6">
           <CardTitle className={touch ? 'text-base' : 'text-sm font-semibold'}>Recent activity</CardTitle>
           <CardDescription>

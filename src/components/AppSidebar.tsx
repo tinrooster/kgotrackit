@@ -53,14 +53,17 @@ function SidebarLink({
       to={target}
       title={collapsed ? item.label : undefined}
       className={cn(
-        'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors',
+        'group relative flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors',
         collapsed && 'justify-center px-0 py-2',
         active
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+          ? 'bg-card text-foreground shadow-ti-sm'
+          : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
       )}
     >
-      <item.icon className="h-4 w-4 shrink-0" aria-hidden />
+      {active && !collapsed ? (
+        <span className="absolute -left-2 top-2 bottom-2 w-0.5 rounded-full bg-primary" aria-hidden />
+      ) : null}
+      <item.icon className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground')} aria-hidden />
       {!collapsed && <span className="truncate">{item.label}</span>}
     </Link>
   )
@@ -195,25 +198,35 @@ export function AppSidebar() {
       {/* ── Desktop / tablet sidebar ───────────────────────────────────────── */}
       <aside
         className={cn(
-          'hidden md:flex flex-col h-screen bg-background border-r shrink-0 transition-[width] duration-200 overflow-hidden',
-          collapsed ? 'w-14' : 'w-60',
+          'hidden md:flex flex-col h-screen bg-ti-sunken border-r shrink-0 transition-[width] duration-200 overflow-hidden',
+          collapsed ? 'w-[60px]' : 'w-[232px]',
         )}
       >
         {/* Header */}
         <div className={cn(
-          'flex items-center gap-2 h-14 px-2 border-b shrink-0',
+          'flex h-14 shrink-0 items-center gap-2 border-b border-ti-divider px-2',
           collapsed ? 'justify-center' : 'justify-between',
         )}>
           {!collapsed && (
             <Link
               to="/"
-              className="flex items-center gap-2 min-w-0 hover:text-primary transition-colors px-1"
+              className="flex min-w-0 items-center gap-2 px-1 transition-colors hover:text-primary"
             >
               {brandLogo && (
                 <img src={brandLogo} alt="" className="h-6 w-auto shrink-0" />
               )}
-              <span className="font-bold text-base truncate leading-tight">
-                {branding.appName || 'TEd_trackIT'}
+              {!brandLogo && (
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ti-ink font-mono text-sm font-semibold tracking-[-0.04em] text-ti-bg shadow-ti-sm">
+                  tI
+                </span>
+              )}
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold leading-tight tracking-[-0.01em]">
+                  {branding.appName || 'trackIT'}
+                </span>
+                <span className="block truncate text-[10.5px] leading-tight tracking-[0.04em] text-muted-foreground">
+                  Production
+                </span>
               </span>
             </Link>
           )}
@@ -221,7 +234,7 @@ export function AppSidebar() {
             type="button"
             onClick={toggleCollapsed}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
           >
             {collapsed
               ? <ChevronRight className="h-4 w-4" />
@@ -233,7 +246,7 @@ export function AppSidebar() {
         {showContextChip && !collapsed && (
           <div className="px-3 pt-2 pb-0.5">
             <span
-              className="block truncate rounded-full border bg-muted px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              className="block truncate rounded-full border bg-card px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground shadow-ti-sm"
               title={activeWorkspaceId
                 ? `${activeOrganizationName ?? 'Organization'} · ${activeWorkspaceName ?? activeWorkspaceId}`
                 : 'Personal inventory'}
@@ -246,11 +259,11 @@ export function AppSidebar() {
         )}
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-2 px-2 flex flex-col gap-0.5">
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2">
           {sections.map((section, si) => (
             <div key={si} className={si > 0 ? 'mt-3' : ''}>
               {section.label && !collapsed && (
-                <p className="px-2 mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 select-none">
+                <p className="mb-1 px-2 pt-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/60 select-none">
                   {section.label}
                 </p>
               )}
@@ -268,13 +281,13 @@ export function AppSidebar() {
         </nav>
 
         {/* User menu */}
-        <div className="border-t p-2 shrink-0">
+        <div className="shrink-0 border-t border-ti-divider p-2">
           <UserMenu />
         </div>
       </aside>
 
       {/* ── Mobile bottom tab bar ──────────────────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-background border-t flex safe-area-inset-bottom">
+      <nav className="fixed inset-x-0 bottom-0 z-50 flex border-t bg-card/95 shadow-ti-lg backdrop-blur safe-area-inset-bottom md:hidden">
         {mobileItems.map((item) => {
           const active = isActive(item.path, item.activeBasePath)
           return (
@@ -282,11 +295,13 @@ export function AppSidebar() {
               key={item.path}
               to={navTarget(item.path)}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-medium transition-colors min-h-[56px]',
+                'flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium tracking-[0.02em] transition-colors',
                 active ? 'text-primary' : 'text-muted-foreground',
               )}
             >
-              <item.icon className="h-5 w-5 shrink-0" aria-hidden />
+              <span className={cn('grid h-7 w-10 place-items-center rounded-full', active && 'bg-ti-accent-soft')}>
+                <item.icon className="h-5 w-5 shrink-0" aria-hidden />
+              </span>
               <span>{item.label}</span>
             </Link>
           )

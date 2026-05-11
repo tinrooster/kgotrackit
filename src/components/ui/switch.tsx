@@ -21,12 +21,12 @@ const Switch = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SwitchPrimitives.Root
     className={cn(
-      "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-[3px]",
+      "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-border/50 p-[3px] shadow-ti-sm",
       "transition-colors duration-200 ease-in-out",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       "disabled:cursor-not-allowed disabled:opacity-40",
       // Off: muted neutral track
-      "data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-600",
+      "data-[state=unchecked]:bg-muted dark:data-[state=unchecked]:bg-muted",
       // On: vivid --switch-on accent (works in light + dark)
       "data-[state=checked]:bg-[hsl(var(--switch-on))]",
       className

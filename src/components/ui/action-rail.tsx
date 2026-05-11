@@ -38,7 +38,7 @@ export function ActionRail({ items, pulseStorageKey, className }: ActionRailProp
     >
       <div
         ref={scrollRef}
-        className="swipe-action-rail flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="swipe-action-rail flex flex-nowrap items-center gap-2 overflow-x-auto rounded-lg border bg-muted/45 p-1 shadow-ti-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <TooltipProvider delayDuration={150}>
           {items.map((item) => (
@@ -48,7 +48,7 @@ export function ActionRail({ items, pulseStorageKey, className }: ActionRailProp
                   type="button"
                   variant={item.active ? 'default' : 'outline'}
                   size="icon"
-                  className="h-11 w-11 shrink-0"
+                  className="h-11 w-11 shrink-0 rounded-lg"
                   onClick={item.onClick}
                   disabled={item.disabled}
                   title={item.label}

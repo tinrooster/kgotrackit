@@ -56,6 +56,7 @@ import {
 } from '@/lib/productionUndo';
 import type { ProductionSheetTab } from '@/lib/productionSheetTab';
 import { normalizeProductionSheetTab } from '@/lib/productionSheetTab';
+import { PageHeader } from '@/components/ui/page-shell';
 
 export default function ProductionsPage() {
   const navigate = useNavigate();
@@ -396,15 +397,13 @@ export default function ProductionsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Productions</h1>
-          <p className="text-sm text-muted-foreground">
-            Plan and manage event and shoot productions, crew, and equipment.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="space-y-5">
+      <PageHeader
+        title="Productions"
+        description="Plan and manage event and shoot productions, crew, and equipment."
+        meta={`${sorted.length} visible`}
+        actions={
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={handleUndo} disabled={!undoAvailable} className="gap-1.5">
             <Undo2 className="h-4 w-4" />
             Undo
@@ -418,9 +417,10 @@ export default function ProductionsPage() {
             New Production
           </Button>
         </div>
-      </div>
+        }
+      />
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 rounded-lg border bg-card p-3 shadow-ti-sm">
         <div className="relative flex-1" style={{ minWidth: '200px' }}>
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -449,7 +449,7 @@ export default function ProductionsPage() {
       </div>
 
       {sorted.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card py-16 text-center shadow-ti-sm">
           {productions.length === 0 ? (
             <>
               <p className="text-lg font-medium">No productions yet</p>
@@ -471,7 +471,7 @@ export default function ProductionsPage() {
           )}
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8 xl:grid-cols-4 xl:gap-8">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {sorted.map((production) => (
             <ProductionCard
               key={production.id}

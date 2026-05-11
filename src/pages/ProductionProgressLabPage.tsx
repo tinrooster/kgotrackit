@@ -8,7 +8,7 @@ import {
   ProductionFusedStripProgress,
 } from '@/components/dashboard/ProductionDashboardProgress';
 import type { ProductionProgressSnapshot } from '@/lib/productionProgressMetrics';
-import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/ui/page-shell';
 
 function buildMetrics(
   checklistPct: number,
@@ -95,10 +95,11 @@ export default function ProductionProgressLabPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <h1 className="text-2xl font-bold">Production progress — layout lab</h1>
-      <p className="text-sm text-muted-foreground">
-        Adjust the sliders to preview how each pattern behaves. The dashboard and production screens use the fused strip (variant A).
-      </p>
+      <PageHeader
+        eyebrow="Lab"
+        title="Production progress - layout lab"
+        description="Adjust the sliders to preview how each pattern behaves. The dashboard and production screens use the fused strip (variant A)."
+      />
 
       <Card>
         <CardHeader className="pb-3">

@@ -1623,17 +1623,20 @@ export default function InventoryPage() {
   return (
     <div
       className={cn(
-        "inventory-page w-full min-w-0 max-w-full space-y-1 sm:space-y-4",
+        "inventory-page w-full min-w-0 max-w-full space-y-2 sm:space-y-4",
         isTinyScreen && "h-[calc(100dvh-3.5rem)] overflow-hidden flex flex-col"
       )}
     >
       <div className={cn(
-        "inventory-toolbar sticky top-10 sm:top-16 z-30 space-y-1 sm:space-y-4 bg-background/95 pb-0 sm:pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 shrink-0",
+        "inventory-toolbar sticky top-0 z-30 space-y-2 rounded-lg border bg-background/95 p-2 shadow-ti-sm backdrop-blur supports-[backdrop-filter]:bg-background/85 shrink-0 sm:space-y-4 sm:p-3",
         isTinyScreen && "space-y-1 pb-0"
       )}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
-            <h1 className={cn("shrink-0 text-2xl font-bold", isTinyScreen && "text-xl")}>Inventory</h1>
+            <div className="shrink-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Inventory</div>
+              <h1 className={cn("text-2xl font-semibold tracking-[-0.018em]", isTinyScreen && "text-xl")}>Inventory</h1>
+            </div>
             <div className="min-w-0 flex-1">
               {isTinyScreen ? (
                 <div className="mb-1 flex items-center gap-2">
@@ -1778,7 +1781,7 @@ export default function InventoryPage() {
             </Label>
           </div>
           {!isTinyScreen ? (
-            <div className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2">
+            <div className="flex items-center gap-2 rounded-md border border-border/70 bg-card px-3 py-2 shadow-ti-sm">
               <Switch
                 id="autofit-columns-toggle"
                 checked={isAutoFitEnabled}
@@ -1944,8 +1947,8 @@ export default function InventoryPage() {
         </div>
 
         <div className={cn("hidden sm:flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between", isTinyScreen && "hidden")}>
-        <div className="text-sm text-muted-foreground">
-          {filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'} found
+        <div className="text-sm text-muted-foreground" data-mono>
+          {filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'} · qty {inventoryTotals.totalQuantity.toLocaleString()} · {formatCurrency(inventoryTotals.totalInventoryValue)}
         </div>
         {!isTinyScreen ? (
           <Button variant="outline" onClick={() => setIsExportDialogOpen(true)}>
@@ -1984,7 +1987,7 @@ export default function InventoryPage() {
       )}
 
       <div
-        className="inventory-table-scroll-shell min-w-0 w-full max-w-full bg-card text-card-foreground rounded-lg border shadow-sm relative"
+        className="inventory-table-scroll-shell min-w-0 w-full max-w-full bg-card text-card-foreground rounded-lg border shadow-ti-sm relative"
         data-overflowing={isTableOverflowing ? 'true' : 'false'}
         data-can-scroll-left={canTableScrollLeft ? 'true' : 'false'}
         data-can-scroll-right={canTableScrollRight ? 'true' : 'false'}
@@ -1993,7 +1996,7 @@ export default function InventoryPage() {
         <Table
           containerRef={tableScrollRef}
           containerClassName={cn(
-            "w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x",
+            "w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x border-0 shadow-none",
             isTinyScreen ? "h-full" : "sm:h-auto sm:max-h-[calc(100vh-16rem)]"
           )}
           className={cn(
@@ -2077,7 +2080,7 @@ export default function InventoryPage() {
             {filteredItems.map((item) => (
               <TableRow
                 key={item.id}
-                className={highlightedItemId === item.id ? 'bg-blue-50 dark:bg-blue-950/35 cursor-pointer' : 'cursor-pointer odd:bg-muted/[0.14] even:bg-transparent'}
+                className={highlightedItemId === item.id ? 'bg-ti-info-soft cursor-pointer' : 'cursor-pointer odd:bg-muted/[0.14] even:bg-transparent'}
                 onDoubleClick={() => handleEditItem(item)}
               >
                 <TableCell>

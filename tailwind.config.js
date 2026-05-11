@@ -14,6 +14,11 @@ module.exports = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--ti-font-sans)"],
+        mono: ["var(--ti-font-mono)"],
+        cond: ["var(--ti-font-cond)"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -48,11 +53,51 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        ti: {
+          bg: "var(--ti-bg)",
+          surface: "var(--ti-surface)",
+          "surface-2": "var(--ti-surface-2)",
+          sunken: "var(--ti-sunken)",
+          border: "var(--ti-border)",
+          "border-soft": "var(--ti-border-soft)",
+          divider: "var(--ti-divider)",
+          ink: "var(--ti-ink)",
+          "ink-2": "var(--ti-ink-2)",
+          muted: "var(--ti-muted)",
+          faint: "var(--ti-faint)",
+          accent: "var(--ti-accent)",
+          "accent-soft": "var(--ti-accent-soft)",
+          "accent-ink": "var(--ti-accent-ink)",
+          "on-accent": "var(--ti-on-accent)",
+          success: "var(--ti-success)",
+          "success-soft": "var(--ti-success-soft)",
+          warning: "var(--ti-warning)",
+          "warning-soft": "var(--ti-warning-soft)",
+          danger: "var(--ti-danger)",
+          "danger-soft": "var(--ti-danger-soft)",
+          info: "var(--ti-info)",
+          "info-soft": "var(--ti-info-soft)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "var(--ti-radius-xl)",
+        pill: "var(--ti-radius-pill)",
+      },
+      boxShadow: {
+        "ti-sm": "var(--ti-shadow-sm)",
+        "ti-md": "var(--ti-shadow-md)",
+        "ti-lg": "var(--ti-shadow-lg)",
+      },
+      minHeight: {
+        "ti-row": "var(--ti-row)",
+        "ti-ctrl": "var(--ti-ctrl)",
+      },
+      height: {
+        "ti-row": "var(--ti-row)",
+        "ti-ctrl": "var(--ti-ctrl)",
       },
       keyframes: {
         "accordion-down": {

@@ -175,22 +175,22 @@ export default function App() {
   return (
     <>
       <ErrorBoundary>
-        <div className="flex h-screen overflow-hidden bg-background">
+        <div data-ti className="flex h-screen overflow-hidden bg-background text-foreground">
           <InitialDefaultsDialog
             open={showInitialDefaultsDialog}
             onApply={handleApplySetupDefaults}
             onDismiss={handleDismissSetupDialog}
           />
           <AppSidebar />
-          <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-ti-bg">
             <AppBreadcrumbs />
             <div className="flex-1 overflow-y-auto">
               <main
                 className={cn(
-                  'min-w-0 pt-6 pb-20 md:pb-6',
+                  'min-w-0 pb-24 pt-5 md:pb-6',
                   inventoryFullBleed
                     ? 'box-border w-full max-w-full px-3 sm:px-4 lg:px-6'
-                    : 'mx-auto box-border w-full max-w-[min(100%,1200px)] px-4 sm:px-6 xl:max-w-[1400px]'
+                    : 'mx-auto box-border w-full max-w-[min(100%,1180px)] px-4 sm:px-6 xl:max-w-[1400px]'
                 )}
               >
             <Routes>

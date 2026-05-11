@@ -40,6 +40,7 @@ import { usePlannerListDeleteConfirm } from '@/hooks/usePlannerListDeleteConfirm
 import { LAST_PLANNER_ROUTE_STORAGE_KEY } from '@/lib/navigationReturn';
 import { useHorizontalScrollHints } from '@/components/ui/useHorizontalScrollHints';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/ui/page-shell';
 const PLANNER_TABS = ['checklist', 'vehicles', 'schedule', 'crew', 'overview'] as const;
 type PlannerTab = (typeof PLANNER_TABS)[number];
 
@@ -253,11 +254,12 @@ export default function PlannerWorkspacePage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Planner Workspace</h1>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        eyebrow="Productions"
+        title="Planner Workspace"
+        description="Coordinate checklist, vehicle packlists, crew, and schedule from one production workspace."
+        actions={
+        <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline" size="sm" className="gap-1.5">
             <Link to="/productions">
               <ChevronLeft className="h-3.5 w-3.5" />
@@ -265,9 +267,10 @@ export default function PlannerWorkspacePage() {
             </Link>
           </Button>
         </div>
-      </div>
+        }
+      />
 
-      <div className="rounded-lg border bg-card p-3">
+      <div className="rounded-lg border bg-card p-3 shadow-ti-sm">
         <div className="space-y-1">
           <Label htmlFor="planner-production-select">Production</Label>
           <Select value={productionIdFromQuery || undefined} onValueChange={handleSelectProduction}>
@@ -286,11 +289,11 @@ export default function PlannerWorkspacePage() {
       </div>
 
       {!selectedProduction ? (
-        <p className="rounded-lg border border-dashed px-4 py-8 text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed bg-card px-4 py-8 text-sm text-muted-foreground shadow-ti-sm">
           Select a production to open its planner workspace.
         </p>
       ) : (
-        <div className="space-y-4 rounded-lg border bg-card p-4">
+        <div className="space-y-4 rounded-lg border bg-card p-4 shadow-ti-sm">
           <div className="flex flex-wrap items-center gap-4">
             <p className="text-lg font-semibold">{selectedProduction.name}</p>
             <Button
@@ -326,7 +329,7 @@ export default function PlannerWorkspacePage() {
               <Printer className="h-3.5 w-3.5" aria-hidden />
               Print offline pack
             </Button>
-            <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            <span className="rounded-full border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
               {PRODUCTION_STATUS_LABELS[selectedProduction.status]}
             </span>
             {(selectedProduction.startDate || selectedProduction.endDate) && (

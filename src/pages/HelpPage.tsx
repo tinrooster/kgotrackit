@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/ui/page-shell';
 
 const navLinkClass =
   'block rounded-md px-2 py-1.5 text-sm font-medium text-primary underline-offset-4 hover:bg-muted/40 hover:underline';
@@ -71,22 +72,21 @@ export default function HelpPage() {
     );
 
   return (
-    <div className="container max-w-5xl py-8 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Link>
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <BookOpen className="h-6 w-6" />
-          Help & Documentation
-        </h1>
-      </div>
+    <div className="container max-w-5xl py-4 space-y-6">
+      <PageHeader
+        eyebrow="Reference"
+        title="Help & Documentation"
+        description="Operational notes for inventory, planner, settings, reporting, backups, and team workspaces."
+        icon={<BookOpen className="h-6 w-6" aria-hidden />}
+        actions={
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Link>
+          </Button>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
         <aside className="lg:sticky lg:top-16 lg:self-start">

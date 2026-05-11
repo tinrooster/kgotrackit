@@ -36,6 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { PageHeader, SegmentedControl } from '@/components/ui/page-shell';
 
 const STATUS_FILTERS: (VehicleStatus | 'all')[] = [
   'all', 'in_service', 'spare', 'in_shop', 'limited_use', 'out_of_service',
@@ -126,44 +127,24 @@ export function FleetBoard() {
 
   return (
     <div className="space-y-4">
-      {/* Page header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Fleet</h1>
-          <p className="text-sm text-muted-foreground">
-            News vehicles, crew assignments, and equipment status.
-          </p>
-        </div>
+      <PageHeader
+        eyebrow="Operations"
+        title="Fleet"
+        description="News vehicles, crew assignments, and equipment status."
+        meta={`${vehicles.length} vehicles`}
+        icon={<Truck className="h-6 w-6" aria-hidden />}
+        actions={
         <div className="flex flex-wrap items-center gap-2">
           {/* Board / Log toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setViewMode('board')}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
-                viewMode === 'board'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <Truck className="h-3.5 w-3.5" />
-              Board
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('log')}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 border-l border-border',
-                viewMode === 'log'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <ScrollText className="h-3.5 w-3.5" />
-              Log
-            </button>
-          </div>
+          <SegmentedControl
+            value={viewMode}
+            size="sm"
+            onChange={(value) => setViewMode(value as ViewMode)}
+            options={[
+              { value: 'board', label: 'Board', icon: <Truck className="h-3.5 w-3.5" /> },
+              { value: 'log', label: 'Log', icon: <ScrollText className="h-3.5 w-3.5" /> },
+            ]}
+          />
           <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setShowPhoneRoster(true)}>
             <Phone className="h-3.5 w-3.5" />
             Phone Roster
@@ -185,14 +166,15 @@ export function FleetBoard() {
             </Button>
           )}
         </div>
-      </div>
+        }
+      />
 
       {/* Fleet-wide log view */}
       {viewMode === 'log' && <LogTimeline vehicles={vehicles} canMutate={canMutate} />}
 
       {/* Board content */}
       {viewMode === 'board' && vehicles.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 rounded-lg border bg-card p-2 shadow-ti-sm">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f}
@@ -202,7 +184,7 @@ export function FleetBoard() {
                 'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                 statusFilter === f
                   ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-background text-muted-foreground hover:border-foreground/40 hover:text-foreground',
+                  : 'border-border bg-card text-muted-foreground hover:border-foreground/40 hover:text-foreground',
               )}
             >
               {FILTER_LABELS[f]}
@@ -218,7 +200,7 @@ export function FleetBoard() {
 
       {/* Spare pool rail */}
       {viewMode === 'board' && spareVehicles.length > 0 && statusFilter === 'all' && (
-        <div className="rounded-lg border border-border bg-muted/30">
+        <div className="rounded-lg border border-border bg-muted/40 shadow-ti-sm">
           <button
             type="button"
             className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
@@ -234,7 +216,7 @@ export function FleetBoard() {
                 <button
                   key={v.id}
                   type="button"
-                  className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium shadow-ti-sm transition-colors hover:bg-accent hover:text-accent-foreground"
                   onClick={() => setSelectedVehicle(v)}
                 >
                   <span className="font-bold">{v.code}</span>

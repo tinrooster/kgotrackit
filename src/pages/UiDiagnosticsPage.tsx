@@ -8,6 +8,7 @@ import {
   promoteProductionCrewToDirectory,
   type PromoteProductionCrewResult,
 } from '@/lib/crewDirectoryMigration';
+import { PageHeader } from '@/components/ui/page-shell';
 
 export default function UiDiagnosticsPage() {
   const { activeWorkspaceId, workspaces, selectWorkspace, refreshWorkspaces } = useWorkspace();
@@ -41,10 +42,11 @@ export default function UiDiagnosticsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <h1 className="text-2xl font-bold">UI Diagnostics</h1>
-      <p className="text-sm text-muted-foreground">
-        Developer-only workspace for visual checks and interaction diagnostics.
-      </p>
+      <PageHeader
+        eyebrow="Diagnostics"
+        title="UI Diagnostics"
+        description="Developer-only workspace for visual checks and interaction diagnostics."
+      />
 
       <Card>
         <CardHeader>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ListExpandAllSwitch } from '@/components/ui/list-expand-all-switch';
+import { PageHeader } from '@/components/ui/page-shell';
 
 function FakeToolbar({ children }: { children: ReactNode }) {
   return (
@@ -33,19 +34,22 @@ export default function ExpandCollapseSegmentedLabPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Expand all: switch layouts</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <PageHeader
+        eyebrow="Lab"
+        title="Expand all: switch layouts"
+        description={
+          <>
             Production toolbars use the same pattern as <strong className="font-medium text-foreground">Confirm deletes</strong>
-            : one <code className="rounded bg-muted px-1 py-0.5 text-xs">Switch</code>, tap to flip. No segmented “two links +
-            overlay”.
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/dev">← Developer menu</Link>
-        </Button>
-      </div>
+            : one <code className="rounded bg-muted px-1 py-0.5 text-xs">Switch</code>, tap to flip. No segmented "two links +
+            overlay".
+          </>
+        }
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link to="/dev">Developer menu</Link>
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader>

@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { resolveLocationDisplay } from '@/lib/resolveLocationLabel';
 import { resolveProjectDisplay } from '@/lib/projectOptions';
 import { loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding';
+import { PageHeader } from '@/components/ui/page-shell';
 
 type BuiltInReportId =
   | 'asset-availability'
@@ -730,10 +731,13 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Reports</h1>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Insights"
+        title="Reports"
+        description="Filter, preview, export, print, and summarize inventory data for production handoff."
+        meta={`${filteredItems.length} rows`}
+      />
 
       <Card>
         <CardHeader>
@@ -858,9 +862,9 @@ export default function ReportsPage() {
 
           <div className="space-y-2">
             <Label>Preview</Label>
-            <div className="max-h-72 overflow-auto rounded-md border">
+            <div className="max-h-72 overflow-auto rounded-lg border bg-card shadow-ti-sm">
               <table className="w-full min-w-[900px] table-fixed text-sm">
-                <thead className="bg-muted">
+                <thead className="bg-muted font-cond text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
                   <tr>
                     {selectedReport.columns.map((column) => (
                       <th key={column} className="px-2 py-1 text-left font-medium whitespace-normal break-words [overflow-wrap:anywhere]">{column}</th>
@@ -869,7 +873,7 @@ export default function ReportsPage() {
                 </thead>
                 <tbody>
                   {previewRows.map((row, index) => (
-                    <tr key={index} className="border-t">
+                    <tr key={index} className="border-t odd:bg-muted/[0.14]">
                       {selectedReport.columns.map((column) => (
                         <td key={column} className="px-2 py-1 align-top whitespace-normal break-words [overflow-wrap:anywhere]">{String(row[column] ?? '')}</td>
                       ))}
@@ -933,7 +937,7 @@ export default function ReportsPage() {
             </Button>
           </div>
           {aiSummaryText ? (
-            <pre className="whitespace-pre-wrap rounded-md border border-border bg-muted/25 p-3 text-sm">{aiSummaryText}</pre>
+            <pre className="whitespace-pre-wrap rounded-md border border-border bg-muted/35 p-3 text-sm shadow-ti-sm">{aiSummaryText}</pre>
           ) : (
             <p className="text-sm text-muted-foreground">No summary generated yet.</p>
           )}

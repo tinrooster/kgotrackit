@@ -17,6 +17,7 @@ import { Production, ProductionStatus, PRODUCTION_STATUS_LABELS } from '@/types/
 import { ProductionDashboardProgress } from '@/components/dashboard/ProductionDashboardProgress';
 import { cn } from '@/lib/utils';
 import { productionListingTileClassName } from '@/lib/productionListingTileStyles';
+import { PageHeader } from '@/components/ui/page-shell';
 
 const ACTIVE_PRODUCTION_STATUS_FILTERS: ProductionStatus[] = ['planning', 'confirmed', 'in_progress'];
 const PRODUCTION_STATUS_BADGE_CLASSES: Record<ProductionStatus, string> = {
@@ -205,9 +206,16 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+        title="Dashboard"
+        description={
+          <>
+            <b>{items.length}</b> inventory items tracked. <b>{activeProductions.length}</b> active productions.
+          </>
+        }
+        actions={
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Button onClick={() => navigate('/inventory')} className="w-full shrink-0 sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
@@ -218,7 +226,8 @@ export default function DashboardPage() {
             Manage Productions
           </Button>
         </div>
-      </div>
+        }
+      />
 
       {items.length === 0 ? (
         <Card>

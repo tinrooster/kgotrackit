@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { FlaskConical, Gauge, Layers, Wrench } from 'lucide-react';
 import { replaceProductionsWithInternalDemoSeed } from '@/lib/demoSeed';
+import { PageHeader } from '@/components/ui/page-shell';
 
 const devItems = [
   {
@@ -66,12 +67,16 @@ export default function DevMenuPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <h1 className="text-2xl font-bold">Developer Menu</h1>
-      <p className="text-sm text-muted-foreground">Admin tools and diagnostics.</p>
+      <PageHeader
+        eyebrow="Internal"
+        title="Developer Menu"
+        description="Admin tools and diagnostics."
+        icon={<Wrench className="h-6 w-6" aria-hidden />}
+      />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {devItems.map((item) => (
           <Link key={item.path} to={item.path} className="block">
-            <Card className="h-full transition-colors hover:bg-accent/30">
+            <Card className="h-full transition-colors hover:bg-accent/30 hover:shadow-ti-md">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <item.icon className="h-4 w-4" />

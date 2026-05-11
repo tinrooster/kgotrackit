@@ -25,6 +25,7 @@ import {
   getInventoryProductionAllocationMap,
   INVENTORY_PRODUCTION_ALLOCATION_UPDATED_EVENT,
 } from '@/lib/productionService'
+import { PageHeader } from '@/components/ui/page-shell'
 
 export default function CheckoutPage() {
   const [items, setItems] = useState<InventoryItem[]>([])
@@ -451,12 +452,15 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="checkout-page mx-auto w-full max-w-4xl min-w-0 px-2 py-4 sm:px-4 sm:py-8">
-      <div className="mb-6 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-bold sm:text-2xl">Secure Cabinet Check-In/Out</h1>
-      </div>
+    <div className="checkout-page mx-auto w-full max-w-5xl min-w-0 space-y-5 px-2 py-2 sm:px-4">
+      <PageHeader
+        eyebrow="Cabinet workflow"
+        title="Secure Cabinet Check-In/Out"
+        description="Scan or manually select cabinet inventory, then review recent movement by item or cabinet."
+        icon={<ScanLine className="h-6 w-6" aria-hidden />}
+      />
 
-      <div className="grid gap-6">
+      <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
         <Card>
           <CardHeader className="px-4 pb-3 sm:px-6">
             <CardTitle>Check In/Out Items</CardTitle>
@@ -518,14 +522,14 @@ export default function CheckoutPage() {
               <div className="grid grid-cols-2 gap-2 pt-2 sm:gap-3 sm:pt-4">
                 <Button
                   variant="outline"
-                  className="h-11 w-full border-green-600 bg-green-50 text-green-900 hover:bg-green-100 dark:border-green-700 dark:bg-green-950/50 dark:text-green-50 dark:hover:bg-green-900/40"
+                  className="h-11 w-full border-ti-success bg-ti-success-soft text-ti-success hover:bg-ti-success-soft"
                   onClick={() => handleAction('check-in')}
                 >
                   Check In
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-11 w-full border-red-600 bg-red-50 text-red-900 hover:bg-red-100 dark:border-red-700 dark:bg-red-950/50 dark:text-red-50 dark:hover:bg-red-900/40"
+                  className="h-11 w-full border-destructive bg-ti-danger-soft text-destructive hover:bg-ti-danger-soft"
                   onClick={() => handleAction('check-out')}
                 >
                   Check Out
@@ -563,7 +567,7 @@ export default function CheckoutPage() {
           <CardContent className="relative px-4 pb-4 sm:px-6 sm:pb-6">
             <Tabs value={activityView} onValueChange={(value) => setActivityView(value as 'list' | 'cabinet')}>
               <div className="mb-3 flex flex-col gap-3">
-                <div className="rounded-md border bg-muted/20 p-2">
+                  <div className="rounded-lg border bg-muted/45 p-2 shadow-ti-sm">
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
                     <Input
                       value={activitySearchQuery}
@@ -588,7 +592,7 @@ export default function CheckoutPage() {
                       {sortedActivityList.length} result{sortedActivityList.length === 1 ? '' : 's'}
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/80 bg-background/70 px-2 py-1.5">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/80 bg-card px-2 py-1.5">
                     <span className="text-xs font-medium text-foreground/90">Legend:</span>
                     <Badge className="border border-green-300 bg-green-100 text-green-800 dark:border-green-500/40 dark:bg-green-600/20 dark:text-green-200">
                       Check In

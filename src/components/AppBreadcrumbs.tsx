@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { Bell, ChevronRight, ScanLine, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
@@ -250,18 +250,18 @@ export function AppBreadcrumbs() {
   }, [location.pathname, urlSearch, canManageSharedConfig]);
 
   return (
-    <div className="border-b bg-background/70">
-      <div className="mx-auto w-full max-w-full px-3 py-2 sm:px-4 lg:px-6">
-        <nav aria-label="Breadcrumb" className="flex items-center text-xs text-muted-foreground sm:text-sm">
+    <div className="border-b bg-background/90 backdrop-blur">
+      <div className="mx-auto flex h-14 w-full max-w-full items-center gap-3 px-3 sm:px-4 lg:px-6">
+        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center text-xs text-muted-foreground sm:text-sm">
           {crumbs.map((crumb, index) => {
             const isLast = index === crumbs.length - 1;
             return (
               <Fragment key={`${crumb.href}|${crumb.label}|${index}`}>
                 {index > 0 ? <ChevronRight className="mx-1 h-3.5 w-3.5" aria-hidden /> : null}
                 {isLast ? (
-                  <span className="font-medium text-foreground">{crumb.label}</span>
+                  <span className="truncate font-semibold text-foreground">{crumb.label}</span>
                 ) : (
-                  <Link to={crumb.href} className="hover:text-foreground hover:underline">
+                  <Link to={crumb.href} className="shrink-0 hover:text-foreground hover:underline">
                     {crumb.label}
                   </Link>
                 )}
@@ -269,6 +269,30 @@ export function AppBreadcrumbs() {
             );
           })}
         </nav>
+        <div className="ml-auto hidden items-center gap-2 lg:flex">
+          <div className="flex h-[34px] w-[260px] items-center gap-2 rounded-md border bg-card px-2.5 text-sm text-muted-foreground shadow-ti-sm">
+            <Search className="h-3.5 w-3.5" aria-hidden />
+            <span className="min-w-0 flex-1 truncate">Search SKU, item, person...</span>
+            <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">Ctrl</kbd>
+            <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">K</kbd>
+          </div>
+          <Link
+            to="/checkout"
+            className="grid h-[34px] w-[34px] place-items-center rounded-md border bg-card text-muted-foreground shadow-ti-sm transition-colors hover:text-foreground"
+            title="Open scanner"
+            aria-label="Open scanner"
+          >
+            <ScanLine className="h-4 w-4" aria-hidden />
+          </Link>
+          <button
+            type="button"
+            className="grid h-[34px] w-[34px] place-items-center rounded-md border bg-card text-muted-foreground shadow-ti-sm transition-colors hover:text-foreground"
+            title="Notifications"
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
       </div>
     </div>
   );

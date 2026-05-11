@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-shell';
 
 type Suit = 'S' | 'H' | 'D' | 'C';
 type Card = { rank: number; suit: Suit };
@@ -364,9 +365,13 @@ export default function AboutPage() {
   };
 
   return (
-    <div className="container max-w-4xl py-8 space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+    <div className="container max-w-4xl py-4 space-y-6">
+      <PageHeader
+        eyebrow="Application"
+        title="About TEd_trackIT"
+        description="Scheduling, crew, vehicles, and inventory — personal and team workspaces with role-aware settings."
+        meta={`Version ${APP_VERSION} · ${APP_REVISION}`}
+        icon={
           <button
             type="button"
             tabIndex={-1}
@@ -376,15 +381,8 @@ export default function AboutPage() {
           >
             <Info className="h-6 w-6" />
           </button>
-          About TEd_trackIT
-        </h1>
-        <p className="text-muted-foreground">
-          Scheduling, crew, vehicles, and inventory — personal and team workspaces with role-aware settings.
-        </p>
-        <p className="text-xs text-muted-foreground/70">
-          Version {APP_VERSION} · {APP_REVISION}
-        </p>
-      </div>
+        }
+      />
 
       <Card>
         <CardHeader>
