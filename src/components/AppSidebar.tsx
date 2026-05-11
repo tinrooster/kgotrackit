@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UserMenu } from '@/components/UserMenu'
+import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useOrganization } from '@/contexts/OrganizationContext'
@@ -17,8 +18,29 @@ import {
 } from '@/lib/devMenu'
 import { APP_BRANDING_UPDATED_EVENT, loadAppBranding, resolveBrandLogoForTheme } from '@/lib/appBranding'
 import { getFieldChecklistNavPath, getProductionsNavPath } from '@/lib/navigationReturn'
+import {
+  DEFAULT_MOBILE_BOTTOM_NAV_IDS,
+  getMobileNavItems,
+  normalizeMobileBottomNavIds,
+  type MobileNavItemId,
+} from '@/lib/mobileNavigation'
 
 const COLLAPSED_KEY = 'trackit:sidebar-collapsed'
+
+const mobileNavIcons: Record<MobileNavItemId, LucideIcon> = {
+  home: LayoutDashboard,
+  inventory: List,
+  checkout: ShoppingCart,
+  fieldChecklist: ClipboardList,
+  fleet: Truck,
+  productions: Clapperboard,
+  plant: Cable,
+  reports: FileText,
+  settings: Settings,
+  help: FileText,
+  about: FileText,
+  dev: FlaskConical,
+}
 
 interface NavItem {
   path: string
@@ -84,6 +106,7 @@ export function AppSidebar() {
   const [devMenuEnabled, setDevMenuEnabledState] = useState(() => isDevMenuEnabled())
   const [branding, setBranding] = useState(() => loadAppBranding())
   const [brandLogo, setBrandLogo] = useState(() => resolveBrandLogoForTheme(loadAppBranding()))
+  const [defaultSettings, setDefaultSettings] = useState(() => SettingsService.loadDefaultSettings())
 
   const toggleCollapsed = () => {
     setCollapsed((v) => {
@@ -97,6 +120,12 @@ export function AppSidebar() {
     const sync = () => setDevMenuEnabledState(isDevMenuEnabled())
     window.addEventListener(DEV_MENU_UPDATED_EVENT, sync)
     return () => window.removeEventListener(DEV_MENU_UPDATED_EVENT, sync)
+  }, [])
+
+  useEffect(() => {
+    const sync = () => setDefaultSettings(SettingsService.loadDefaultSettings())
+    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, sync)
+    return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, sync)
   }, [])
 
   useEffect(() => {
@@ -174,14 +203,17 @@ export function AppSidebar() {
     },
   ], [isAdmin, devMenuEnabled])
 
-  // Bottom tab bar items for mobile: keep the five phone-critical field workflows one tap away.
-  const mobileItems: NavItem[] = [
-    { path: '/', label: 'Home', icon: LayoutDashboard },
-    { path: '/inventory', label: 'Inventory', icon: List },
-    { path: '/checkout', label: 'Checkout', icon: ShoppingCart },
-    { path: '/field-checklist', label: 'Field', icon: ClipboardList },
-    { path: '/fleet', label: 'Fleet', icon: Truck, activeBasePath: '/fleet' },
-  ]
+  const currentUsername = (currentUser?.username || currentUser?.displayName || 'default').trim() || 'default'
+  const mobileItems: NavItem[] = getMobileNavItems(
+    normalizeMobileBottomNavIds(defaultSettings.mobileBottomNavByUser?.[currentUsername] ?? DEFAULT_MOBILE_BOTTOM_NAV_IDS)
+  )
+    .filter((item) => !item.adminOnly || isAdmin)
+    .map((item) => ({
+      path: item.path,
+      label: item.shortLabel,
+      icon: mobileNavIcons[item.id],
+      activeBasePath: item.activeBasePath,
+    }))
 
   return (
     <>

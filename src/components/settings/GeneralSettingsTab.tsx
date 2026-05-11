@@ -3,11 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Camera } from 'lucide-react';
 import type { DefaultSettings } from '@/lib/settingsService';
 import { CAMERA_DEVICE_ID_KEY, CAMERA_SETTINGS_UPDATED_EVENT } from "@/components/CameraSettingsDialog";
+import {
+  DEFAULT_MOBILE_BOTTOM_NAV_IDS,
+  MOBILE_NAV_ITEMS,
+  type MobileNavItemId,
+} from '@/lib/mobileNavigation';
 
 interface GeneralSettingsTabProps {
   onOpenCameraSettings: () => void;
@@ -30,6 +36,9 @@ export function GeneralSettingsTab({
   const undoEnabled = settings.undoByUser?.[currentUsername] ?? true;
   const confirmPlannerListDeletes =
     settings.confirmPlannerListDeletesByUser?.[currentUsername] ?? true;
+  const selectedMobileBottomNavIds =
+    settings.mobileBottomNavByUser?.[currentUsername] ?? DEFAULT_MOBILE_BOTTOM_NAV_IDS;
+  const selectedMobileBottomNavSet = new Set(selectedMobileBottomNavIds);
   const [cameraSummary, setCameraSummary] = React.useState('Checking available cameras...');
   const refreshCameraSummary = React.useCallback(async () => {
     const selectedDeviceId = localStorage.getItem(CAMERA_DEVICE_ID_KEY) || '';
@@ -73,6 +82,29 @@ export function GeneralSettingsTab({
       window.removeEventListener(CAMERA_SETTINGS_UPDATED_EVENT, handleCameraUpdated);
     };
   }, [refreshCameraSummary]);
+
+  const handleMobileShortcutChange = (id: MobileNavItemId, checked: boolean) => {
+    const current = settings.mobileBottomNavByUser?.[currentUsername] ?? DEFAULT_MOBILE_BOTTOM_NAV_IDS;
+    const next = checked
+      ? [...current.filter((itemId) => itemId !== id), id].slice(0, 5)
+      : current.filter((itemId) => itemId !== id);
+
+    onSettingsChange({
+      mobileBottomNavByUser: {
+        ...(settings.mobileBottomNavByUser ?? {}),
+        [currentUsername]: next,
+      },
+    });
+  };
+
+  const handleResetMobileShortcuts = () => {
+    onSettingsChange({
+      mobileBottomNavByUser: {
+        ...(settings.mobileBottomNavByUser ?? {}),
+        [currentUsername]: [...DEFAULT_MOBILE_BOTTOM_NAV_IDS],
+      },
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -139,6 +171,42 @@ export function GeneralSettingsTab({
               checked={settings.mobileTabletUi}
               onCheckedChange={(checked) => onSettingsChange({ mobileTabletUi: checked })}
             />
+          </div>
+
+          <div className="space-y-3 rounded-md border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <p className="font-medium">Mobile bottom toolbar</p>
+                <p className="text-xs text-muted-foreground">
+                  Pick up to five shortcuts for this user. Unselected routes stay available under More.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={handleResetMobileShortcuts}>
+                Reset
+              </Button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {MOBILE_NAV_ITEMS.filter((item) => item.id !== 'dev').map((item) => {
+                const checked = selectedMobileBottomNavSet.has(item.id);
+                const disabled = !checked && selectedMobileBottomNavIds.length >= 5;
+                return (
+                  <label
+                    key={item.id}
+                    className="flex items-center gap-3 rounded-md border bg-card px-3 py-2 text-sm"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      disabled={disabled}
+                      onCheckedChange={(value) => handleMobileShortcutChange(item.id, value === true)}
+                    />
+                    <span className="min-w-0 flex-1">{item.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {selectedMobileBottomNavIds.length}/5 selected
+            </p>
           </div>
         </CardContent>
       </Card>

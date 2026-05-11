@@ -13,6 +13,7 @@ import {
   ScanLine,
   Search,
   Settings,
+  Truck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -24,6 +25,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DEFAULT_SETTINGS_CHANGED_EVENT, SettingsService } from '@/lib/settingsService';
+import {
+  DEFAULT_MOBILE_BOTTOM_NAV_IDS,
+  MOBILE_NAV_ITEMS,
+  normalizeMobileBottomNavIds,
+  type MobileNavItemId,
+} from '@/lib/mobileNavigation';
 import {
   ORGANIZATION_SETTINGS_SUB_TAB_IDS,
   type OrganizationSettingsSubTabId,
@@ -109,6 +117,17 @@ const PLANNER_TAB_LABELS: Record<string, string> = {
   overview: 'Overview',
 };
 
+const moreNavIcons: Partial<Record<MobileNavItemId, typeof Cable>> = {
+  productions: Clapperboard,
+  plant: Cable,
+  reports: FileText,
+  settings: Settings,
+  help: HelpCircle,
+  about: Info,
+  dev: FlaskConical,
+  fleet: Truck,
+};
+
 function titleize(segment: string): string {
   return segment
     .split('-')
@@ -123,6 +142,7 @@ export function AppBreadcrumbs() {
   const { activeWorkspaceId, activeWorkspaceRole } = useWorkspace();
   /** Mirrors query string: React Router updates + replaceState (Settings) via URL_SYNC_EVENT. */
   const [urlSearch, setUrlSearch] = useState(location.search);
+  const [defaultSettings, setDefaultSettings] = useState(() => SettingsService.loadDefaultSettings());
 
   useEffect(() => {
     setUrlSearch(location.search);
@@ -138,6 +158,22 @@ export function AppBreadcrumbs() {
     };
   }, []);
   const canManageSharedConfig = activeWorkspaceId ? activeWorkspaceRole === 'admin' : currentUser?.role === 'admin';
+  const currentUsername = (currentUser?.username || currentUser?.displayName || 'default').trim() || 'default';
+  const mobileBottomIds = normalizeMobileBottomNavIds(
+    defaultSettings.mobileBottomNavByUser?.[currentUsername] ?? DEFAULT_MOBILE_BOTTOM_NAV_IDS
+  );
+  const moreItems = MOBILE_NAV_ITEMS.filter((item) => {
+    if (mobileBottomIds.includes(item.id)) return false;
+    if (item.id === 'home' || item.id === 'inventory' || item.id === 'checkout' || item.id === 'fieldChecklist') return false;
+    if (item.adminOnly && !canManageSharedConfig) return false;
+    return true;
+  });
+
+  useEffect(() => {
+    const sync = () => setDefaultSettings(SettingsService.loadDefaultSettings());
+    window.addEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(DEFAULT_SETTINGS_CHANGED_EVENT, sync);
+  }, []);
 
   const crumbs = useMemo(() => {
     const segments = location.pathname.split('/').filter(Boolean);
@@ -304,54 +340,21 @@ export function AppBreadcrumbs() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>More</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/productions" className="gap-2">
-                <Clapperboard className="h-4 w-4" aria-hidden />
-                Productions
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/plant" className="gap-2">
-                <Cable className="h-4 w-4" aria-hidden />
-                Plant
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/reports" className="gap-2">
-                <FileText className="h-4 w-4" aria-hidden />
-                Reports
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/settings" className="gap-2">
-                <Settings className="h-4 w-4" aria-hidden />
-                Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/help" className="gap-2">
-                <HelpCircle className="h-4 w-4" aria-hidden />
-                Help
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/about" className="gap-2">
-                <Info className="h-4 w-4" aria-hidden />
-                About
-              </Link>
-            </DropdownMenuItem>
-            {canManageSharedConfig ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/dev" className="gap-2">
-                    <FlaskConical className="h-4 w-4" aria-hidden />
-                    Dev
-                  </Link>
-                </DropdownMenuItem>
-              </>
-            ) : null}
+            {moreItems.map((item, index) => {
+              const Icon = moreNavIcons[item.id] ?? FileText;
+              const shouldSeparate = index > 0 && item.id === 'help';
+              return (
+                <Fragment key={item.id}>
+                  {shouldSeparate ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem asChild>
+                    <Link to={item.path} className="gap-2">
+                      <Icon className="h-4 w-4" aria-hidden />
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                </Fragment>
+              );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="ml-auto hidden items-center gap-2 lg:flex">

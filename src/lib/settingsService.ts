@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Cabinet, CabinetWithItems } from "@/types/cabinets";
 import { SETTINGS_UPDATED_EVENT } from "@/lib/storageService";
 import { requestCloudSync } from "@/lib/cloudSyncEvents";
+import { MOBILE_NAV_ITEM_IDS } from "@/lib/mobileNavigation";
 
 /** Dispatched on window after default UI settings are persisted (theme, density, mobile layout). */
 export const DEFAULT_SETTINGS_CHANGED_EVENT = "trackit:default-settings-changed";
@@ -153,6 +154,8 @@ export const defaultSettingsSchema = z.object({
   undoByUser: z.record(z.string(), z.boolean()).default({}),
   /** Confirm checklist / packlist / crew / schedule line deletes in planner & production detail. */
   confirmPlannerListDeletesByUser: z.record(z.string(), z.boolean()).default({}),
+  /** Per-user mobile bottom toolbar route ids, capped at five visible shortcuts. */
+  mobileBottomNavByUser: z.record(z.string(), z.array(z.enum(MOBILE_NAV_ITEM_IDS)).max(5)).default({}),
 });
 
 export type DefaultSettings = z.infer<typeof defaultSettingsSchema>;
@@ -224,6 +227,7 @@ export class SettingsService {
       deleteConfirmationByUser: {},
       undoByUser: {},
       confirmPlannerListDeletesByUser: {},
+      mobileBottomNavByUser: {},
     };
   }
 
