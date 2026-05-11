@@ -559,16 +559,8 @@ export default function FieldChecklistPage() {
   );
 
   return (
-    <div
-      className={cn(
-        'field-checklist-page mx-auto w-full min-w-0',
-        touch
-          ? 'max-w-lg px-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-3 sm:px-4 sm:pb-8 sm:pt-6'
-          : 'max-w-[min(100%,1200px)] px-4 py-6 sm:px-6'
-      )}
-    >
+    <div className="field-checklist-page mx-auto w-full max-w-3xl min-w-0 space-y-5 px-2 py-2 sm:px-4">
       <PageHeader
-        className="mb-4"
         eyebrow="Field workflow"
         title="Field checklist"
         description={selectedProduction ? selectedProduction.name : 'Select a confirmed or in-progress production.'}
@@ -584,11 +576,15 @@ export default function FieldChecklistPage() {
         ) : null}
       />
 
-      <Card className="mb-4">
-        <CardHeader className="px-4 pb-2 pt-4 sm:px-6">
+      <div className="grid gap-5">
+      <Card>
+        <CardHeader className="px-4 pb-3 sm:px-6">
           <CardTitle className={touch ? 'text-base' : 'text-sm font-semibold'}>Production</CardTitle>
+          <CardDescription>
+            Choose a confirmed or in-progress production before checking field rows.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="px-4 pb-4 sm:px-6">
+        <CardContent className="relative px-4 pb-4 sm:px-6 sm:pb-6">
           {activeProductions.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No productions in Confirmed or In progress. Update status on the Productions page.
@@ -622,188 +618,198 @@ export default function FieldChecklistPage() {
       ) : null}
 
       {!selectedProduction ? (
-        <p className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-ti-sm">
           Select a production.
         </p>
       ) : (
-        <Tabs defaultValue="checklist" className="w-full">
-          <TabsList
-            className={cn(
-              'grid w-full grid-cols-2 rounded-lg p-1',
-              touch ? 'h-12' : 'h-10'
-            )}
-          >
-            <TabsTrigger value="checklist" className={touch ? 'text-sm sm:text-base' : 'text-sm'}>
-              Checklist
-            </TabsTrigger>
-            <TabsTrigger value="vehicle" className={touch ? 'text-sm sm:text-base' : 'text-sm'}>
-              Vehicle checks
-            </TabsTrigger>
-          </TabsList>
+        <Card>
+          <CardHeader className="px-4 pb-3 sm:px-6">
+            <CardTitle className={touch ? 'text-base' : 'text-sm font-semibold'}>Field Verification</CardTitle>
+            <CardDescription>
+              Check production gear and vehicle loads using the same field workflow.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="relative px-4 pb-4 sm:px-6 sm:pb-6">
+            <Tabs defaultValue="checklist" className="w-full">
+              <TabsList
+                className={cn(
+                  'grid w-full grid-cols-2 rounded-lg p-1',
+                  touch ? 'h-12' : 'h-10'
+                )}
+              >
+                <TabsTrigger value="checklist" className={touch ? 'text-sm sm:text-base' : 'text-sm'}>
+                  Checklist
+                </TabsTrigger>
+                <TabsTrigger value="vehicle" className={touch ? 'text-sm sm:text-base' : 'text-sm'}>
+                  Vehicle checks
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="checklist" className="mt-4 space-y-3 outline-none">
-            {selectedProduction.checklistGroups.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No checklist sections yet.</p>
-            ) : touch ? (
-              selectedProduction.checklistGroups.map((group) => (
-                <details
-                  key={group.id}
-                  className="group overflow-hidden rounded-lg border border-border/90 bg-card shadow-ti-sm"
-                  style={{
-                    borderLeftWidth: 4,
-                    borderLeftColor: getStableGroupAccentHex(group.title),
-                  }}
-                >
-                  <summary
-                    className={cn(
-                      'flex cursor-pointer list-none items-center justify-between gap-2 border-b border-border/60 bg-muted/50 text-left font-medium marker:content-none [&::-webkit-details-marker]:hidden',
-                      'px-4 py-3 text-[15px] transition-colors hover:bg-muted/70'
-                    )}
-                  >
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      <span className="min-w-0 truncate">{group.title}</span>
-                      <FieldChecklistProgressBadge {...countChecklistCompletion(group.items)} />
-                    </span>
-                    <ChevronDown className="h-4 w-4 shrink-0 opacity-60 transition-transform duration-200 group-open:rotate-180" />
-                  </summary>
-                    <div className="bg-muted/35 px-2 py-2">
-                    <div className="ml-1 border-l-2 border-border/60 pl-3 sm:ml-2 sm:pl-4">
-                      <ul className="divide-y divide-border/50 rounded-md border border-border/40 bg-background/80">
-                        {group.items.map((item) => (
-                          <li key={item.id} className="flex gap-3 px-3 py-3">
-                            <Checkbox
-                              id={`cl-${item.id}`}
-                              checked={item.completed}
-                              className="mt-0.5 h-6 w-6 shrink-0 touch-manipulation"
-                              onCheckedChange={(v) =>
-                                onToggleChecklistItem(
-                                  selectedProduction,
-                                  group.title,
-                                  group.id,
-                                  item,
-                                  v === true
-                                )
-                              }
-                            />
-                            <div className="min-w-0 flex-1">
-                              <Label
-                                htmlFor={`cl-${item.id}`}
-                                className="cursor-pointer text-base font-medium leading-snug"
-                              >
-                                {item.label}
-                                {item.quantity != null && item.quantity > 1 ? (
-                                  <span className="ml-1.5 inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-border bg-muted/70 px-1.5 py-0.5 align-middle text-xs font-semibold tabular-nums text-foreground shadow-sm">
-                                    ×{item.quantity}
-                                  </span>
-                                ) : null}
-                              </Label>
-                              {item.completed && item.fieldCompletedAt && (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {item.fieldCompletedBy ?? userLabel} ·{' '}
-                                  {format(new Date(item.fieldCompletedAt), 'MMM d, h:mm a')}
-                                </p>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </details>
-              ))
-            ) : (
-              <ChecklistEditor
-                groups={selectedProduction.checklistGroups}
-                onChange={handleDesktopChecklistChange}
-                inventoryItems={inventoryItems}
-                requireDeleteConfirm
-                mergeOnCompletionToggle={(item, completed) => {
-                  const next = applyFieldAudit(item, completed, userLabel);
-                  return {
-                    completed: next.completed,
-                    fieldCompletedAt: next.fieldCompletedAt,
-                    fieldCompletedBy: next.fieldCompletedBy,
-                  };
-                }}
-                onCompletionToggle={({ groupTitle, item, completed }) => {
-                  logAndRemember({
-                    productionId: selectedProduction.id,
-                    productionName: selectedProduction.name,
-                    scope: 'checklist',
-                    groupTitle,
-                    itemLabel: item.label,
-                    completed,
-                  });
-                }}
-                renderItemBelowLabel={(item) =>
-                  item.completed && item.fieldCompletedAt ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {item.fieldCompletedBy ?? userLabel} ·{' '}
-                      {format(new Date(item.fieldCompletedAt), 'MMM d, h:mm a')}
-                    </p>
-                  ) : null
-                }
-              />
-            )}
-          </TabsContent>
+              <TabsContent value="checklist" className="mt-4 space-y-3 outline-none">
+                {selectedProduction.checklistGroups.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No checklist sections yet.</p>
+                ) : touch ? (
+                  selectedProduction.checklistGroups.map((group) => (
+                    <details
+                      key={group.id}
+                      className="group overflow-hidden rounded-lg border border-border/90 bg-card shadow-ti-sm"
+                      style={{
+                        borderLeftWidth: 4,
+                        borderLeftColor: getStableGroupAccentHex(group.title),
+                      }}
+                    >
+                      <summary
+                        className={cn(
+                          'flex cursor-pointer list-none items-center justify-between gap-2 border-b border-border/60 bg-muted/50 text-left font-medium marker:content-none [&::-webkit-details-marker]:hidden',
+                          'px-4 py-3 text-[15px] transition-colors hover:bg-muted/70'
+                        )}
+                      >
+                        <span className="flex min-w-0 flex-1 items-center gap-2">
+                          <span className="min-w-0 truncate">{group.title}</span>
+                          <FieldChecklistProgressBadge {...countChecklistCompletion(group.items)} />
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-60 transition-transform duration-200 group-open:rotate-180" />
+                      </summary>
+                      <div className="bg-muted/35 px-2 py-2">
+                        <div className="ml-1 border-l-2 border-border/60 pl-3 sm:ml-2 sm:pl-4">
+                          <ul className="divide-y divide-border/50 rounded-md border border-border/40 bg-background/80">
+                            {group.items.map((item) => (
+                              <li key={item.id} className="flex gap-3 px-3 py-3">
+                                <Checkbox
+                                  id={`cl-${item.id}`}
+                                  checked={item.completed}
+                                  className="mt-0.5 h-6 w-6 shrink-0 touch-manipulation"
+                                  onCheckedChange={(v) =>
+                                    onToggleChecklistItem(
+                                      selectedProduction,
+                                      group.title,
+                                      group.id,
+                                      item,
+                                      v === true
+                                    )
+                                  }
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <Label
+                                    htmlFor={`cl-${item.id}`}
+                                    className="cursor-pointer text-base font-medium leading-snug"
+                                  >
+                                    {item.label}
+                                    {item.quantity != null && item.quantity > 1 ? (
+                                      <span className="ml-1.5 inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-border bg-muted/70 px-1.5 py-0.5 align-middle text-xs font-semibold tabular-nums text-foreground shadow-sm">
+                                        ×{item.quantity}
+                                      </span>
+                                    ) : null}
+                                  </Label>
+                                  {item.completed && item.fieldCompletedAt && (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {item.fieldCompletedBy ?? userLabel} ·{' '}
+                                      {format(new Date(item.fieldCompletedAt), 'MMM d, h:mm a')}
+                                    </p>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </details>
+                  ))
+                ) : (
+                  <ChecklistEditor
+                    groups={selectedProduction.checklistGroups}
+                    onChange={handleDesktopChecklistChange}
+                    inventoryItems={inventoryItems}
+                    requireDeleteConfirm
+                    mergeOnCompletionToggle={(item, completed) => {
+                      const next = applyFieldAudit(item, completed, userLabel);
+                      return {
+                        completed: next.completed,
+                        fieldCompletedAt: next.fieldCompletedAt,
+                        fieldCompletedBy: next.fieldCompletedBy,
+                      };
+                    }}
+                    onCompletionToggle={({ groupTitle, item, completed }) => {
+                      logAndRemember({
+                        productionId: selectedProduction.id,
+                        productionName: selectedProduction.name,
+                        scope: 'checklist',
+                        groupTitle,
+                        itemLabel: item.label,
+                        completed,
+                      });
+                    }}
+                    renderItemBelowLabel={(item) =>
+                      item.completed && item.fieldCompletedAt ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {item.fieldCompletedBy ?? userLabel} ·{' '}
+                          {format(new Date(item.fieldCompletedAt), 'MMM d, h:mm a')}
+                        </p>
+                      ) : null
+                    }
+                  />
+                )}
+              </TabsContent>
 
-          <TabsContent value="vehicle" className="mt-4 space-y-4 outline-none">
-            {selectedProduction.vehiclePacklists.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No vehicle packlists yet.</p>
-            ) : touch ? (
-              selectedProduction.vehiclePacklists.map((packlist) => (
-                <VehiclePacklistTouchBlock
-                  key={packlist.id}
-                  production={selectedProduction}
-                  packlist={packlist}
-                  userLabel={userLabel}
-                  onToggle={onToggleTruckItem}
-                />
-              ))
-            ) : (
-              <VehiclePacklistEditor
-                packlists={selectedProduction.vehiclePacklists}
-                onChange={handleDesktopVehiclePacklistsChange}
-                checklistGroups={selectedProduction.checklistGroups}
-                onChecklistGroupsChange={handleChecklistGroupsWhenMirroredFromPack}
-                inventoryItems={inventoryItems}
-                requireDeleteConfirm
-                suppressFooterHint
-                mergeOnPackCompletionToggle={(item, completed) => {
-                  const next = applyFieldAudit(item, completed, userLabel);
-                  return {
-                    completed: next.completed,
-                    fieldCompletedAt: next.fieldCompletedAt,
-                    fieldCompletedBy: next.fieldCompletedBy,
-                  };
-                }}
-                onPackCompletionToggle={({ vehicleName, sectionTitle, item, completed }) => {
-                  logAndRemember({
-                    productionId: selectedProduction.id,
-                    productionName: selectedProduction.name,
-                    scope: 'truck',
-                    vehicleName,
-                    sectionTitle,
-                    itemLabel: item.label,
-                    completed,
-                  });
-                }}
-                renderPackItemBelowLabel={(item) =>
-                  item.completed && item.fieldCompletedAt ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {item.fieldCompletedBy ?? userLabel} ·{' '}
-                      {format(new Date(item.fieldCompletedAt), 'MMM d, h:mm a')}
-                    </p>
-                  ) : null
-                }
-              />
-            )}
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="vehicle" className="mt-4 space-y-4 outline-none">
+                {selectedProduction.vehiclePacklists.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No vehicle packlists yet.</p>
+                ) : touch ? (
+                  selectedProduction.vehiclePacklists.map((packlist) => (
+                    <VehiclePacklistTouchBlock
+                      key={packlist.id}
+                      production={selectedProduction}
+                      packlist={packlist}
+                      userLabel={userLabel}
+                      onToggle={onToggleTruckItem}
+                    />
+                  ))
+                ) : (
+                  <VehiclePacklistEditor
+                    packlists={selectedProduction.vehiclePacklists}
+                    onChange={handleDesktopVehiclePacklistsChange}
+                    checklistGroups={selectedProduction.checklistGroups}
+                    onChecklistGroupsChange={handleChecklistGroupsWhenMirroredFromPack}
+                    inventoryItems={inventoryItems}
+                    requireDeleteConfirm
+                    suppressFooterHint
+                    mergeOnPackCompletionToggle={(item, completed) => {
+                      const next = applyFieldAudit(item, completed, userLabel);
+                      return {
+                        completed: next.completed,
+                        fieldCompletedAt: next.fieldCompletedAt,
+                        fieldCompletedBy: next.fieldCompletedBy,
+                      };
+                    }}
+                    onPackCompletionToggle={({ vehicleName, sectionTitle, item, completed }) => {
+                      logAndRemember({
+                        productionId: selectedProduction.id,
+                        productionName: selectedProduction.name,
+                        scope: 'truck',
+                        vehicleName,
+                        sectionTitle,
+                        itemLabel: item.label,
+                        completed,
+                      });
+                    }}
+                    renderPackItemBelowLabel={(item) =>
+                      item.completed && item.fieldCompletedAt ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {item.fieldCompletedBy ?? userLabel} ·{' '}
+                          {format(new Date(item.fieldCompletedAt), 'MMM d, h:mm a')}
+                        </p>
+                      ) : null
+                    }
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       )}
 
-      <Card className="mt-6">
-        <CardHeader className="px-4 pb-2 pt-4 sm:px-6">
+      <Card>
+        <CardHeader className="px-4 pb-3 sm:px-6">
           <CardTitle className={touch ? 'text-base' : 'text-sm font-semibold'}>Recent activity</CardTitle>
           <CardDescription>
             Latest verification per line item (on vehicle vs missing). Follow up on anything flagged.
@@ -974,6 +980,7 @@ export default function FieldChecklistPage() {
           </Tabs>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

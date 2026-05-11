@@ -1,8 +1,29 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, ChevronRight, ScanLine, Search } from 'lucide-react';
+import {
+  Bell,
+  Cable,
+  ChevronRight,
+  Clapperboard,
+  FileText,
+  FlaskConical,
+  HelpCircle,
+  Info,
+  Menu,
+  ScanLine,
+  Search,
+  Settings,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   ORGANIZATION_SETTINGS_SUB_TAB_IDS,
   type OrganizationSettingsSubTabId,
@@ -269,6 +290,70 @@ export function AppBreadcrumbs() {
             );
           })}
         </nav>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="ml-auto grid h-9 w-9 place-items-center rounded-md border bg-card text-muted-foreground shadow-ti-sm transition-colors hover:text-foreground md:hidden"
+              aria-label="Open more navigation"
+              title="More"
+            >
+              <Menu className="h-4 w-4" aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>More</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/productions" className="gap-2">
+                <Clapperboard className="h-4 w-4" aria-hidden />
+                Productions
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/plant" className="gap-2">
+                <Cable className="h-4 w-4" aria-hidden />
+                Plant
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/reports" className="gap-2">
+                <FileText className="h-4 w-4" aria-hidden />
+                Reports
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/settings" className="gap-2">
+                <Settings className="h-4 w-4" aria-hidden />
+                Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/help" className="gap-2">
+                <HelpCircle className="h-4 w-4" aria-hidden />
+                Help
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/about" className="gap-2">
+                <Info className="h-4 w-4" aria-hidden />
+                About
+              </Link>
+            </DropdownMenuItem>
+            {canManageSharedConfig ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/dev" className="gap-2">
+                    <FlaskConical className="h-4 w-4" aria-hidden />
+                    Dev
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="ml-auto hidden items-center gap-2 lg:flex">
           <div className="flex h-[34px] w-[260px] items-center gap-2 rounded-md border bg-card px-2.5 text-sm text-muted-foreground shadow-ti-sm">
             <Search className="h-3.5 w-3.5" aria-hidden />
