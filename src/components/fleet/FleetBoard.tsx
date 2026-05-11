@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Truck } from 'lucide-react';
+import { Plus, Truck, ScrollText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VehicleCard } from './VehicleCard';
 import { VehicleEditDialog } from './VehicleEditDialog';
 import { VehicleDetailSheet } from './VehicleDetailSheet';
+import { LogTimeline } from './LogTimeline';
 import {
   FLEET_UPDATED_EVENT,
   getFleet,
@@ -37,8 +38,11 @@ const FILTER_LABELS: Record<VehicleStatus | 'all', string> = {
   ...VEHICLE_STATUS_LABELS,
 };
 
+type ViewMode = 'board' | 'log';
+
 export function FleetBoard() {
   const canMutate = useCanMutateAppData();
+  const [viewMode, setViewMode] = useState<ViewMode>('board');
   const [vehicles, setVehicles] = useState(() => getFleet().vehicles);
   const [statusFilter, setStatusFilter] = useState<VehicleStatus | 'all'>('all');
   const [selectedVehicle, setSelectedVehicle] = useState<FleetVehicle | null>(null);
@@ -97,16 +101,50 @@ export function FleetBoard() {
             News vehicles, crew assignments, and equipment status.
           </p>
         </div>
-        {canMutate && (
-          <Button onClick={() => setEditTarget('new')} className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            Add Vehicle
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Board / Log toggle */}
+          <div className="flex rounded-md border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setViewMode('board')}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
+                viewMode === 'board'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Truck className="h-3.5 w-3.5" />
+              Board
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('log')}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 border-l border-border',
+                viewMode === 'log'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <ScrollText className="h-3.5 w-3.5" />
+              Log
+            </button>
+          </div>
+          {canMutate && viewMode === 'board' && (
+            <Button onClick={() => setEditTarget('new')} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Add Vehicle
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Filter chips */}
-      {vehicles.length > 0 && (
+      {/* Fleet-wide log view */}
+      {viewMode === 'log' && <LogTimeline vehicles={vehicles} canMutate={canMutate} />}
+
+      {/* Board content */}
+      {viewMode === 'board' && vehicles.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -131,50 +169,53 @@ export function FleetBoard() {
         </div>
       )}
 
-      {/* Empty state */}
-      {vehicles.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
-          <Truck className="mb-3 h-10 w-10 text-muted-foreground/30" />
-          <p className="text-base font-medium">No vehicles yet</p>
-          {canMutate ? (
-            <div className="mt-4 flex flex-col items-center gap-2">
-              <Button onClick={handleSeed} variant="default">
-                Seed default roster
-                <span className="ml-1.5 text-xs opacity-75">(M1–M25 + specials)</span>
-              </Button>
-              <p className="text-xs text-muted-foreground">or</p>
-              <Button variant="outline" onClick={() => setEditTarget('new')}>
-                Add vehicle manually
-              </Button>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-muted-foreground">Ask an admin to add vehicles.</p>
-          )}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-          No vehicles match this filter.
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {filtered.map((v) => (
-            <VehicleCard
-              key={v.id}
-              vehicle={v}
-              defaultOperatorName={getDefaultOperator(v)}
-              onClick={setSelectedVehicle}
-              onEdit={canMutate ? (veh) => setEditTarget(veh) : undefined}
-              onStatusChange={canMutate ? (veh, status) => { setVehicleStatus(veh.id, status); } : undefined}
-              onDelete={canMutate ? setDeleteTarget : undefined}
-            />
-          ))}
-        </div>
+      {/* Empty state / grid */}
+      {viewMode === 'board' && (
+        vehicles.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+            <Truck className="mb-3 h-10 w-10 text-muted-foreground/30" />
+            <p className="text-base font-medium">No vehicles yet</p>
+            {canMutate ? (
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <Button onClick={handleSeed} variant="default">
+                  Seed default roster
+                  <span className="ml-1.5 text-xs opacity-75">(M1–M25 + specials)</span>
+                </Button>
+                <p className="text-xs text-muted-foreground">or</p>
+                <Button variant="outline" onClick={() => setEditTarget('new')}>
+                  Add vehicle manually
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Ask an admin to add vehicles.</p>
+            )}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+            No vehicles match this filter.
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {filtered.map((v) => (
+              <VehicleCard
+                key={v.id}
+                vehicle={v}
+                defaultOperatorName={getDefaultOperator(v)}
+                onClick={setSelectedVehicle}
+                onEdit={canMutate ? (veh) => setEditTarget(veh) : undefined}
+                onStatusChange={canMutate ? (veh, status) => { setVehicleStatus(veh.id, status); } : undefined}
+                onDelete={canMutate ? setDeleteTarget : undefined}
+              />
+            ))}
+          </div>
+        )
       )}
 
       {/* Detail sheet */}
       <VehicleDetailSheet
         vehicle={selectedVehicle}
         defaultOperatorName={selectedVehicle ? getDefaultOperator(selectedVehicle) : undefined}
+        canMutate={canMutate}
         onClose={() => setSelectedVehicle(null)}
         onEdit={canMutate ? (v) => { setEditTarget(v); } : undefined}
       />

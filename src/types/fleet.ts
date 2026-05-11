@@ -135,3 +135,113 @@ export const VEHICLE_STATUS_BADGE_CLASSES: Record<VehicleStatus, string> = {
   out_of_service: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
   limited_use: 'border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300',
 };
+
+export const SUBSYSTEM_KIND_LABELS: Record<VehicleSubsystem['kind'], string> = {
+  dejero: 'Dejero',
+  modem: 'Modem',
+  p2_reader: 'P2 Reader',
+  microwave_mast: 'Microwave / Mast',
+  sat_dish: 'Satellite / Dish',
+  air_pressure: 'Air Pressure',
+  laptop: 'Laptop / Edit',
+  camera: 'Camera',
+  audio: 'Audio',
+  vehicle_mech: 'Vehicle / Mechanical',
+  other: 'Other',
+};
+
+export const SUBSYSTEM_KIND_OPTIONS: { value: VehicleSubsystem['kind']; label: string }[] = (
+  Object.entries(SUBSYSTEM_KIND_LABELS) as [VehicleSubsystem['kind'], string][]
+).map(([value, label]) => ({ value, label }));
+
+export const SUBSYSTEM_STATUS_LABELS: Record<SubsystemStatus, string> = {
+  operational: 'Operational',
+  degraded: 'Degraded',
+  down: 'Down',
+  loaned_out: 'Loaned Out',
+  loaned_in: 'Loaned In',
+  awaiting_repair: 'Awaiting Repair',
+};
+
+export const SUBSYSTEM_STATUS_OPTIONS: { value: SubsystemStatus; label: string }[] = [
+  { value: 'operational', label: 'Operational' },
+  { value: 'degraded', label: 'Degraded' },
+  { value: 'down', label: 'Down' },
+  { value: 'loaned_out', label: 'Loaned Out' },
+  { value: 'loaned_in', label: 'Loaned In' },
+  { value: 'awaiting_repair', label: 'Awaiting Repair' },
+];
+
+export const SUBSYSTEM_STATUS_BADGE_CLASSES: Record<SubsystemStatus, string> = {
+  operational: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  degraded: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  down: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
+  loaned_out: 'border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300',
+  loaned_in: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  awaiting_repair: 'border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300',
+};
+
+export const SCHEDULED_WORK_STATUS_LABELS: Record<ScheduledWorkStatus, string> = {
+  scheduled: 'Scheduled',
+  in_progress: 'In Progress',
+  done: 'Done',
+  cancelled: 'Cancelled',
+};
+
+export const SCHEDULED_WORK_STATUS_OPTIONS: { value: ScheduledWorkStatus; label: string }[] = [
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'done', label: 'Done' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+export const SCHEDULED_WORK_STATUS_BADGE_CLASSES: Record<ScheduledWorkStatus, string> = {
+  scheduled: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  in_progress: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  done: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  cancelled: 'border-muted-foreground/30 bg-muted/30 text-muted-foreground',
+};
+
+// ---------------------------------------------------------------------------
+// Fleet log
+// ---------------------------------------------------------------------------
+
+export interface FleetLogEntry {
+  id: string;
+  organizationId: string;
+  occurredAt: string;
+  authorUserId: string;
+  authorDisplayName?: string;   // denormalized at write time
+  vehicleIds: string[];
+  category: LogCategory;
+  body: string;
+  attachmentUrls?: string[];
+  scheduledWorkId?: string;
+}
+
+export const LOG_CATEGORY_LABELS: Record<LogCategory, string> = {
+  issue: 'Issue',
+  scheduled: 'Scheduled',
+  resolved: 'Resolved',
+  reassignment: 'Reassignment',
+  location: 'Location',
+  info: 'Info',
+};
+
+export const LOG_CATEGORY_OPTIONS: { value: LogCategory; label: string }[] = [
+  { value: 'issue', label: 'Issue' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'reassignment', label: 'Reassignment' },
+  { value: 'location', label: 'Location' },
+  { value: 'info', label: 'Info' },
+];
+
+export const LOG_CATEGORY_BADGE_CLASSES: Record<LogCategory, string> = {
+  issue: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
+  scheduled: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  resolved: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  reassignment: 'border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300',
+  location: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  info: 'border-muted-foreground/30 bg-muted/30 text-muted-foreground',
+};

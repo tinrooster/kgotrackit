@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   Cable, ChevronLeft, ChevronRight, ClipboardList, Clapperboard,
   FileText, FlaskConical, LayoutDashboard, List, Settings, ShoppingCart, Truck,
+  type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UserMenu } from '@/components/UserMenu'
@@ -23,7 +24,7 @@ const COLLAPSED_KEY = 'trackit:sidebar-collapsed'
 interface NavItem {
   path: string
   label: string
-  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+  icon: LucideIcon
   activeBasePath?: string
 }
 
